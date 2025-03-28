@@ -60,21 +60,21 @@ export const Login: React.FC = () => {
     setMessage('');
 
     try {
-      // First try to sign in with email/password
-      const { error: signInError } = await signIn(email, password);
+      // First check if the user exists and what provider they used
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (signInError) {
-        // If email/password fails, check if the user exists with Google OAuth
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) throw userError;
-        
-        if (user?.app_metadata.provider === 'google') {
-          setError('This account was created with Google. Please use the "Sign in with Google" button below.');
-          return;
-        }
-        
-        throw signInError;
+      if (userError) {
+        // If user doesn't exist, try email/password login
+        const { error: signInError } = await signIn(email, password);
+        if (signInError) throw signInError;
+      } else if (user?.app_metadata.provider === 'google') {
+        // If user exists and was created with Google, show appropriate message
+        setError('This account was created with Google. Please use the "Sign in with Google" button below.');
+        return;
+      } else {
+        // If user exists and wasn't created with Google, try email/password login
+        const { error: signInError } = await signIn(email, password);
+        if (signInError) throw signInError;
       }
 
       if (isSetupMode || needsSetup) {
