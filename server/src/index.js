@@ -103,7 +103,7 @@ app.post('/auth/google/frontend-callback', (req, res) => {
     return res.status(400).json({ success: false, error: 'No code provided' });
   }
 
-  
+
   // Here you would typically exchange the code for tokens
   // For now, we'll just return success
   res.json({ success: true });
@@ -180,17 +180,33 @@ app.get('/api/scan-emails', async (req, res) => {
       maxResults: 10
     });
 
+    messages.data.messages.forEach(element => {
+      console.log("Message ID:", element.id);
+      console.log("Message Snippet:", element.snippet);
+      console.log("Message Payload:", element.payload);
+      console.log(JSON.stringify(element.payload));
+    });
     console.log(`Found ${messages.data.messages?.length || 0} messages`);
 
     // Get full message details for each message
     const messageDetails = await Promise.all(
       (messages.data.messages || []).map(async (message) => {
         try {
-          const detail = await gmail.users.messages.get({
+          // const detail = await gmail.users.messages.get({
+          //   userId: 'me',
+          //   id: message.id
+          // });
+          const response = gmail.users.messages.get({
             userId: 'me',
             id: message.id
           });
-          return detail.data;
+          const _detail = await new Promise((resolve, reject) => {
+            response.then(response =>{
+              console.log("Message Detail:", response);
+              resolve(response);
+            })
+          });
+          return _detail;
         } catch (error) {
           console.error(`Error fetching message ${message.id}:`, error.message);
           return null;
@@ -200,20 +216,22 @@ app.get('/api/scan-emails', async (req, res) => {
 
     // Filter out any failed message fetches
     const validMessages = messageDetails.filter(msg => msg !== null);
-
+    console.log("Valid Messages:", validMessages);
     // Store the messages in a local array (you can replace this with a database later)
     const subscriptionEmails = validMessages.map(msg => {
-      const headers = msg.payload.headers;
-      const subject = headers.find(h => h.name === 'Subject')?.value || '';
-      const from = headers.find(h => h.name === 'From')?.value || '';
-      const date = headers.find(h => h.name === 'Date')?.value || '';
+      const data = msg.data;
+      const headers = data?.payload?.headers;
+      const subject = headers?.find(h => h.name === 'Subject')?.value || '';
+      const from = headers?.find(h => h.name === 'From')?.value || '';
+      const date = headers?.find(h => h.name === 'Date')?.value || '';
       
       return {
         id: msg.id,
         subject,
         from,
         date,
-        snippet: msg.snippet
+        snippet: data?.snippet,
+        payload: data?.payload
       };
     });
 
