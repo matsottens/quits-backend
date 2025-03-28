@@ -2,7 +2,7 @@ import '@fontsource-variable/inter';
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import Login from './components/auth/Login';
+import { Login } from './components/auth/Login';
 import { SignUp } from '@/components/auth/SignUp';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Settings } from '@/components/settings/Settings';
@@ -13,9 +13,9 @@ import { EmailOAuthConsent } from '@/components/auth/EmailOAuthConsent';
 import PrivateRoute from '@/components/PrivateRoute';
 import { useAuth } from './contexts/AuthContext';
 import SubscriptionDashboard from './components/subscription/SubscriptionDashboard';
-import GetStarted from './components/onboarding/GetStarted';
 import { AuthProvider } from './contexts/AuthContext';
 import { CircularProgress, Box } from '@mui/material';
+import GetStarted from './components/onboarding/GetStarted';
 
 // Component to automatically log out on startup
 const AutoLogoutContent: React.FC = () => {
@@ -139,7 +139,9 @@ const AppContent: React.FC = () => {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <SubscriptionDashboard />
+            <Layout>
+              <Dashboard />
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -161,7 +163,7 @@ const AppContent: React.FC = () => {
           </PrivateRoute>
         } 
       />
-      <Route path="/auth/google/callback" element={<Navigate to="/scanning" replace />} />
+      <Route path="/auth/google/callback" element={<OAuthRedirect />} />
       <Route path="*" element={<Navigate to="/get-started" replace />} />
     </Routes>
   );
