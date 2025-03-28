@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
@@ -7,22 +8,29 @@ const SignUp: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
+      setIsLoading(false);
       return;
     }
 
     try {
-      // TODO: Implement actual signup logic
-      localStorage.setItem('token', 'dummy-token');
-      navigate('/');
-    } catch (err) {
-      setError('Failed to create account');
+      await signUp(email, password);
+      // After successful signup, user will need to verify their email
+      navigate('/login?message=Please check your email to verify your account');
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      setError(err.message || 'Failed to create account');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -105,9 +113,10 @@ const SignUp: React.FC = () => {
           <div>
             <button
               type="submit"
+              disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              Create Account
+              {isLoading ? 'Creating account...' : 'Create Account'}
             </button>
           </div>
         </form>

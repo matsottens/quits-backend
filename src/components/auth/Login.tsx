@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const navigate = useNavigate();
@@ -16,11 +18,20 @@ export const Login: React.FC = () => {
   const isSetupMode = location.search.includes('setup=true');
 
   useEffect(() => {
+    // Check for messages in URL
+    const params = new URLSearchParams(location.search);
+    const message = params.get('message');
+    if (message) {
+      setMessage(message);
+    }
+
     // Check if user is already authenticated
     const checkAuth = async () => {
       try {
-        const session = await supabase.auth.getSession();
-        if (session.data.session) {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        
+        if (session) {
           // If setup is complete and not in setup mode, redirect to scanning
           if (!isSetupMode) {
             navigate('/scanning');
@@ -40,12 +51,13 @@ export const Login: React.FC = () => {
     };
 
     checkAuth();
-  }, [navigate, isSetupMode]);
+  }, [navigate, isSetupMode, location.search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setMessage('');
 
     try {
       await signIn(email, password);
@@ -54,8 +66,13 @@ export const Login: React.FC = () => {
       } else {
         navigate('/scanning');
       }
-    } catch (err) {
-      setError('Failed to log in. Please try again.');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.message.includes('Email not confirmed')) {
+        setError('Please verify your email address before logging in');
+      } else {
+        setError(err.message || 'Failed to log in. Please try again.');
+      }
       setIsLoading(false);
     }
   };
@@ -101,6 +118,16 @@ export const Login: React.FC = () => {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {message && (
+            <div className="rounded-md bg-green-50 p-4">
+              <div className="text-sm text-green-700">{message}</div>
+            </div>
+          )}
+          {error && (
+            <div className="rounded-md bg-red-50 p-4">
+              <div className="text-sm text-red-700">{error}</div>
+            </div>
+          )}
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email-address" className="sr-only">
@@ -135,8 +162,6 @@ export const Login: React.FC = () => {
               />
             </div>
           </div>
-
-          {error && <div className="text-red-600 text-sm">{error}</div>}
 
           <div>
             <button
