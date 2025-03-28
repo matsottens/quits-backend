@@ -7,6 +7,7 @@ const bodyParser = require('body-parser');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { google } = require('googleapis');
 const { createClient } = require('@supabase/supabase-js');
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,7 +30,9 @@ app.use((req, res, next) => {
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gmail-Token', 'X-User-ID']
 }));
 
 app.use(bodyParser.json());
@@ -147,10 +150,51 @@ app.get('/auth/logout', (req, res) => {
   });
 });
 
-// Initialize Supabase client
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    error: err.message || 'Internal server error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+// Add a health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Initialize Supabase client with custom fetch
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('Missing Supabase configuration. Please check your .env file.');
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  },
+  global: {
+    fetch: fetch
+  }
+});
+
+// Test Supabase connection on startup
+async function testSupabaseConnection() {
+  try {
+    const { data, error } = await supabase.from('subscriptions').select('count');
+    if (error) throw error;
+    console.log('Successfully connected to Supabase');
+  } catch (error) {
+    console.error('Error connecting to Supabase:', error);
+    process.exit(1);
+  }
+}
+
+testSupabaseConnection();
 
 // Helper function to extract subscription data from email
 function extractSubscriptionData(emailBody) {

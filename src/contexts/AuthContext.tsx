@@ -138,7 +138,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasSession: !!session,
         hasAccessToken: !!session?.access_token,
         hasProviderToken: !!session?.provider_token,
-        hasStoredGmailToken: !!gmailToken
+        hasStoredGmailToken: !!gmailToken,
+        userId: session?.user?.id
       });
       
       if (!session?.access_token) {
@@ -149,11 +150,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No Gmail access token available. Please sign in with Google again.');
       }
 
+      if (!session.user?.id) {
+        throw new Error('No user ID available');
+      }
+
       const response = await fetch('http://localhost:5000/api/scan-emails', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'X-Gmail-Token': gmailToken,
+          'X-User-ID': session.user.id,
           'Content-Type': 'application/json'
         }
       });
@@ -168,6 +174,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!data.success) {
         throw new Error(data.error || 'Failed to scan emails');
+      }
+
+      // Store subscriptions in local state if needed
+      if (data.subscriptions) {
+        // You might want to update some state here or trigger a refresh of the dashboard
+        const { data: existingData, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', session.user.id);
+
+        if (error) {
+          console.error('Error fetching subscriptions:', error);
+        } else {
+          // You could emit an event or call a callback here to update the UI
+          console.log('Current subscriptions:', existingData);
+        }
       }
 
       return data;
