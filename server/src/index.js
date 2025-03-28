@@ -103,6 +103,7 @@ app.post('/auth/google/frontend-callback', (req, res) => {
     return res.status(400).json({ success: false, error: 'No code provided' });
   }
 
+  
   // Here you would typically exchange the code for tokens
   // For now, we'll just return success
   res.json({ success: true });
