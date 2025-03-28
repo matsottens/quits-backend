@@ -5,6 +5,8 @@ const passport = require('passport');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const { google } = require('googleapis');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -145,137 +147,154 @@ app.get('/auth/logout', (req, res) => {
   });
 });
 
-// Add the email scanning endpoint with better error handling
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Helper function to extract subscription data from email
+function extractSubscriptionData(emailBody) {
+  // This is a basic implementation - you might want to enhance this based on your specific email formats
+  const subscriptionPatterns = [
+    {
+      pattern: /subscription|subscribe|membership/i,
+      type: 'general'
+    },
+    {
+      pattern: /monthly payment|recurring payment/i,
+      type: 'recurring'
+    },
+    {
+      pattern: /(\$|€)\s*(\d+(\.\d{2})?)/,
+      type: 'price'
+    }
+  ];
+
+  const data = {
+    type: null,
+    price: null,
+    provider: null,
+    frequency: 'monthly', // default
+    lastDetectedDate: new Date().toISOString()
+  };
+
+  // Extract provider from email address
+  if (emailBody.from) {
+    const fromMatch = emailBody.from.match(/@([^>]+)/);
+    if (fromMatch) {
+      data.provider = fromMatch[1].split('.')[0];
+    }
+  }
+
+  // Extract subscription type and price
+  const bodyText = emailBody.snippet || '';
+  for (const pattern of subscriptionPatterns) {
+    const match = bodyText.match(pattern.pattern);
+    if (match) {
+      if (pattern.type === 'price' && match[2]) {
+        data.price = parseFloat(match[2]);
+      } else {
+        data.type = pattern.type;
+      }
+    }
+  }
+
+  return data;
+}
+
 app.get('/api/scan-emails', async (req, res) => {
-  console.log('Starting email scan, auth status:', req.isAuthenticated());
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ error: 'Not authenticated' });
+  const authHeader = req.headers.authorization;
+  const gmailToken = req.headers['x-gmail-token'];
+  const userId = req.headers['x-user-id'];
+  
+  console.log('Starting email scan, auth header:', authHeader ? 'present' : 'missing', 'gmail token:', gmailToken ? 'present' : 'missing');
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No authentication token provided' });
+  }
+
+  if (!gmailToken) {
+    return res.status(401).json({ error: 'No Gmail token provided' });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: 'No user ID provided' });
   }
 
   try {
-    console.log('User tokens:', {
-      hasAccessToken: !!req.user.accessToken,
-      hasRefreshToken: !!req.user.refreshToken,
-      scopes: req.user.scope
-    });
-
-    const { google } = require('googleapis');
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_CALLBACK_URL
-    );
+    // Create Gmail API client
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: gmailToken });
     
-    oauth2Client.setCredentials({
-      access_token: req.user.accessToken,
-      refresh_token: req.user.refreshToken,
-      scope: req.user.scope
-    });
+    const gmail = google.gmail({ version: 'v1', auth });
 
-    // Get the user's email address first
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const userInfo = await oauth2.userinfo.get();
-    const email = userInfo.data.email;
-    console.log('User email:', email);
-
-    // Now use the Gmail API to search for messages
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-    
-    // First, try to get the user's profile
-    const profile = await gmail.users.getProfile({
-      userId: 'me'
-    });
-    console.log('Successfully connected to Gmail API for:', profile.data.emailAddress);
-
-    // Search for messages with subscription-related subjects
-    const searchQuery = 'subject:(subscription OR payment OR invoice)';
-    const messages = await gmail.users.messages.list({
+    // List emails from inbox
+    const response = await gmail.users.messages.list({
       userId: 'me',
-      q: searchQuery,
-      maxResults: 10
+      maxResults: 100, // Increased to get more potential subscription emails
+      q: 'in:inbox subject:(subscription OR payment OR receipt OR invoice)'
     });
 
-    messages.data.messages.forEach(element => {
-      console.log("Message ID:", element.id);
-      console.log("Message Snippet:", element.snippet);
-      console.log("Message Payload:", element.payload);
-      console.log(JSON.stringify(element.payload));
-    });
-    console.log(`Found ${messages.data.messages?.length || 0} messages`);
+    const messages = response.data.messages || [];
+    const subscriptions = [];
+    const processedEmails = new Set();
 
-    // Get full message details for each message
-    const messageDetails = await Promise.all(
-      (messages.data.messages || []).map(async (message) => {
-        try {
-          // const detail = await gmail.users.messages.get({
-          //   userId: 'me',
-          //   id: message.id
-          // });
-          const response = gmail.users.messages.get({
-            userId: 'me',
-            id: message.id
-          });
-          const _detail = await new Promise((resolve, reject) => {
-            response.then(response =>{
-              console.log("Message Detail:", response);
-              resolve(response);
-            })
-          });
-          return _detail;
-        } catch (error) {
-          console.error(`Error fetching message ${message.id}:`, error.message);
-          return null;
-        }
-      })
-    );
+    // Get details for each email
+    for (const message of messages) {
+      const details = await gmail.users.messages.get({
+        userId: 'me',
+        id: message.id,
+        format: 'full'
+      });
 
-    // Filter out any failed message fetches
-    const validMessages = messageDetails.filter(msg => msg !== null);
-    console.log("Valid Messages:", validMessages);
-    // Store the messages in a local array (you can replace this with a database later)
-    const subscriptionEmails = validMessages.map(msg => {
-      const data = msg.data;
-      const headers = data?.payload?.headers;
-      const subject = headers?.find(h => h.name === 'Subject')?.value || '';
-      const from = headers?.find(h => h.name === 'From')?.value || '';
-      const date = headers?.find(h => h.name === 'Date')?.value || '';
-      
-      return {
-        id: msg.id,
-        subject,
-        from,
-        date,
-        snippet: data?.snippet,
-        payload: data?.payload
+      const headers = details.data.payload.headers;
+      const emailData = {
+        id: message.id,
+        subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
+        from: headers.find(h => h.name === 'From')?.value || 'Unknown',
+        date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
+        snippet: details.data.snippet || ''
       };
-    });
 
-    res.json({
-      success: true,
-      message: 'Email scan completed',
-      email: profile.data.emailAddress,
-      messageCount: subscriptionEmails.length,
-      messages: subscriptionEmails
-    });
-
-  } catch (error) {
-    console.error('Email scanning error:', error);
-    
-    let errorMessage = 'Failed to scan emails';
-    if (error.response) {
-      console.error('Error response:', error.response.data);
-      errorMessage = error.response.data.error?.message || errorMessage;
+      // Extract subscription data
+      const subscriptionData = extractSubscriptionData(emailData);
       
-      if (errorMessage === 'Mail service not enabled') {
-        errorMessage = 'Gmail API access is not properly configured. Please check the OAuth consent screen and API permissions.';
+      // Only add if we have meaningful data and haven't processed this provider
+      if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
+        processedEmails.add(subscriptionData.provider);
+        subscriptions.push({
+          ...subscriptionData,
+          user_id: userId,
+          email_id: message.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
       }
     }
-    
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-      details: error.message
+
+    // Store subscriptions in Supabase
+    if (subscriptions.length > 0) {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .upsert(subscriptions, {
+          onConflict: 'user_id,provider',
+          returning: true
+        });
+
+      if (error) {
+        console.error('Error storing subscriptions:', error);
+        throw new Error('Failed to store subscription data');
+      }
+    }
+
+    return res.json({ 
+      success: true, 
+      message: 'Subscriptions processed and stored successfully',
+      subscriptions
     });
+  } catch (error) {
+    console.error('Error in email scan:', error);
+    return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
