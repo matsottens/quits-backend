@@ -7,7 +7,7 @@ const bodyParser = require('body-parser');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { google } = require('googleapis');
 const { createClient } = require('@supabase/supabase-js');
-const fetch = require('node-fetch');
+const fetch = require('cross-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -172,12 +172,17 @@ if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing Supabase configuration. Please check your .env file.');
 }
 
+console.log('Initializing Supabase with URL:', supabaseUrl);
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
   },
   global: {
+    headers: {
+      'Content-Type': 'application/json'
+    },
     fetch: fetch
   }
 });
@@ -185,16 +190,41 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 // Test Supabase connection on startup
 async function testSupabaseConnection() {
   try {
+    console.log('Testing Supabase connection...');
     const { data, error } = await supabase.from('subscriptions').select('count');
-    if (error) throw error;
+    if (error) {
+      console.error('Error connecting to Supabase:', error);
+      return false;
+    }
     console.log('Successfully connected to Supabase');
+    return true;
   } catch (error) {
     console.error('Error connecting to Supabase:', error);
-    process.exit(1);
+    return false;
   }
 }
 
-testSupabaseConnection();
+// Test connection but don't block server startup
+testSupabaseConnection().then(success => {
+  if (!success) {
+    console.warn('Warning: Could not establish initial Supabase connection. Will retry on requests.');
+  }
+});
+
+// Helper function to ensure Supabase connection
+async function ensureSupabaseConnection() {
+  try {
+    const { data, error } = await supabase.from('subscriptions').select('count');
+    if (error) {
+      console.error('Database connection error:', error);
+      throw new Error('Could not connect to database: ' + error.message);
+    }
+    return true;
+  } catch (error) {
+    console.error('Database connection error:', error);
+    throw new Error('Could not connect to database: ' + error.message);
+  }
+}
 
 // Helper function to extract subscription data from email
 function extractSubscriptionData(emailBody) {
@@ -266,6 +296,9 @@ app.get('/api/scan-emails', async (req, res) => {
   }
 
   try {
+    // Ensure database connection
+    await ensureSupabaseConnection();
+
     // Create Gmail API client
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: gmailToken });
@@ -275,7 +308,7 @@ app.get('/api/scan-emails', async (req, res) => {
     // List emails from inbox
     const response = await gmail.users.messages.list({
       userId: 'me',
-      maxResults: 100, // Increased to get more potential subscription emails
+      maxResults: 100,
       q: 'in:inbox subject:(subscription OR payment OR receipt OR invoice)'
     });
 
@@ -329,6 +362,8 @@ app.get('/api/scan-emails', async (req, res) => {
         console.error('Error storing subscriptions:', error);
         throw new Error('Failed to store subscription data');
       }
+
+      console.log('Successfully stored subscriptions:', data);
     }
 
     return res.json({ 
