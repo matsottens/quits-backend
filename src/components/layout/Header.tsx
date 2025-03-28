@@ -1,14 +1,20 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
 export const Header: React.FC = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Function to determine if a link is active
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   return (
@@ -28,29 +34,9 @@ export const Header: React.FC = () => {
           </div>
           
           {user ? (
-            <div className="flex items-center space-x-6">
-              <Link 
-                to="/dashboard" 
-                className={`font-medium transition-colors ${
-                  isActive('/dashboard') 
-                    ? 'text-white border-b-2 border-white' 
-                    : 'text-white/80 hover:text-white'
-                }`}
-              >
-                Dashboard
-              </Link>
-              <Link 
-                to="/settings" 
-                className={`font-medium transition-colors ${
-                  isActive('/settings') 
-                    ? 'text-white border-b-2 border-white' 
-                    : 'text-white/80 hover:text-white'
-                }`}
-              >
-                Settings
-              </Link>
+            <div className="flex items-center">
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="font-medium text-white/80 hover:text-white transition-colors"
               >
                 Logout

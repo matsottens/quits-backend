@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import type { User } from '../lib/supabase';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -12,7 +12,7 @@ interface AuthContextType {
   scanEmails: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -20,53 +20,98 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user as User);
-      }
-      setLoading(false);
-    });
-
-    // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user as User);
-      } else {
+    const initializeAuth = async () => {
+      try {
+        setLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error('Error checking auth status:', error);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
+    };
+
+    initializeAuth();
+
+    // Listen for changes on auth state (sign in, sign out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setLoading(true);
+      try {
+        console.log('Auth state changed:', event, session?.user?.email);
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+        } else if (session?.user) {
+          setUser(session.user);
+        }
+      } catch (error) {
+        console.error('Error handling auth state change:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (error) throw error;
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (error) throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null); // Immediately clear the user state
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signInWithGoogle = async () => {
-    // Implementation of signInWithGoogle
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: ['profile', 'email', 'https://www.googleapis.com/auth/gmail.readonly'],
+          redirectTo: `${window.location.origin}/auth/google/callback`
+        }
+      });
+      if (error) throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const scanEmails = async () => {
     try {
+      setLoading(true);
       const response = await fetch('http://localhost:5000/api/scan-emails', {
         credentials: 'include'
       });
@@ -81,13 +126,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(data.error || 'Failed to scan emails');
       }
 
-      // Store the found subscriptions
-      if (data.subscriptions && data.subscriptions.length > 0) {
-        localStorage.setItem('found_subscriptions', JSON.stringify(data.subscriptions));
-      }
+      return data;
     } catch (error) {
       console.error('Error scanning emails:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
