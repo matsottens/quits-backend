@@ -9,6 +9,21 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Add CSP headers middleware
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://*.googleapis.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "img-src 'self' data: https://*.supabase.co https://*.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "connect-src 'self' https://*.supabase.co https://*.googleapis.com; " +
+    "frame-src 'self' https://*.supabase.co https://*.googleapis.com;"
+  );
+  next();
+});
+
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
