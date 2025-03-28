@@ -8,6 +8,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  scanEmails: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,11 +61,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
   };
 
-  return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const signInWithGoogle = async () => {
+    // Implementation of signInWithGoogle
+  };
+
+  const scanEmails = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/scan-emails', {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to scan emails');
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to scan emails');
+      }
+
+      // Store the found subscriptions
+      if (data.subscriptions && data.subscriptions.length > 0) {
+        localStorage.setItem('found_subscriptions', JSON.stringify(data.subscriptions));
+      }
+    } catch (error) {
+      console.error('Error scanning emails:', error);
+      throw error;
+    }
+  };
+
+  const value = {
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    signInWithGoogle,
+    scanEmails
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

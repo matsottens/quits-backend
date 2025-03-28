@@ -16,6 +16,7 @@ import SubscriptionDashboard from './components/subscription/SubscriptionDashboa
 import { AuthProvider } from './contexts/AuthContext';
 import { CircularProgress, Box } from '@mui/material';
 import GetStarted from './components/onboarding/GetStarted';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 // Component to automatically log out on startup
 const AutoLogoutContent: React.FC = () => {
@@ -169,13 +170,50 @@ const AppContent: React.FC = () => {
   );
 };
 
+// Define routes
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Navigate to="/login" replace />
+  },
+  {
+    path: '/login',
+    element: <Login />
+  },
+  {
+    path: '/signup',
+    element: <SignUp />
+  },
+  {
+    path: '/auth/google',
+    element: <OAuthRedirect />
+  },
+  {
+    path: '/auth/consent',
+    element: <EmailOAuthConsent />
+  },
+  {
+    path: '/scanning',
+    element: (
+      <ProtectedRoute>
+        <Layout>
+          <Dashboard />
+        </Layout>
+      </ProtectedRoute>
+    )
+  }
+], {
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true
+  }
+});
+
 const App: React.FC = () => {
   return (
-    <Router>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </Router>
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   );
 };
 
