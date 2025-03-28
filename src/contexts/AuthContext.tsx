@@ -112,12 +112,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const scanEmails = async () => {
     try {
       setLoading(true);
+      
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No active session');
+      }
+
       const response = await fetch('http://localhost:5000/api/scan-emails', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
         credentials: 'include'
       });
 
       if (!response.ok) {
-        throw new Error('Failed to scan emails');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();

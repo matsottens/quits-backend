@@ -1,6 +1,6 @@
 import '@fontsource-variable/inter';
 import React from 'react';
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Login } from './components/auth/Login';
 import { SignUp } from '@/components/auth/SignUp';
@@ -14,7 +14,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import SubscriptionDashboard from './components/subscription/SubscriptionDashboard';
 import { Box, CircularProgress } from '@mui/material';
 
-// Protected Route component
+// Protected Route component with Layout
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
   
@@ -30,7 +30,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/login" replace />;
   }
   
-  return <>{children}</>;
+  return <Layout>{children}</Layout>;
 };
 
 // Public Route component - redirects to dashboard if already authenticated
@@ -82,6 +82,7 @@ const router = createBrowserRouter([
     path: '/auth/consent',
     element: <EmailOAuthConsent />
   },
+  // Protected routes
   {
     path: '/scanning',
     element: (
@@ -102,9 +103,7 @@ const router = createBrowserRouter([
     path: '/dashboard',
     element: (
       <ProtectedRoute>
-        <Layout>
-          <Dashboard />
-        </Layout>
+        <Dashboard />
       </ProtectedRoute>
     )
   },
@@ -112,9 +111,7 @@ const router = createBrowserRouter([
     path: '/settings',
     element: (
       <ProtectedRoute>
-        <Layout>
-          <Settings />
-        </Layout>
+        <Settings />
       </ProtectedRoute>
     )
   },
