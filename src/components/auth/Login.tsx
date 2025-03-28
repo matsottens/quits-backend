@@ -60,19 +60,26 @@ export const Login: React.FC = () => {
     setMessage('');
 
     try {
-      await signIn(email, password);
-      if (isSetupMode || needsSetup) {
-        navigate('/scanning?setup=true');
+      const { error } = await signIn(email, password);
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          setError('Please verify your email address before logging in. Check your inbox for the verification link.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please try again or reset your password.');
+        } else {
+          setError(error.message || 'Failed to log in. Please try again.');
+        }
       } else {
-        navigate('/scanning');
+        if (isSetupMode || needsSetup) {
+          navigate('/scanning?setup=true');
+        } else {
+          navigate('/scanning');
+        }
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      if (err.message.includes('Email not confirmed')) {
-        setError('Please verify your email address before logging in');
-      } else {
-        setError(err.message || 'Failed to log in. Please try again.');
-      }
+      setError(err.message || 'Failed to log in. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };

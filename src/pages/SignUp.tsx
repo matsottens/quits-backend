@@ -9,11 +9,13 @@ const SignUp: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
   const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setIsLoading(true);
 
     if (password !== confirmPassword) {
@@ -23,12 +25,21 @@ const SignUp: React.FC = () => {
     }
 
     try {
-      await signUp(email, password);
-      // After successful signup, user will need to verify their email
-      navigate('/login?message=Please check your email to verify your account');
+      const { error } = await signUp(email, password);
+      if (error) throw error;
+      
+      // Show success message and redirect to login
+      setMessage('Please check your email for a verification link. After verifying, you can log in.');
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
     } catch (err: any) {
       console.error('Signup error:', err);
-      setError(err.message || 'Failed to create account');
+      if (err.message.includes('already registered')) {
+        setError('This email is already registered. Please try logging in instead.');
+      } else {
+        setError(err.message || 'Failed to create account');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -54,6 +65,11 @@ const SignUp: React.FC = () => {
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {message && (
+            <div className="rounded-md bg-green-50 p-4">
+              <div className="text-sm text-green-700">{message}</div>
+            </div>
+          )}
           {error && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">{error}</div>
