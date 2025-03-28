@@ -2,7 +2,7 @@ import '@fontsource-variable/inter';
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { Login } from '@/components/auth/Login';
+import Login from './components/auth/Login';
 import { SignUp } from '@/components/auth/SignUp';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Settings } from '@/components/settings/Settings';
@@ -11,9 +11,11 @@ import { ScanningScreen } from '@/components/auth/ScanningScreen';
 import { SubscriptionSelection } from '@/components/auth/SubscriptionSelection';
 import { EmailOAuthConsent } from '@/components/auth/EmailOAuthConsent';
 import PrivateRoute from '@/components/PrivateRoute';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from './contexts/AuthContext';
 import SubscriptionDashboard from './components/subscription/SubscriptionDashboard';
 import GetStarted from './components/onboarding/GetStarted';
+import { AuthProvider } from './contexts/AuthContext';
+import { CircularProgress, Box } from '@mui/material';
 
 // Component to automatically log out on startup
 const AutoLogoutContent: React.FC = () => {
@@ -79,21 +81,34 @@ const SetupRedirect: React.FC = () => {
   );
 };
 
-// Main app content component
-const AppContent: React.FC = () => {
-  const { loading } = useAuth();
+// Protected Route component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFEDD6]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#26457A] mx-auto"></div>
-          <p className="mt-4 text-[#26457A]">Loading...</p>
-        </div>
-      </div>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Box>
     );
   }
 
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  return <>{children}</>;
+};
+
+// Main app content component
+const AppContent: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/logout" replace />} />
@@ -123,11 +138,9 @@ const AppContent: React.FC = () => {
       <Route
         path="/dashboard"
         element={
-          <PrivateRoute>
-            <Layout>
-              <Dashboard />
-            </Layout>
-          </PrivateRoute>
+          <ProtectedRoute>
+            <SubscriptionDashboard />
+          </ProtectedRoute>
         }
       />
       <Route
@@ -157,7 +170,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <Router>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </Router>
   );
 };

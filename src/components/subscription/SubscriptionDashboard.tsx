@@ -46,6 +46,9 @@ import AddSubscription from './AddSubscription';
 import ManualSubscription from './ManualSubscription';
 import SubscriptionDetails from './SubscriptionDetails';
 import { cn } from '../../lib/utils';
+import { db } from '../../lib/supabase';
+import type { Subscription } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 const StyledContainer = styled(Container)(({ theme }) => ({
   minHeight: '100vh',
@@ -124,17 +127,6 @@ const StyledDrawer = styled(Drawer)(({ theme }) => ({
   },
 }));
 
-interface Subscription {
-  id: string;
-  name: string;
-  amount: string;
-  nextBilling: string;
-  status: string;
-  billingCycle: string;
-  category: string;
-  description: string;
-}
-
 interface SubscriptionFormData {
   name: string;
   amount: string;
@@ -165,57 +157,36 @@ interface SubscriptionDetailsProps {
 const SubscriptionDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddSubscription, setShowAddSubscription] = useState(false);
   const [showManualSubscription, setShowManualSubscription] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(() => {
-    try {
-      const savedSubscriptions = localStorage.getItem('subscriptions');
-      if (savedSubscriptions) {
-        return JSON.parse(savedSubscriptions);
-      }
-    } catch (error) {
-      console.error('Error loading subscriptions:', error);
-    }
-    // Default subscriptions if none are saved
-    const defaultSubscriptions = [
-      {
-        id: '1',
-        name: 'Netflix',
-        amount: '14.99',
-        nextBilling: '2024-04-15',
-        status: 'active',
-        billingCycle: 'monthly',
-        category: 'entertainment',
-        description: 'Streaming service for movies and TV shows',
-      },
-      {
-        id: '2',
-        name: 'Spotify Premium',
-        amount: '9.99',
-        nextBilling: '2024-04-20',
-        status: 'active',
-        billingCycle: 'monthly',
-        category: 'entertainment',
-        description: 'Music streaming service',
-      },
-    ];
-    localStorage.setItem('subscriptions', JSON.stringify(defaultSubscriptions));
-    return defaultSubscriptions;
-  });
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
 
-  // Save subscriptions to localStorage whenever they change
+  // Load subscriptions from Supabase
   useEffect(() => {
-    try {
-      console.log('Saving subscriptions:', subscriptions);
-      localStorage.setItem('subscriptions', JSON.stringify(subscriptions));
-    } catch (error) {
-      console.error('Error saving subscriptions:', error);
-    }
-  }, [subscriptions]);
+    const loadSubscriptions = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        const data = await db.getSubscriptionsByUserId(user.id);
+        setSubscriptions(data);
+      } catch (err) {
+        console.error('Error loading subscriptions:', err);
+        setError('Failed to load subscriptions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSubscriptions();
+  }, [user]);
 
   useEffect(() => {
     // Check for query params to determine which form to show
@@ -273,69 +244,60 @@ const SubscriptionDashboard: React.FC = () => {
     setShowAddSubscription(false);
   };
 
-  const handleManualSubscriptionSubmit = (formData: ManualSubscriptionFormData) => {
+  const handleManualSubscriptionSubmit = async (formData: ManualSubscriptionFormData) => {
+    if (!user) return;
+    
     try {
       console.log('Received form data:', formData);
       
-      // Create a new subscription with a unique ID
-      const newSubscription: Subscription = {
-        id: Date.now().toString(),
+      const newSubscription = {
+        user_id: user.id,
         name: formData.name,
         amount: formData.amount,
-        billingCycle: formData.billingCycle,
-        nextBilling: formData.nextBilling,
+        billing_cycle: formData.billingCycle,
+        next_billing: formData.nextBilling,
         category: formData.category,
         description: formData.description,
         status: 'active',
       };
 
-      console.log('Adding new subscription:', newSubscription);
-      
-      // Update state with the new subscription
-      setSubscriptions(prevSubscriptions => {
-        const updatedSubscriptions = [...prevSubscriptions, newSubscription];
-        console.log('Updated subscriptions list:', updatedSubscriptions);
-        return updatedSubscriptions;
-      });
-      
-      // Close the modal
+      const savedSubscription = await db.createSubscription(newSubscription);
+      setSubscriptions(prev => [...prev, savedSubscription]);
       setShowManualSubscription(false);
     } catch (error) {
       console.error('Error adding subscription:', error);
+      setError('Failed to add subscription');
     }
   };
 
-  const handleSubscriptionEdit = (updatedSubscription: Subscription) => {
+  const handleSubscriptionEdit = async (updatedSubscription: Subscription) => {
     try {
-      console.log('Editing subscription:', updatedSubscription);
+      const savedSubscription = await db.updateSubscription(
+        updatedSubscription.id,
+        updatedSubscription
+      );
       
-      setSubscriptions(prevSubscriptions => {
-        const updatedSubscriptions = prevSubscriptions.map(sub =>
-          sub.id === updatedSubscription.id ? updatedSubscription : sub
-        );
-        console.log('Updated subscriptions after edit:', updatedSubscriptions);
-        return updatedSubscriptions;
-      });
+      setSubscriptions(prev =>
+        prev.map(sub =>
+          sub.id === savedSubscription.id ? savedSubscription : sub
+        )
+      );
       
       setSelectedSubscription(null);
     } catch (error) {
       console.error('Error editing subscription:', error);
+      setError('Failed to update subscription');
     }
   };
 
-  const handleSubscriptionDelete = (id: string) => {
+  const handleSubscriptionDelete = async (id: string) => {
     try {
-      console.log('Deleting subscription:', id);
-      
-      setSubscriptions(prevSubscriptions => {
-        const updatedSubscriptions = prevSubscriptions.filter(sub => sub.id !== id);
-        console.log('Updated subscriptions after delete:', updatedSubscriptions);
-        return updatedSubscriptions;
-      });
-      
+      await db.deleteSubscription(id);
+      setSubscriptions(prev => prev.filter(sub => sub.id !== id));
       setSelectedSubscription(null);
     } catch (error) {
       console.error('Error deleting subscription:', error);
+      setError('Failed to delete subscription');
     }
   };
 
