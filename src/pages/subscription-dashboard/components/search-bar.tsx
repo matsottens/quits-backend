@@ -9,7 +9,7 @@ interface SearchBarProps {
   onClose: () => void
 }
 
-const SearchBar = ({ value, onChange, onClose }: SearchBarProps): React.ReactElement => {
+const SearchBar = ({ value, onChange, onClose }: SearchBarProps) => {
   return (
     <div className="p-2 bg-[#f9f0e1] border-b border-gray-300">
       <div className="relative flex items-center">
