@@ -1,24 +1,19 @@
 "use client"
 
-import type React from "react"
-
+import React from 'react';
+import { Link } from '../../utils/nextCompatibility';
+// Remove Next.js font imports and add CSS imports for the fonts
+import '@fontsource/playfair-display/400.css';
+import '@fontsource/playfair-display/500.css';
+import '@fontsource/playfair-display/600.css';
+import '@fontsource/playfair-display/700.css';
+import '@fontsource/inter/300.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
 import { useState } from "react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Playfair_Display, Inter } from "next/font/google"
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-playfair",
-})
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  variable: "--font-inter",
-})
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
@@ -31,7 +26,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className={`flex flex-col min-h-screen bg-[#ffefd5] ${playfair.variable} ${inter.variable} font-sans`}>
+    <div className={`flex flex-col min-h-screen bg-[#ffefd5] font-sans`}>
       {/* Status bar */}
       <div className="flex justify-between items-center p-4">
         <div className="text-black font-medium">9:41</div>

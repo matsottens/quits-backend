@@ -11,6 +11,7 @@ import { ScanningScreen } from './components/auth/ScanningScreen';
 import { SubscriptionSelection } from './components/auth/SubscriptionSelection';
 import { EmailOAuthConsent } from './components/auth/EmailOAuthConsent';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import SubscriptionDashboard from './components/subscription/SubscriptionDashboard';
 import { Box, CircularProgress } from '@mui/material';
 
@@ -131,9 +132,11 @@ const router = createBrowserRouter([
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 
