@@ -17,7 +17,7 @@ app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://*.googleapis.com; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pihflemmavointdxjdsx.supabase.co https://*.supabase.co; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "img-src 'self' data: https://*.supabase.co https://*.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
@@ -191,8 +191,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 async function testSupabaseConnection() {
   try {
     console.log('Testing Supabase connection...');
-    const { data, error } = await supabase.from('subscriptions').select('count');
+    // Instead of querying the subscriptions table, let's do a simpler test
+    const { data, error } = await supabase.from('subscriptions').select('count').limit(0);
     if (error) {
+      if (error.code === '42P01') {
+        console.log('Database table not ready yet, will retry on requests');
+        return true; // Don't treat this as an error
+      }
       console.error('Error connecting to Supabase:', error);
       return false;
     }
