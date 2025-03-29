@@ -234,11 +234,17 @@ const SubscriptionDashboard: React.FC = () => {
   };
 
   const handleSubscriptionSubmit = (formData: SubscriptionFormData) => {
+    if (!user) return;
+    
     // Here you would typically make an API call to save the subscription
-    const newSubscription: Omit<Subscription, 'id'> = {
+    const newSubscription: Omit<Subscription, 'id' | 'created_at' | 'updated_at'> = {
       ...formData,
-      status: 'active', // Set default status for new subscriptions
+      user_id: user.id,
+      status: 'active',
+      billing_cycle: formData.billingCycle,
+      next_billing: formData.nextBilling
     };
+    
     console.log('New subscription:', newSubscription);
     // For now, we'll just close the modal
     setShowAddSubscription(false);
