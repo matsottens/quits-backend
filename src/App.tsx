@@ -2,7 +2,7 @@ import '@fontsource-variable/inter';
 import React from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { Login } from './components/auth/Login';
+import { Login } from '@/components/auth/Login';
 import { SignUp } from '@/components/auth/SignUp';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Settings } from '@/components/settings/Settings';
