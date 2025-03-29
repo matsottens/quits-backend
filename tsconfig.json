@@ -14,23 +14,23 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react",
+    "jsx": "react-jsx",
     "baseUrl": "src",
     "paths": {
       "@/*": ["*"]
     },
-    "typeRoots": ["./src/types", "./node_modules/@types"],
-    "types": ["react", "react-dom", "node"]
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "types": ["react", "react-dom", "node"],
+    "jsxImportSource": "react"
   },
   "include": [
     "src",
     "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/types/jsx.d.ts"
+    "src/**/*.tsx"
   ],
   "exclude": [
     "node_modules"
