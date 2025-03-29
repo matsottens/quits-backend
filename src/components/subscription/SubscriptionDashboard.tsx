@@ -446,7 +446,7 @@ const SubscriptionDashboard: React.FC = () => {
                 >
                   <ListItemText
                     primary={subscription.name}
-                    secondary={`Next billing: ${subscription.nextBilling}`}
+                    secondary={`Next billing: ${subscription.next_billing}`}
                   />
                   <ListItemSecondaryAction>
                     <Typography
