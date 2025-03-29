@@ -23,12 +23,14 @@
     "paths": {
       "@/*": ["*"]
     },
-    "types": ["react", "react-dom"]
+    "typeRoots": ["./src/types", "./node_modules/@types"],
+    "types": ["react", "react-dom", "node"]
   },
   "include": [
     "src",
     "src/**/*.ts",
-    "src/**/*.tsx"
+    "src/**/*.tsx",
+    "src/types/jsx.d.ts"
   ],
   "exclude": [
     "node_modules"

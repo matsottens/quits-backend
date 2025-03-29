@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-
+import * as React from "react"
 import { X } from "lucide-react"
 
 interface SearchBarProps {
@@ -10,7 +9,7 @@ interface SearchBarProps {
   onClose: () => void
 }
 
-export default function SearchBar({ value, onChange, onClose }: SearchBarProps) {
+const SearchBar = ({ value, onChange, onClose }: SearchBarProps): React.ReactElement => {
   return (
     <div className="p-2 bg-[#f9f0e1] border-b border-gray-300">
       <div className="relative flex items-center">
@@ -29,4 +28,6 @@ export default function SearchBar({ value, onChange, onClose }: SearchBarProps) 
     </div>
   )
 }
+
+export default SearchBar
 
