@@ -46,13 +46,16 @@ const DetailValue = styled(Typography)({
 interface SubscriptionDetailsProps {
   subscription: {
     id: string;
+    user_id: string;
     name: string;
     amount: string;
-    billingCycle: string;
-    nextBilling: string;
+    billing_cycle: string;
+    next_billing: string;
     category: string;
     description: string;
     status: string;
+    created_at: string;
+    updated_at: string;
   };
   onClose: () => void;
   onEdit: (subscription: SubscriptionDetailsProps['subscription']) => void;
@@ -96,10 +99,10 @@ const SubscriptionDetails: React.FC<SubscriptionDetailsProps> = ({
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <StyledTitle variant="h5">{subscription.name}</StyledTitle>
           <Box>
-            <IconButton onClick={onEdit} sx={{ color: '#1a365d' }}>
+            <IconButton onClick={() => onEdit(subscription)} sx={{ color: '#1a365d' }}>
               <EditIcon />
             </IconButton>
-            <IconButton onClick={onDelete} sx={{ color: '#ef4444' }}>
+            <IconButton onClick={() => onDelete(subscription.id)} sx={{ color: '#ef4444' }}>
               <DeleteIcon />
             </IconButton>
           </Box>
@@ -113,12 +116,12 @@ const SubscriptionDetails: React.FC<SubscriptionDetailsProps> = ({
 
           <Grid item xs={12} sm={6}>
             <DetailLabel>Billing Cycle</DetailLabel>
-            <DetailValue>{subscription.billingCycle.charAt(0).toUpperCase() + subscription.billingCycle.slice(1)}</DetailValue>
+            <DetailValue>{subscription.billing_cycle.charAt(0).toUpperCase() + subscription.billing_cycle.slice(1)}</DetailValue>
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <DetailLabel>Next Billing Date</DetailLabel>
-            <DetailValue>{new Date(subscription.nextBilling).toLocaleDateString()}</DetailValue>
+            <DetailValue>{new Date(subscription.next_billing).toLocaleDateString()}</DetailValue>
           </Grid>
 
           <Grid item xs={12} sm={6}>
