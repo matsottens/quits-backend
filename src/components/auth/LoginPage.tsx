@@ -47,7 +47,7 @@ const LogoIcon = styled(Box)({
 const LogoText = styled(Typography)({
   fontSize: '2.25rem',
   fontWeight: 700,
-  color: '#1a365d',
+  color: '#000000',
   fontFamily: 'Playfair Display, serif',
 });
 
@@ -95,7 +95,7 @@ const StyledButton = styled(Button)(({ theme }) => ({
 const SocialButton = styled(Button)(({ theme }) => ({
   height: '3.5rem',
   backgroundColor: '#f3f4f6',
-  color: 'black',
+  color: '#000000',
   borderColor: '#e5e7eb',
   '&:hover': {
     backgroundColor: '#e5e7eb',
@@ -152,7 +152,7 @@ const LoginPage: React.FC = () => {
             variant="h4"
             sx={{
               textAlign: 'center',
-              color: '#1a365d',
+              color: '#000000',
               fontWeight: 700,
               fontFamily: 'Playfair Display, serif',
               mb: 1,
@@ -163,7 +163,7 @@ const LoginPage: React.FC = () => {
           <Typography
             sx={{
               textAlign: 'center',
-              color: '#1a365d',
+              color: '#000000',
               mb: 4,
               fontFamily: 'Inter, sans-serif',
               fontSize: '0.875rem',
@@ -192,7 +192,7 @@ const LoginPage: React.FC = () => {
             />
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Link to="/forgot-password" style={{ color: '#1a365d', fontSize: '0.875rem' }}>
+              <Link to="/forgot-password" style={{ color: '#000000', fontSize: '0.875rem' }}>
                 Forgot password?
               </Link>
             </Box>
@@ -203,7 +203,7 @@ const LoginPage: React.FC = () => {
           </StyledForm>
 
           <Box sx={{ textAlign: 'center', mt: 3 }}>
-            <Link to="/signup" style={{ color: '#1a365d', fontWeight: 500, fontSize: '0.875rem' }}>
+            <Link to="/signup" style={{ color: '#000000', fontWeight: 500, fontSize: '0.875rem' }}>
               Don't have an account? Sign up here.
             </Link>
           </Box>
