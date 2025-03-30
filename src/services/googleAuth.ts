@@ -19,6 +19,8 @@ export interface GoogleAuthResponse {
 }
 
 export const initiateGoogleAuth = () => {
+  console.log('Initiating Google Auth with redirect URI:', process.env.REACT_APP_GOOGLE_REDIRECT_URI);
+  
   const params = new URLSearchParams({
     client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || '',
     redirect_uri: process.env.REACT_APP_GOOGLE_REDIRECT_URI || '',
@@ -28,7 +30,10 @@ export const initiateGoogleAuth = () => {
     prompt: 'consent',
   });
 
-  window.location.href = `${GOOGLE_AUTH_URL}?${params.toString()}`;
+  const authUrl = `${GOOGLE_AUTH_URL}?${params.toString()}`;
+  console.log('Redirecting to:', authUrl);
+  
+  window.location.href = authUrl;
 };
 
 export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResponse> => {
