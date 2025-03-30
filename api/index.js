@@ -29,30 +29,40 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'https://www.quits.cc',
+  origin: ['https://www.quits.cc', 'https://quits.vercel.app', 'https://quits-api.onrender.com'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID']
 }));
 
 app.use(bodyParser.json());
 
-// Health check endpoint
+// Health check endpoint (no auth required)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Email scanning endpoint
-app.get('/api/scan-emails', async (req, res) => {
+// Protected routes middleware
+const requireAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'No authorization header' });
+  }
+  next();
+};
+
+// Email scanning endpoint (protected)
+app.get('/api/scan-emails', requireAuth, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ error: 'No authorization header' });
+    const gmailToken = req.headers['x-gmail-token'];
+    const userId = req.headers['x-user-id'];
+
+    if (!gmailToken) {
+      return res.status(401).json({ error: 'No Gmail token provided' });
     }
 
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+    if (!userId) {
+      return res.status(401).json({ error: 'No user ID provided' });
     }
 
     // For now, return mock data
@@ -69,7 +79,7 @@ app.get('/api/scan-emails', async (req, res) => {
       .from('subscriptions')
       .insert([
         {
-          user_id: req.user?.id,
+          user_id: userId,
           provider: 'example.com',
           type: 'test',
           price: 9.99,
@@ -86,6 +96,7 @@ app.get('/api/scan-emails', async (req, res) => {
     }
 
     res.json({
+      success: true,
       message: 'Email scan initiated',
       email: mockEmail,
       subscription: data[0]
