@@ -186,45 +186,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       console.log('Scanning emails using API URL:', apiUrl);
 
-      const response = await fetch(`${apiUrl}/api/scan-emails`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'X-Gmail-Token': gmailToken,
-          'X-User-ID': session.user.id,
-          'Content-Type': 'application/json'
+      // Add retry logic
+      const maxRetries = 3;
+      let lastError;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Attempt ${attempt} of ${maxRetries} to scan emails`);
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+          const response = await fetch(`${apiUrl}/api/scan-emails`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'X-Gmail-Token': gmailToken,
+              'X-User-ID': session.user.id,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`API error (attempt ${attempt}):`, {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorText
+            });
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          console.log('Scan emails response:', data);
+          
+          if (!data.success) {
+            throw new Error(data.error || 'Failed to scan emails');
+          }
+
+          // Store subscriptions in local state if needed
+          if (data.subscriptions) {
+            const { data: existingData, error } = await supabase
+              .from('subscriptions')
+              .select('*')
+              .eq('user_id', session.user.id);
+
+            if (error) {
+              console.error('Error fetching subscriptions:', error);
+            } else {
+              console.log('Current subscriptions:', existingData);
+            }
+          }
+
+          return data;
+        } catch (error: any) {
+          lastError = error;
+          console.error(`Error on attempt ${attempt}:`, error);
+          
+          if (attempt === maxRetries) {
+            throw error;
+          }
+          
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      console.log('Scan emails response:', data);
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to scan emails');
-      }
-
-      // Store subscriptions in local state if needed
-      if (data.subscriptions) {
-        // You might want to update some state here or trigger a refresh of the dashboard
-        const { data: existingData, error } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', session.user.id);
-
-        if (error) {
-          console.error('Error fetching subscriptions:', error);
-        } else {
-          // You could emit an event or call a callback here to update the UI
-          console.log('Current subscriptions:', existingData);
-        }
-      }
-
-      return data;
+      throw lastError;
     } catch (error: any) {
       console.error('Error scanning emails:', error);
       throw new Error(error.message || 'Failed to scan emails');
