@@ -13,7 +13,7 @@ import '@fontsource/inter/600.css';
 
 const StyledContainer = styled(Container)(({ theme }) => ({
   minHeight: '100vh',
-  backgroundColor: '#ffefd5',
+  backgroundColor: '#ffffff',
   display: 'flex',
   flexDirection: 'column',
   padding: theme.spacing(4),
@@ -66,19 +66,19 @@ const StyledForm = styled('form')(({ theme }) => ({
 const StyledTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     height: '3.5rem',
-    backgroundColor: 'white',
+    backgroundColor: '#ffffff',
     '& fieldset': {
-      borderColor: '#e5e7eb',
+      borderColor: '#000000',
     },
     '&:hover fieldset': {
-      borderColor: '#d1d5db',
+      borderColor: '#000000',
     },
   },
   '& .MuiInputLabel-root': {
-    color: '#1a365d',
-    fontWeight: 500,
+    color: '#000000',
+    fontWeight: 600,
     '&.Mui-focused': {
-      color: '#1a365d',
+      color: '#000000',
     },
   },
 }));
@@ -94,11 +94,12 @@ const StyledButton = styled(Button)(({ theme }) => ({
 
 const SocialButton = styled(Button)(({ theme }) => ({
   height: '3.5rem',
-  backgroundColor: '#f3f4f6',
+  backgroundColor: '#ffffff',
   color: '#000000',
-  borderColor: '#e5e7eb',
+  borderColor: '#000000',
+  fontWeight: 600,
   '&:hover': {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#f5f5f5',
   },
 }));
 
@@ -153,7 +154,7 @@ const LoginPage: React.FC = () => {
             sx={{
               textAlign: 'center',
               color: '#000000',
-              fontWeight: 700,
+              fontWeight: 800,
               fontFamily: 'Playfair Display, serif',
               mb: 1,
             }}
@@ -167,6 +168,7 @@ const LoginPage: React.FC = () => {
               mb: 4,
               fontFamily: 'Inter, sans-serif',
               fontSize: '0.875rem',
+              fontWeight: 600,
             }}
           >
             Sign in to your account
@@ -192,7 +194,7 @@ const LoginPage: React.FC = () => {
             />
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Link to="/forgot-password" style={{ color: '#000000', fontSize: '0.875rem' }}>
+              <Link to="/forgot-password" style={{ color: '#000000', fontSize: '0.875rem', fontWeight: 600 }}>
                 Forgot password?
               </Link>
             </Box>
@@ -203,14 +205,14 @@ const LoginPage: React.FC = () => {
           </StyledForm>
 
           <Box sx={{ textAlign: 'center', mt: 3 }}>
-            <Link to="/signup" style={{ color: '#000000', fontWeight: 500, fontSize: '0.875rem' }}>
+            <Link to="/signup" style={{ color: '#000000', fontWeight: 600, fontSize: '0.875rem' }}>
               Don't have an account? Sign up here.
             </Link>
           </Box>
 
           <Box sx={{ my: 4 }}>
             <Divider sx={{ mb: 2 }}>
-              <Typography sx={{ color: '#6b7280', px: 2 }}>or</Typography>
+              <Typography sx={{ color: '#000000', px: 2, fontWeight: 600 }}>or</Typography>
             </Divider>
           </Box>
 
