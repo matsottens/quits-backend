@@ -12,6 +12,12 @@ export interface GoogleUserInfo {
   picture: string;
 }
 
+export interface GoogleAuthResponse {
+  user: GoogleUserInfo;
+  access_token: string;
+  refresh_token: string;
+}
+
 export const initiateGoogleAuth = () => {
   const params = new URLSearchParams({
     client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || '',
@@ -25,7 +31,7 @@ export const initiateGoogleAuth = () => {
   window.location.href = `${GOOGLE_AUTH_URL}?${params.toString()}`;
 };
 
-export const handleGoogleCallback = async (code: string): Promise<GoogleUserInfo> => {
+export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResponse> => {
   try {
     // Exchange code for tokens
     const tokenResponse = await axios.post(GOOGLE_TOKEN_URL, {
@@ -49,7 +55,11 @@ export const handleGoogleCallback = async (code: string): Promise<GoogleUserInfo
     localStorage.setItem('google_access_token', access_token);
     localStorage.setItem('google_refresh_token', refresh_token);
 
-    return userInfoResponse.data;
+    return {
+      user: userInfoResponse.data,
+      access_token,
+      refresh_token
+    };
   } catch (error) {
     console.error('Error handling Google callback:', error);
     throw error;

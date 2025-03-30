@@ -10,6 +10,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   scanEmails: () => Promise<void>;
+  login: (userInfo: any) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -112,15 +113,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-            scope: 'email profile https://www.googleapis.com/auth/gmail.readonly'
-          },
           redirectTo: `${window.location.origin}/auth/google/callback`
         }
       });
       if (error) throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (userInfo: any) => {
+    try {
+      setLoading(true);
+      // Store the user info in Supabase session
+      const { error } = await supabase.auth.setSession({
+        access_token: userInfo.access_token,
+        refresh_token: userInfo.refresh_token
+      });
+      if (error) throw error;
+
+      // Set the user in the context
+      setUser(userInfo.user);
+      
+      // Store the Gmail access token if available
+      if (userInfo.access_token) {
+        sessionStorage.setItem('gmail_access_token', userInfo.access_token);
+      }
+    } catch (error) {
+      console.error('Error during login:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -208,7 +229,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signOut,
     signInWithGoogle,
-    scanEmails
+    scanEmails,
+    login
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
