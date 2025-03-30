@@ -29,13 +29,16 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 // Middleware
 app.use(cors({
-  origin: ['https://www.quits.cc', 'https://quits.vercel.app', 'https://quits-api.onrender.com'],
+  origin: ['https://www.quits.cc', 'https://quits.vercel.app', 'http://localhost:3000', 'https://quits-api.onrender.com', 'https://api.quits.cc'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID']
 }));
 
 app.use(bodyParser.json());
+
+// Add port configuration
+const port = process.env.PORT || 3001;
 
 // Health check endpoint (no auth required)
 app.get('/api/health', (req, res) => {
@@ -111,6 +114,13 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
 app.all('*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
+
+// Start the server if not being imported
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+}
 
 // Export the Express app for Vercel
 module.exports = app; 
