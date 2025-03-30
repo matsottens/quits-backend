@@ -3,9 +3,12 @@ services:
     name: quits-api
     env: node
     buildCommand: npm install
-    startCommand: ./start.sh
+    startCommand: node index.js
     envVars:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
-        sync: false 
+        sync: false
+      - key: PORT
+        value: 10000
+    nodeVersion: 18 

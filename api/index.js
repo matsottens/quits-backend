@@ -5,6 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 const fetch = require('cross-fetch');
 
 const app = express();
+const port = process.env.PORT || 10000;
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -36,9 +37,6 @@ app.use(cors({
 }));
 
 app.use(bodyParser.json());
-
-// Add port configuration
-const port = process.env.PORT || 3001;
 
 // Health check endpoint (no auth required)
 app.get('/api/health', (req, res) => {
@@ -115,12 +113,10 @@ app.all('*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Start the server if not being imported
-if (require.main === module) {
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
-}
+// Start the server
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
+});
 
-// Export the Express app for Vercel
+// Export the Express app
 module.exports = app; 
