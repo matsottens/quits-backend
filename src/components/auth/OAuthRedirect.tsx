@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { handleGoogleCallback, GoogleAuthResponse } from '../../services/googleAuth';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,6 +8,7 @@ export const OAuthRedirect: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const isProcessing = useRef(false);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -15,6 +16,13 @@ export const OAuthRedirect: React.FC = () => {
         console.log('OAuthRedirect - Starting callback handling');
         console.log('Current location:', location.pathname + location.search);
         
+        // Prevent multiple token exchanges
+        if (isProcessing.current) {
+          console.log('OAuthRedirect - Already processing callback');
+          return;
+        }
+        isProcessing.current = true;
+
         const searchParams = new URLSearchParams(location.search);
         const code = searchParams.get('code');
         const error = searchParams.get('error');
@@ -42,7 +50,8 @@ export const OAuthRedirect: React.FC = () => {
         console.log('OAuthRedirect - Received auth response:', {
           hasUser: !!authResponse.user,
           hasAccessToken: !!authResponse.access_token,
-          hasRefreshToken: !!authResponse.refresh_token
+          hasRefreshToken: !!authResponse.refresh_token,
+          hasIdToken: !!authResponse.id_token
         });
 
         console.log('OAuthRedirect - Logging in user');
@@ -53,6 +62,8 @@ export const OAuthRedirect: React.FC = () => {
       } catch (err) {
         console.error('OAuthRedirect - Error in callback handling:', err);
         setError('Failed to complete authentication');
+      } finally {
+        isProcessing.current = false;
       }
     };
 
