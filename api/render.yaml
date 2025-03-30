@@ -2,8 +2,9 @@ services:
   - type: web
     name: quits-api
     env: node
+    runtime: node
     buildCommand: npm install
-    startCommand: node index.js
+    startCommand: cd /opt/render/project && node index.js
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -11,4 +12,5 @@ services:
         sync: false
       - key: PORT
         value: 10000
-    nodeVersion: 18 
+      - key: NODE_VERSION
+        value: 18.19.0 
