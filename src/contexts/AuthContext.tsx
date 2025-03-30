@@ -183,7 +183,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No user ID available');
       }
 
-      const response = await fetch('http://localhost:5000/api/scan-emails', {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      console.log('Scanning emails using API URL:', apiUrl);
+
+      const response = await fetch(`${apiUrl}/api/scan-emails`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
