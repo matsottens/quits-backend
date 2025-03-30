@@ -33,6 +33,9 @@ export const initiateGoogleAuth = () => {
 
 export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResponse> => {
   try {
+    console.log('GoogleAuth - Starting token exchange');
+    console.log('GoogleAuth - Using redirect URI:', process.env.REACT_APP_GOOGLE_REDIRECT_URI);
+    
     // Exchange code for tokens
     const tokenResponse = await axios.post(GOOGLE_TOKEN_URL, {
       client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
@@ -42,13 +45,20 @@ export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResp
       grant_type: 'authorization_code',
     });
 
+    console.log('GoogleAuth - Token exchange successful');
     const { access_token, refresh_token } = tokenResponse.data;
 
     // Get user info
+    console.log('GoogleAuth - Fetching user info');
     const userInfoResponse = await axios.get(GOOGLE_USERINFO_URL, {
       headers: {
         Authorization: `Bearer ${access_token}`,
       },
+    });
+
+    console.log('GoogleAuth - User info received:', {
+      email: userInfoResponse.data.email,
+      name: userInfoResponse.data.name
     });
 
     // Store tokens securely (you might want to use a more secure method)
@@ -60,8 +70,12 @@ export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResp
       access_token,
       refresh_token
     };
-  } catch (error) {
-    console.error('Error handling Google callback:', error);
+  } catch (error: any) {
+    console.error('GoogleAuth - Error in callback handling:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
     throw error;
   }
 };

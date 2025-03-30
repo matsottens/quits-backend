@@ -12,25 +12,46 @@ export const OAuthRedirect: React.FC = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        console.log('OAuthRedirect - Starting callback handling');
+        console.log('Current location:', location.pathname + location.search);
+        
         const searchParams = new URLSearchParams(location.search);
         const code = searchParams.get('code');
         const error = searchParams.get('error');
 
+        console.log('OAuthRedirect - URL parameters:', {
+          hasCode: !!code,
+          hasError: !!error,
+          errorMessage: error
+        });
+
         if (error) {
+          console.error('OAuthRedirect - Error from Google:', error);
           setError(`Authentication failed: ${error}`);
           return;
         }
 
         if (!code) {
+          console.error('OAuthRedirect - No authorization code received');
           setError('No authorization code received');
           return;
         }
 
+        console.log('OAuthRedirect - Exchanging code for tokens');
         const authResponse: GoogleAuthResponse = await handleGoogleCallback(code);
+        console.log('OAuthRedirect - Received auth response:', {
+          hasUser: !!authResponse.user,
+          hasAccessToken: !!authResponse.access_token,
+          hasRefreshToken: !!authResponse.refresh_token
+        });
+
+        console.log('OAuthRedirect - Logging in user');
         await login(authResponse);
+        
+        console.log('OAuthRedirect - Login successful, redirecting to scanning');
         navigate('/scanning');
       } catch (err) {
-        console.error('Error handling Google callback:', err);
+        console.error('OAuthRedirect - Error in callback handling:', err);
         setError('Failed to complete authentication');
       }
     };
