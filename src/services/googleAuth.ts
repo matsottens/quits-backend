@@ -16,6 +16,7 @@ export interface GoogleAuthResponse {
   user: GoogleUserInfo;
   access_token: string;
   refresh_token: string;
+  id_token: string;
 }
 
 export const initiateGoogleAuth = () => {
@@ -40,18 +41,27 @@ export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResp
   try {
     console.log('GoogleAuth - Starting token exchange');
     console.log('GoogleAuth - Using redirect URI:', process.env.REACT_APP_GOOGLE_REDIRECT_URI);
+    console.log('GoogleAuth - Client ID available:', !!process.env.REACT_APP_GOOGLE_CLIENT_ID);
+    console.log('GoogleAuth - Client Secret available:', !!process.env.REACT_APP_GOOGLE_CLIENT_SECRET);
     
-    // Exchange code for tokens
-    const tokenResponse = await axios.post(GOOGLE_TOKEN_URL, {
+    const tokenData = {
       client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
       client_secret: process.env.REACT_APP_GOOGLE_CLIENT_SECRET,
       code,
       redirect_uri: process.env.REACT_APP_GOOGLE_REDIRECT_URI,
       grant_type: 'authorization_code',
+    };
+
+    console.log('GoogleAuth - Token request data:', {
+      ...tokenData,
+      client_secret: tokenData.client_secret ? '[REDACTED]' : undefined
     });
 
+    // Exchange code for tokens
+    const tokenResponse = await axios.post(GOOGLE_TOKEN_URL, tokenData);
+
     console.log('GoogleAuth - Token exchange successful');
-    const { access_token, refresh_token } = tokenResponse.data;
+    const { access_token, refresh_token, id_token } = tokenResponse.data;
 
     // Get user info
     console.log('GoogleAuth - Fetching user info');
@@ -73,13 +83,15 @@ export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResp
     return {
       user: userInfoResponse.data,
       access_token,
-      refresh_token
+      refresh_token,
+      id_token
     };
   } catch (error: any) {
     console.error('GoogleAuth - Error in callback handling:', {
       message: error.message,
       response: error.response?.data,
-      status: error.response?.status
+      status: error.response?.status,
+      details: error.response?.data?.error_description
     });
     throw error;
   }

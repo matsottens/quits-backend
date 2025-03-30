@@ -11,7 +11,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   scanEmails: () => Promise<void>;
-  login: (userInfo: any) => Promise<void>;
+  login: (authResponse: any) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -117,25 +117,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (userInfo: any) => {
+  const login = async (authResponse: any) => {
     try {
       setLoading(true);
-      // Store the user info in Supabase session
-      const { error } = await supabase.auth.setSession({
-        access_token: userInfo.access_token,
-        refresh_token: userInfo.refresh_token
+      console.log('AuthContext - Starting login with response:', {
+        hasUser: !!authResponse.user,
+        hasAccessToken: !!authResponse.access_token,
+        hasRefreshToken: !!authResponse.refresh_token,
+        hasIdToken: !!authResponse.id_token
       });
-      if (error) throw error;
 
-      // Set the user in the context
-      setUser(userInfo.user);
+      // Sign in with Supabase using the ID token
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: authResponse.id_token,
+      });
+
+      if (error) {
+        console.error('AuthContext - Error signing in with ID token:', error);
+        throw error;
+      }
+
+      console.log('AuthContext - Supabase sign-in successful');
       
       // Store the Gmail access token if available
-      if (userInfo.access_token) {
-        sessionStorage.setItem('gmail_access_token', userInfo.access_token);
+      if (authResponse.access_token) {
+        sessionStorage.setItem('gmail_access_token', authResponse.access_token);
       }
+
+      // Set the user in the context
+      setUser(data.user);
     } catch (error) {
-      console.error('Error during login:', error);
+      console.error('AuthContext - Error during login:', error);
       throw error;
     } finally {
       setLoading(false);
