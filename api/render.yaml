@@ -3,7 +3,7 @@ services:
     name: quits-api
     env: node
     buildCommand: npm install
-    startCommand: node index.js
+    startCommand: ./start.sh
     envVars:
       - key: SUPABASE_URL
         sync: false
