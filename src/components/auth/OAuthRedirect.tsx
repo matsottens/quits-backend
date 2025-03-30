@@ -18,7 +18,7 @@ export const OAuthRedirect: React.FC = () => {
         
         // Prevent multiple token exchanges
         if (isProcessing.current) {
-          console.log('OAuthRedirect - Already processing callback');
+          console.log('OAuthRedirect - Already processing callback, skipping');
           return;
         }
         isProcessing.current = true;
@@ -58,7 +58,7 @@ export const OAuthRedirect: React.FC = () => {
         await login(authResponse);
         
         console.log('OAuthRedirect - Login successful, redirecting to scanning');
-        navigate('/scanning');
+        navigate('/scanning', { replace: true });
       } catch (err) {
         console.error('OAuthRedirect - Error in callback handling:', err);
         setError('Failed to complete authentication');
@@ -68,7 +68,7 @@ export const OAuthRedirect: React.FC = () => {
     };
 
     handleCallback();
-  }, [location, navigate, login]);
+  }, [location.search]); // Only re-run when the search params change
 
   if (error) {
     return (
