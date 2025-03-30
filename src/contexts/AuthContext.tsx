@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
+import { initiateGoogleAuth } from '../services/googleAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -110,13 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/google/callback`
-        }
-      });
-      if (error) throw error;
+      initiateGoogleAuth();
     } finally {
       setLoading(false);
     }
