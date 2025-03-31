@@ -296,8 +296,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${currentSession.access_token}`,
           'X-Gmail-Token': gmailToken,
-          'X-User-ID': currentSession.user.id,
-          'Origin': window.location.origin
+          'X-User-ID': currentSession.user.id
         }
       };
 
@@ -327,7 +326,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
             method: 'GET',
             ...fetchOptions,
-            signal: controller.signal
+            signal: controller.signal,
+            // Add additional fetch options for CORS
+            cache: 'no-cache',
+            redirect: 'follow',
+            referrerPolicy: 'no-referrer'
           });
           
           clearTimeout(timeoutId);

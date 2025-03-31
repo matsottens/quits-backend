@@ -44,13 +44,15 @@ function setCorsHeaders(req, res) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
     
     // Log the headers that were set
     console.log('CORS headers set:', {
       'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
       'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials'),
       'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
-      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers')
+      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+      'Access-Control-Max-Age': res.getHeader('Access-Control-Max-Age')
     });
     
     return true;
@@ -64,7 +66,7 @@ function setCorsHeaders(req, res) {
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// Add a middleware to log all requests
+// Add a middleware to log all requests and handle CORS
 app.use((req, res, next) => {
   console.log('Incoming request:', {
     method: req.method,
@@ -72,6 +74,19 @@ app.use((req, res, next) => {
     origin: req.headers.origin,
     headers: req.headers
   });
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    if (setCorsHeaders(req, res)) {
+      res.status(204).end();
+    } else {
+      res.status(403).end();
+    }
+    return;
+  }
+  
+  // Set CORS headers for all requests
+  setCorsHeaders(req, res);
   
   // Log response headers after they're sent
   res.on('finish', () => {
@@ -96,18 +111,6 @@ app.get('/health', async (req, res) => {
       hasAuthHeader: !!req.headers.authorization,
       headers: req.headers
     });
-
-    // Set CORS headers first
-    if (!setCorsHeaders(req, res)) {
-      console.log('CORS check failed for origin:', req.headers.origin);
-      return res.status(403).json({ 
-        error: 'Origin not allowed',
-        details: `Origin ${req.headers.origin} is not allowed by CORS policy`
-      });
-    }
-
-    // Log headers after setting CORS
-    console.log('Headers after setting CORS:', res.getHeaders());
 
     // Get the authorization header
     const authHeader = req.headers.authorization;
@@ -146,24 +149,6 @@ app.get('/health', async (req, res) => {
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
-  }
-});
-
-// Add OPTIONS handler for health endpoint
-app.options('/health', (req, res) => {
-  if (setCorsHeaders(req, res)) {
-    res.status(204).end();
-  } else {
-    res.status(403).end();
-  }
-});
-
-// Add OPTIONS handler for all routes
-app.options('*', (req, res) => {
-  if (setCorsHeaders(req, res)) {
-    res.status(204).end();
-  } else {
-    res.status(403).end();
   }
 });
 
