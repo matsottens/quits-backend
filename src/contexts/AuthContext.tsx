@@ -27,11 +27,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
         
-        // Check if we have provider tokens in the session
-        if (session?.provider_token) {
+        // If no session, clear any stale tokens
+        if (!session) {
+          localStorage.removeItem('gmail_token');
+          sessionStorage.removeItem('gmail_access_token');
+          setUser(null);
+          return;
+        }
+
+        setUser(session.user);
+        
+        // Check and store provider tokens
+        if (session.provider_token) {
+          localStorage.setItem('gmail_token', session.provider_token);
           sessionStorage.setItem('gmail_access_token', session.provider_token);
+          console.log('Stored provider token from session');
+        }
+
+        // If we have a user but no Gmail token, we need to re-authenticate
+        const hasGmailToken = localStorage.getItem('gmail_token') || sessionStorage.getItem('gmail_access_token');
+        if (session.user && !hasGmailToken) {
+          console.log('No Gmail token found, redirecting to Google auth');
+          await signInWithGoogle();
         }
       } catch (error) {
         console.error('Error checking auth status:', error);
@@ -52,12 +70,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (event === 'SIGNED_OUT') {
           setUser(null);
+          localStorage.removeItem('gmail_token');
           sessionStorage.removeItem('gmail_access_token');
         } else if (session?.user) {
           setUser(session.user);
           // Store provider token if available
           if (session.provider_token) {
-            console.log('Storing provider token');
+            console.log('Storing provider token from auth change');
+            localStorage.setItem('gmail_token', session.provider_token);
             sessionStorage.setItem('gmail_access_token', session.provider_token);
           }
         }
@@ -101,9 +121,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setLoading(true);
+      // Clear all stored tokens
+      localStorage.removeItem('gmail_token');
+      sessionStorage.removeItem('gmail_access_token');
+      localStorage.removeItem('supabase.auth.token');
+      
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      setUser(null); // Immediately clear the user state
+      
+      // Clear user state
+      setUser(null);
+      
+      // Clear any cached auth state
+      await supabase.auth.refreshSession();
+      
+      // Force reload the page to clear any remaining state
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Error signing out:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -112,6 +149,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
+      
+      // Clear any existing tokens to ensure fresh auth
+      localStorage.removeItem('gmail_token');
+      sessionStorage.removeItem('gmail_access_token');
+      
       const redirectTo = window.location.host.includes('localhost')
         ? 'http://localhost:3000/auth/callback'
         : `${window.location.origin}/auth/callback`;
@@ -124,13 +166,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           redirectTo,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent'
+            prompt: 'consent',
+            scope: 'https://www.googleapis.com/auth/gmail.readonly'
           },
-          skipBrowserRedirect: false
+          skipBrowserRedirect: false,
+          // Always show consent screen
+          flowType: 'pkce'
         }
       });
 
       if (error) {
+        console.error('OAuth error:', error);
         throw error;
       }
 
@@ -156,9 +202,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasUser: !!tokens.user
       });
 
-      // Store the Gmail token for later use
+      // Store the Gmail token in both localStorage and sessionStorage
       if (tokens.access_token) {
+        localStorage.setItem('gmail_token', tokens.access_token);
         sessionStorage.setItem('gmail_access_token', tokens.access_token);
+        console.log('Stored Gmail access token');
       }
 
       // Sign in with Supabase using the Google ID token
@@ -166,6 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',
           token: tokens.id_token,
+          nonce: sessionStorage.getItem('supabase.auth.nonce') || undefined
         });
 
         if (error) {
@@ -175,8 +224,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         console.log('Supabase sign in successful:', {
           hasSession: !!data.session,
-          hasUser: !!data.user
+          hasUser: !!data.user,
+          hasProviderToken: !!data.session?.provider_token
         });
+
+        // Store provider token if available
+        if (data.session?.provider_token) {
+          localStorage.setItem('gmail_token', data.session.provider_token);
+          sessionStorage.setItem('gmail_access_token', data.session.provider_token);
+        }
 
         setUser(data.user);
         return data;
