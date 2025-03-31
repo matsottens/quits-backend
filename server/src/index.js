@@ -9,52 +9,13 @@ const { google } = require('googleapis');
 const { createClient } = require('@supabase/supabase-js');
 const fetch = require('cross-fetch');
 
+const { corsOptions, logRequest, authenticateRequest, supabase } = require('./middleware/auth');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 const notificationsRouter = require('./routes/notifications');
 const analyticsRouter = require('./routes/analytics');
-
-// CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-
-    const allowedOrigins = [
-      'https://quits.cc',
-      'https://www.quits.cc',
-      'https://quits.vercel.app',
-      'http://localhost:3000'
-    ];
-
-    // Normalize origins for comparison
-    const normalizedOrigin = origin.toLowerCase();
-    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase());
-
-    // Check if the origin matches any allowed origin
-    const isAllowed = normalizedAllowedOrigins.some(allowed => 
-      allowed === normalizedOrigin || 
-      allowed.replace('www.', '') === normalizedOrigin.replace('www.', '')
-    );
-
-    if (isAllowed) {
-      console.log('CORS: Allowing origin:', origin);
-      callback(null, origin); // Return the actual origin to ensure exact match
-    } else {
-      console.log('CORS: Blocking origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 86400 // 24 hours
-};
 
 // Apply CORS middleware first
 app.use(cors(corsOptions));
@@ -63,31 +24,15 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// Add request logging
+app.use(logRequest);
+
 // Add routes
 app.use('/api/notifications', notificationsRouter);
 app.use('/api', analyticsRouter);
 
-// Add a middleware to log all requests
-app.use((req, res, next) => {
-  console.log('Incoming request:', {
-    method: req.method,
-    path: req.path,
-    origin: req.headers.origin,
-    headers: req.headers
-  });
-  
-  // Log response headers after they're sent
-  res.on('finish', () => {
-    console.log('Response sent:', {
-      method: req.method,
-      path: req.path,
-      statusCode: res.statusCode,
-      headers: res.getHeaders()
-    });
-  });
-  
-  next();
-});
+// Apply authentication middleware to protected routes
+app.use('/api', authenticateRequest);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -99,6 +44,13 @@ app.get('/health', async (req, res) => {
       hasAuthHeader: !!req.headers.authorization,
       headers: req.headers
     });
+
+    // Set CORS headers explicitly for this endpoint
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
 
     // Get the authorization header
     const authHeader = req.headers.authorization;

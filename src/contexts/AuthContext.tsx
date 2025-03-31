@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
-import { initiateGoogleAuth } from '../services/googleAuth';
+import { apiService } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -11,7 +11,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   scanEmails: () => Promise<void>;
-  login: (tokens: any) => Promise<void>;
+  login: (tokens: any) => Promise<{ user: User; session: Session }>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -161,11 +161,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             access_type: 'offline',
             prompt: 'consent',
             scope: 'https://www.googleapis.com/auth/gmail.readonly email profile',
-            response_type: 'code',
-            client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID
+            response_type: 'code'
           },
-          skipBrowserRedirect: false,
-          flowType: 'pkce'
+          skipBrowserRedirect: false
         }
       });
 
@@ -189,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.location.href = data.url;
     } catch (error) {
       console.error('Error initiating Google sign-in:', error);
-      setError(error instanceof Error ? error.message : 'Failed to start Google sign-in');
+      setError(error instanceof Error ? error : new Error('Failed to start Google sign-in'));
       // Redirect to login page on error
       window.location.href = '/login';
     } finally {
@@ -242,7 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to login');
+      setError(error instanceof Error ? error : new Error('Failed to login'));
       throw error;
     }
   };
@@ -250,245 +248,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const scanEmails = async () => {
     setLoading(true);
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      const gmailToken = sessionStorage.getItem('gmail_access_token');
-      
-      console.log('Scan emails - Session:', {
-        hasSession: !!currentSession,
-        hasAccessToken: !!currentSession?.access_token,
-        hasProviderToken: !!currentSession?.provider_token,
-        hasStoredGmailToken: !!gmailToken,
-        userId: currentSession?.user?.id
-      });
-      
-      if (!currentSession?.access_token) {
-        throw new Error('Not authenticated. Please sign in again.');
+      const result = await apiService.scanEmails();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to scan emails');
       }
-
-      if (!gmailToken) {
-        throw new Error('No Gmail access token available. Please sign in with Google again.');
-      }
-
-      if (!currentSession.user?.id) {
-        throw new Error('No user ID available. Please sign in again.');
-      }
-
-      // Use the API URL from environment or fallback to a default
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
-      const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
-      console.log('Scanning emails using API URL:', apiUrlWithProtocol);
-
-      // Common fetch options with improved configuration
-      const fetchOptions = {
-        credentials: 'include' as RequestCredentials,
-        mode: 'cors' as RequestMode,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentSession.access_token}`,
-          'X-Gmail-Token': gmailToken,
-          'X-User-ID': currentSession.user.id
-        }
-      };
-
-      console.log('Request options:', {
-        ...fetchOptions,
-        headers: {
-          ...fetchOptions.headers,
-          'Authorization': 'Bearer [REDACTED]',
-          'X-Gmail-Token': '[REDACTED]'
-        }
-      });
-
-      // First, try a health check with retries
-      const maxHealthCheckRetries = 3;
-      let healthCheckError;
-
-      for (let attempt = 1; attempt <= maxHealthCheckRetries; attempt++) {
-        try {
-          console.log(`Health check attempt ${attempt} of ${maxHealthCheckRetries}`);
-          
-          // Create a new AbortController for each attempt
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-          // Ensure consistent URL format
-          const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
-          const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
-          const healthCheckUrl = `${apiUrlWithProtocol}/health`;
-          
-          console.log('Making health check request to:', healthCheckUrl);
-          
-          const healthCheck = await fetch(healthCheckUrl, {
-            method: 'GET',
-            ...fetchOptions,
-            signal: controller.signal,
-            // Add additional fetch options for CORS
-            cache: 'no-cache',
-            redirect: 'follow',
-            referrerPolicy: 'no-referrer',
-            // Ensure consistent origin handling
-            mode: 'cors',
-            credentials: 'include'
-          });
-          
-          clearTimeout(timeoutId);
-
-          // Log response details
-          console.log('Health check response:', {
-            status: healthCheck.status,
-            statusText: healthCheck.statusText,
-            headers: Object.fromEntries(healthCheck.headers.entries()),
-            ok: healthCheck.ok,
-            type: healthCheck.type,
-            url: healthCheck.url
-          });
-
-          if (!healthCheck.ok) {
-            const errorData = await healthCheck.json().catch(() => null);
-            console.error('Health check failed:', {
-              status: healthCheck.status,
-              statusText: healthCheck.statusText,
-              error: errorData,
-              headers: Object.fromEntries(healthCheck.headers.entries())
-            });
-
-            // If unauthorized, try to refresh the session
-            if (healthCheck.status === 401) {
-              console.log('Attempting to refresh session...');
-              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-              if (refreshError || !newSession) {
-                console.error('Session refresh failed:', refreshError);
-                throw new Error('Session expired. Please sign in again.');
-              }
-              console.log('Session refreshed successfully');
-              // Update the session and retry with new token
-              currentSession.access_token = newSession.access_token;
-              fetchOptions.headers['Authorization'] = `Bearer ${newSession.access_token}`;
-              continue;
-            }
-
-            throw new Error(errorData?.error || `Health check failed with status ${healthCheck.status}`);
-          }
-          
-          const healthData = await healthCheck.json();
-          console.log('Health check response data:', healthData);
-          
-          // If we get here, the health check was successful
-          break;
-        } catch (error: any) {
-          healthCheckError = error;
-          console.error(`Health check attempt ${attempt} failed:`, {
-            error: error.message,
-            type: error.name,
-            stack: error.stack,
-            cause: error.cause
-          });
-          
-          if (attempt === maxHealthCheckRetries) {
-            console.error('All health check attempts failed');
-            throw new Error('Backend service is not responding. Please try again later.');
-          }
-          
-          // Wait before retrying (exponential backoff)
-          const delay = Math.pow(2, attempt) * 1000;
-          console.log(`Waiting ${delay}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-
-      // Add retry logic for the main request
-      const maxRetries = 3;
-      let lastError;
-
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`Attempt ${attempt} of ${maxRetries} to scan emails`);
-          
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-          console.log('Making request to:', `${apiUrlWithProtocol}/api/scan-emails`);
-          console.log('With headers:', {
-            ...fetchOptions.headers,
-            'Authorization': 'Bearer [REDACTED]',
-            'X-Gmail-Token': '[REDACTED]'
-          });
-
-          const response = await fetch(`${apiUrlWithProtocol}/api/scan-emails`, {
-            method: 'GET',
-            signal: controller.signal,
-            ...fetchOptions
-          });
-
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => null);
-            console.error(`API error (attempt ${attempt}):`, {
-              status: response.status,
-              statusText: response.statusText,
-              error: errorData,
-              headers: Object.fromEntries(response.headers.entries())
-            });
-
-            // Handle specific error cases
-            if (response.status === 401) {
-              if (errorData?.error === 'Gmail token expired or invalid') {
-                // Clear Gmail tokens and redirect to Google auth
-                sessionStorage.removeItem('gmail_access_token');
-                await signInWithGoogle();
-                return;
-              } else {
-                // Other auth errors - clear session and redirect to login
-                await signOut();
-                return;
-              }
-            }
-
-            throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
-          console.log('Scan emails response:', data);
-          
-          if (!data.success) {
-            throw new Error(data.error || 'Failed to scan emails');
-          }
-
-          // Store subscriptions in local state if needed
-          if (data.subscriptions) {
-            const { data: existingData, error } = await supabase
-              .from('subscriptions')
-              .select('*')
-              .eq('user_id', currentSession.user.id);
-
-            if (error) {
-              console.error('Error fetching subscriptions:', error);
-            } else {
-              console.log('Current subscriptions:', existingData);
-            }
-          }
-
-          return data;
-        } catch (error: any) {
-          lastError = error;
-          console.error(`Error on attempt ${attempt}:`, {
-            error: error.message,
-            type: error.name,
-            stack: error.stack
-          });
-          
-          if (attempt === maxRetries) {
-            throw error;
-          }
-          
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-        }
-      }
-
-      throw lastError;
+      return result.data;
     } catch (error: any) {
       console.error('Error scanning emails:', {
         error: error.message,
