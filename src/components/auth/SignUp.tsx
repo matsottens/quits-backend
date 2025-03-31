@@ -45,10 +45,37 @@ export const SignUp: React.FC = () => {
       }
 
       if (signUpData.user) {
-        console.log('Sign up successful:', signUpData.user.email);
+        console.log('Sign up response:', {
+          email: signUpData.user.email,
+          confirmed: signUpData.user.confirmed_at,
+          hasIdentities: signUpData.user.identities?.length > 0
+        });
         
-        if (signUpData.user.identities?.length === 0) {
-          setError('An account with this email already exists');
+        // If user exists but is not confirmed
+        if (signUpData.user.identities?.length === 0 && !signUpData.user.confirmed_at) {
+          // Resend confirmation email
+          const { error: resendError } = await supabase.auth.resend({
+            type: 'signup',
+            email,
+            options: {
+              emailRedirectTo: 'https://www.quits.cc/auth/callback'
+            }
+          });
+
+          if (resendError) {
+            throw resendError;
+          }
+
+          setSuccess('A new confirmation email has been sent. Please check your inbox.');
+          setTimeout(() => {
+            navigate('/login');
+          }, 5000);
+          return;
+        }
+
+        // If user exists and is confirmed
+        if (signUpData.user.identities?.length === 0 && signUpData.user.confirmed_at) {
+          setError('An account with this email already exists and is verified. Please sign in.');
           return;
         }
 
@@ -65,7 +92,7 @@ export const SignUp: React.FC = () => {
 
           navigate('/scanning');
         } else {
-          // User needs to confirm email
+          // New signup, user needs to confirm email
           setSuccess('Please check your email for a confirmation link to complete your registration.');
           setTimeout(() => {
             navigate('/login');
