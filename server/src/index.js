@@ -32,7 +32,42 @@ const analyticsRouter = require('./routes/analytics');
 app.use(customCorsMiddleware);
 
 // Apply CSP middleware
-app.use(cspMiddleware);
+app.use((req, res, next) => {
+  // Set strict CSP headers
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      // Scripts - only allow from our domain and necessary third parties
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://*.googleapis.com https://apis.google.com",
+      // Styles
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // Images
+      "img-src 'self' data: https: http:",
+      // Fonts
+      "font-src 'self' https://fonts.gstatic.com",
+      // Connect (for API calls)
+      "connect-src 'self' https://api.quits.cc https://*.supabase.co https://accounts.google.com https://*.googleapis.com",
+      // Frame ancestors (for iframe embedding)
+      "frame-ancestors 'none'",
+      // Object sources
+      "object-src 'none'",
+      // Form actions
+      "form-action 'self' https://accounts.google.com",
+      // Frame sources
+      "frame-src 'self' https://accounts.google.com",
+      // Default source
+      "default-src 'self'"
+    ].join('; ')
+  );
+
+  // Set other security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  next();
+});
 
 // Add specific OPTIONS handler for scan-emails
 app.options('/api/scan-emails', (req, res) => {
