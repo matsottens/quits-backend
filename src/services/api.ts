@@ -103,7 +103,7 @@ class ApiService {
         },
         signal: controller.signal,
         mode: 'cors',
-        credentials: 'include',
+        credentials: 'same-origin',
         referrerPolicy: 'strict-origin-when-cross-origin'
       });
 
