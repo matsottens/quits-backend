@@ -25,18 +25,39 @@ app.use((req, res, next) => {
 
 // Configure CORS based on environment
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://quits.cc', 'https://quits.vercel.app', 'https://www.quits.cc']
-    : true,
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'https://quits.cc',
+      'https://quits.vercel.app',
+      'https://www.quits.cc',
+      'http://localhost:3000'
+    ];
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      console.log('CORS blocked for origin:', origin);
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    console.log('CORS allowed for origin:', origin);
+    return callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID', 'Accept', 'Origin'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   maxAge: 600,
-  preflightContinue: false
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
+// Apply CORS middleware
 app.use(cors(corsOptions));
+
+// Add a preflight handler for the scan-emails endpoint
+app.options('/api/scan-emails', cors(corsOptions));
 
 // Add CSP headers middleware
 app.use((req, res, next) => {
@@ -51,6 +72,10 @@ app.use((req, res, next) => {
     : "default-src 'self' 'unsafe-inline' 'unsafe-eval';";
   
   res.setHeader('Content-Security-Policy', cspHeader);
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Gmail-Token, X-User-ID, Accept, Origin');
   next();
 });
 
@@ -344,7 +369,8 @@ app.get('/api/scan-emails', async (req, res) => {
   console.log('Starting email scan', {
     hasAuthHeader: !!authHeader,
     hasGmailToken: !!gmailToken,
-    hasUserId: !!userId
+    hasUserId: !!userId,
+    origin: req.headers.origin
   });
   
   if (!authHeader?.startsWith('Bearer ')) {
@@ -367,6 +393,17 @@ app.get('/api/scan-emails', async (req, res) => {
     
     const gmail = google.gmail({ version: 'v1', auth });
 
+    // Test Gmail API access first
+    try {
+      await gmail.users.getProfile({ userId: 'me' });
+    } catch (error) {
+      console.error('Gmail API access error:', error);
+      if (error.code === 401) {
+        return res.status(401).json({ error: 'Gmail token expired or invalid. Please sign in again.' });
+      }
+      throw error;
+    }
+
     // List emails with pagination
     let messages = [];
     let nextPageToken = null;
@@ -379,8 +416,15 @@ app.get('/api/scan-emails', async (req, res) => {
         q: 'in:inbox subject:(subscription OR payment OR receipt OR invoice)'
       });
 
-      messages = messages.concat(response.data.messages || []);
+      if (!response.data.messages) {
+        console.log('No messages found');
+        break;
+      }
+
+      messages = messages.concat(response.data.messages);
       nextPageToken = response.data.nextPageToken;
+      
+      console.log(`Retrieved ${messages.length} messages so far`);
     } while (nextPageToken && messages.length < 500); // Limit to 500 emails max
 
     const subscriptions = [];
@@ -401,27 +445,33 @@ app.get('/api/scan-emails', async (req, res) => {
       const batchResults = await Promise.all(batchPromises);
       
       for (const result of batchResults) {
-        const details = result.data;
-        const headers = details.payload.headers;
-        const emailData = {
-          id: details.id,
-          subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
-          from: headers.find(h => h.name === 'From')?.value || 'Unknown',
-          date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
-          snippet: details.snippet || ''
-        };
+        try {
+          const details = result.data;
+          const headers = details.payload.headers;
+          const emailData = {
+            id: details.id,
+            subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
+            from: headers.find(h => h.name === 'From')?.value || 'Unknown',
+            date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
+            snippet: details.snippet || ''
+          };
 
-        const subscriptionData = extractSubscriptionData(emailData);
-        
-        if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
-          processedEmails.add(subscriptionData.provider);
-          subscriptions.push({
-            ...subscriptionData,
-            user_id: userId,
-            email_id: details.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
+          const subscriptionData = extractSubscriptionData(emailData);
+          
+          if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
+            processedEmails.add(subscriptionData.provider);
+            subscriptions.push({
+              ...subscriptionData,
+              user_id: userId,
+              email_id: details.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          }
+        } catch (error) {
+          console.error('Error processing email:', error);
+          // Continue with next email instead of failing the entire batch
+          continue;
         }
       }
     }

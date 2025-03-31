@@ -183,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No user ID available');
       }
 
-      // Try both HTTPS and HTTP endpoints during development
+      // Use the API URL from environment or fallback to a default
       const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
       const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
       console.log('Scanning emails using API URL:', apiUrlWithProtocol);
@@ -193,12 +193,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
           method: 'GET',
           headers: {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Origin': window.location.origin
           }
         });
+        
+        if (!healthCheck.ok) {
+          throw new Error(`Health check failed with status ${healthCheck.status}`);
+        }
+        
         console.log('Health check response:', healthCheck.ok ? 'OK' : 'Failed', healthCheck.status);
       } catch (error) {
         console.error('Health check failed:', error);
+        throw new Error('Backend service is not responding. Please try again later.');
       }
 
       // Add retry logic
@@ -212,25 +219,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-          console.log('Making request to:', `${apiUrlWithProtocol}/api/scan-emails`);
-          console.log('With headers:', {
-            Authorization: 'Bearer [REDACTED]',
-            'X-Gmail-Token': '[REDACTED]',
+          const headers = {
+            'Authorization': `Bearer ${session.access_token}`,
+            'X-Gmail-Token': gmailToken,
             'X-User-ID': session.user.id,
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Origin': window.location.origin
+          };
+
+          console.log('Making request to:', `${apiUrlWithProtocol}/api/scan-emails`);
+          console.log('With headers:', {
+            ...headers,
+            'Authorization': 'Bearer [REDACTED]',
+            'X-Gmail-Token': '[REDACTED]'
           });
 
           const response = await fetch(`${apiUrlWithProtocol}/api/scan-emails`, {
             method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'X-Gmail-Token': gmailToken,
-              'X-User-ID': session.user.id,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            signal: controller.signal
+            headers,
+            signal: controller.signal,
+            credentials: 'include'
           });
 
           clearTimeout(timeoutId);
