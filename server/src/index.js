@@ -20,59 +20,63 @@ const allowedOrigins = [
   'http://localhost:3000'
 ];
 
-// Single CORS configuration function
-function handleCors(req, res, next) {
+// CORS middleware - MUST be first!
+app.use((req, res, next) => {
   const origin = req.headers.origin;
-  
-  // Log the incoming request for debugging
+
+  // Log incoming request for debugging
   console.log('Incoming request:', {
     method: req.method,
     path: req.path,
-    origin: origin,
-    headers: req.headers
+    origin: origin
   });
 
   if (!origin) {
     return next();
   }
 
-  // Normalize origins
-  const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
-  const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase().replace(/\/$/, ''));
-
   // Check if origin is allowed
-  const isAllowed = normalizedAllowedOrigins.some(allowedOrigin => {
-    // Exact match
-    if (normalizedOrigin === allowedOrigin) return true;
+  const isAllowed = allowedOrigins.some(allowedOrigin => {
+    // Direct match
+    if (origin === allowedOrigin) return true;
     
-    // Match with or without www
-    const originWithoutWww = normalizedOrigin.replace('www.', '');
+    // Match without www
+    const originWithoutWww = origin.replace('www.', '');
     const allowedWithoutWww = allowedOrigin.replace('www.', '');
     return originWithoutWww === allowedWithoutWww;
   });
 
   if (isAllowed) {
-    // Set CORS headers using the actual origin
+    // Set CORS headers
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
-    res.header('Access-Control-Max-Age', '86400'); // 24 hours
-    
+    res.header('Access-Control-Max-Age', '86400');
+
     // Handle preflight
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
     }
   } else {
     console.log('Origin not allowed:', origin);
+    return res.status(403).json({ error: 'Origin not allowed' });
   }
 
   next();
-}
+});
 
-// Middleware
+// Other middleware
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Session configuration with better security
 app.use(session({
@@ -299,26 +303,6 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({
     error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
     details: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
-});
-
-// Apply our single CORS handler
-app.use(handleCors);
-
-// Health check endpoint with explicit CORS handling
-app.get('/health', (req, res) => {
-  // Log the request for debugging
-  console.log('Health check request:', {
-    origin: req.headers.origin,
-    method: req.method,
-    headers: req.headers
-  });
-
-  res.status(200).json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    origin: req.headers.origin, // Include origin in response for debugging
-    headers: req.headers // Include headers in response for debugging
   });
 });
 

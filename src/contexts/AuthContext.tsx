@@ -312,11 +312,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
             method: 'GET',
+            mode: 'cors',
             credentials: 'include',
             headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Origin': window.location.origin
+              'Accept': 'application/json'
             }
           });
           
