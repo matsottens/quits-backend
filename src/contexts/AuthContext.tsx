@@ -195,7 +195,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           headers: {
             'Accept': 'application/json',
             'Origin': window.location.origin
-          }
+          },
+          credentials: 'include',
+          mode: 'cors'
         });
         
         if (!healthCheck.ok) {
@@ -239,7 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             method: 'GET',
             headers,
             signal: controller.signal,
-            credentials: 'include'
+            credentials: 'include',
+            mode: 'cors'
           });
 
           clearTimeout(timeoutId);

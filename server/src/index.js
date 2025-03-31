@@ -56,8 +56,8 @@ const corsOptions = {
 // Apply CORS middleware
 app.use(cors(corsOptions));
 
-// Add a preflight handler for the scan-emails endpoint
-app.options('/api/scan-emails', cors(corsOptions));
+// Add preflight handlers for all routes
+app.options('*', cors(corsOptions));
 
 // Add CSP headers middleware
 app.use((req, res, next) => {
@@ -71,11 +71,17 @@ app.use((req, res, next) => {
       "frame-src 'self' https://*.supabase.co https://*.googleapis.com;"
     : "default-src 'self' 'unsafe-inline' 'unsafe-eval';";
   
+  // Set CORS headers
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Gmail-Token, X-User-ID, Accept, Origin');
+  }
+  
+  // Set CSP header
   res.setHeader('Content-Security-Policy', cspHeader);
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Gmail-Token, X-User-ID, Accept, Origin');
   next();
 });
 
