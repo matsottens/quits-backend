@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const siteUrl = process.env.REACT_APP_SITE_URL || 'https://www.quits.cc';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
@@ -15,9 +16,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    // Use production URL in production, localhost in development
-    site: process.env.NODE_ENV === 'production' 
-      ? 'https://www.quits.cc'
-      : 'http://localhost:3000'
+    site: window.location.host.includes('localhost') ? 'http://localhost:3000' : siteUrl
   }
 }); 

@@ -112,9 +112,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
-      const redirectTo = process.env.NODE_ENV === 'production'
-        ? 'https://www.quits.cc/auth/callback'
-        : 'http://localhost:3000/auth/callback';
+      const redirectTo = window.location.host.includes('localhost')
+        ? 'http://localhost:3000/auth/callback'
+        : `${window.location.origin}/auth/callback`;
+
+      console.log('Starting Google sign-in with redirect:', redirectTo);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -123,7 +125,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'
-          }
+          },
+          skipBrowserRedirect: false
         }
       });
 
@@ -135,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No URL returned from Supabase OAuth');
       }
 
-      console.log('Redirecting to OAuth URL with redirectTo:', redirectTo);
+      console.log('Redirecting to OAuth URL:', data.url);
       window.location.href = data.url;
     } catch (error) {
       console.error('Error initiating Google sign-in:', error);
