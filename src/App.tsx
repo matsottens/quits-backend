@@ -15,7 +15,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import SubscriptionDashboard from './components/subscription/SubscriptionDashboard';
 import { Box, CircularProgress } from '@mui/material';
 import { AuthCallback } from './components/auth/AuthCallback';
-import { SubscriptionList } from './components/subscriptions/SubscriptionList';
 
 // Protected Route component with Layout
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -104,14 +103,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SubscriptionDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/subscriptions"
-              element={
-                <ProtectedRoute>
-                  <SubscriptionList />
                 </ProtectedRoute>
               }
             />
