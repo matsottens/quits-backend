@@ -13,60 +13,36 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration
-const allowedOrigins = [
-  'https://quits.cc',
-  'https://www.quits.cc',
-  'https://quits.vercel.app',
-  'http://localhost:3000'
-];
-
-// Helper function to check origin
-function isOriginAllowed(origin) {
-  if (!origin) return false;
-  
-  const normalizedOrigin = origin.toLowerCase();
-  const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase());
-  
-  return normalizedAllowedOrigins.some(allowed => 
-    allowed === normalizedOrigin || 
-    allowed.replace('www.', '') === normalizedOrigin.replace('www.', '')
-  );
-}
-
-// Helper function to set CORS headers
-function setCorsHeaders(req, res) {
-  const origin = req.headers.origin;
-  console.log('Setting CORS headers for origin:', origin);
-  
-  if (origin && isOriginAllowed(origin)) {
-    console.log('Origin is allowed:', origin);
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
-    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'https://quits.cc',
+      'https://www.quits.cc',
+      'https://quits.vercel.app',
+      'http://localhost:3000'
+    ];
     
-    // Log the headers that were set
-    console.log('CORS headers set:', {
-      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
-      'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials'),
-      'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
-      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
-      'Access-Control-Max-Age': res.getHeader('Access-Control-Max-Age')
-    });
-    
-    return true;
-  }
-  
-  console.log('Origin not allowed:', origin);
-  return false;
-}
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('Origin not allowed:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id'],
+  maxAge: 86400 // 24 hours
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
 // Other middleware
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// Add a middleware to log all requests and handle CORS
+// Add a middleware to log all requests
 app.use((req, res, next) => {
   console.log('Incoming request:', {
     method: req.method,
@@ -74,19 +50,6 @@ app.use((req, res, next) => {
     origin: req.headers.origin,
     headers: req.headers
   });
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    if (setCorsHeaders(req, res)) {
-      res.status(204).end();
-    } else {
-      res.status(403).end();
-    }
-    return;
-  }
-  
-  // Set CORS headers for all requests
-  setCorsHeaders(req, res);
   
   // Log response headers after they're sent
   res.on('finish', () => {

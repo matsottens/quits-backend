@@ -11,11 +11,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Create a single instance of the Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    storageKey: 'quits_auth_token',
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-    site: window.location.host.includes('localhost') ? 'http://localhost:3000' : siteUrl
+    persistSession: true,
+    storageKey: 'quits-auth'
   }
 }); 

@@ -30,7 +30,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // If no session, clear any stale tokens
         if (!session) {
-          localStorage.removeItem('gmail_token');
           sessionStorage.removeItem('gmail_access_token');
           setUser(null);
           return;
@@ -40,13 +39,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Check and store provider tokens
         if (session.provider_token) {
-          localStorage.setItem('gmail_token', session.provider_token);
           sessionStorage.setItem('gmail_access_token', session.provider_token);
           console.log('Stored provider token from session');
         }
 
         // If we have a user but no Gmail token, we need to re-authenticate
-        const hasGmailToken = localStorage.getItem('gmail_token') || sessionStorage.getItem('gmail_access_token');
+        const hasGmailToken = sessionStorage.getItem('gmail_access_token');
         if (session.user && !hasGmailToken) {
           console.log('No Gmail token found, redirecting to Google auth');
           await signInWithGoogle();
@@ -70,14 +68,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (event === 'SIGNED_OUT') {
           setUser(null);
-          localStorage.removeItem('gmail_token');
           sessionStorage.removeItem('gmail_access_token');
         } else if (session?.user) {
           setUser(session.user);
           // Store provider token if available
           if (session.provider_token) {
             console.log('Storing provider token from auth change');
-            localStorage.setItem('gmail_token', session.provider_token);
             sessionStorage.setItem('gmail_access_token', session.provider_token);
           }
         }
@@ -122,9 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
       // Clear all stored tokens
-      localStorage.removeItem('gmail_token');
       sessionStorage.removeItem('gmail_access_token');
-      localStorage.removeItem('supabase.auth.token');
       
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
@@ -151,7 +145,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       
       // Clear any existing tokens to ensure fresh auth
-      localStorage.removeItem('gmail_token');
       sessionStorage.removeItem('gmail_access_token');
       
       const redirectTo = window.location.host.includes('localhost')
@@ -212,9 +205,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasUser: !!tokens.user
       });
 
-      // Store the Gmail token in both localStorage and sessionStorage
+      // Store the Gmail token in sessionStorage only
       if (tokens.access_token) {
-        localStorage.setItem('gmail_token', tokens.access_token);
         sessionStorage.setItem('gmail_access_token', tokens.access_token);
         console.log('Stored Gmail access token');
       }
@@ -240,7 +232,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Store provider token if available
         if (data.session?.provider_token) {
-          localStorage.setItem('gmail_token', data.session.provider_token);
           sessionStorage.setItem('gmail_access_token', data.session.provider_token);
         }
 
@@ -260,7 +251,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
-      const gmailToken = localStorage.getItem('gmail_token') || sessionStorage.getItem('gmail_access_token');
+      const gmailToken = sessionStorage.getItem('gmail_access_token');
       
       console.log('Scan emails - Session:', {
         hasSession: !!currentSession,
@@ -437,7 +428,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (response.status === 401) {
               if (errorData?.error === 'Gmail token expired or invalid') {
                 // Clear Gmail tokens and redirect to Google auth
-                localStorage.removeItem('gmail_token');
                 sessionStorage.removeItem('gmail_access_token');
                 await signInWithGoogle();
                 return;
