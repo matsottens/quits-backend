@@ -9,6 +9,36 @@ interface ApiResponse<T> {
   error?: string;
 }
 
+// Types for subscription data
+interface SubscriptionData {
+  provider: string;
+  price: number | null;
+  frequency: 'monthly' | 'yearly';
+  renewal_date: string | null;
+  term_months: number | null;
+  is_price_increase: boolean;
+  lastDetectedDate: string;
+}
+
+// Types for API response
+interface ScanEmailsResponse {
+  success: boolean;
+  message: string;
+  count: number;
+  subscriptions: SubscriptionData[];
+  priceChanges: PriceChange[] | null;
+}
+
+interface PriceChange {
+  oldPrice: number;
+  newPrice: number;
+  change: number;
+  percentageChange: number;
+  term_months: number | null;
+  renewal_date: string | null;
+  provider: string;
+}
+
 class ApiService {
   private static instance: ApiService;
   private constructor() {}
@@ -141,8 +171,34 @@ class ApiService {
     }
   }
 
-  public async scanEmails(): Promise<ApiResponse<any>> {
-    return this.makeRequest('/api/scan-emails');
+  public async scanEmails(): Promise<ApiResponse<ScanEmailsResponse>> {
+    try {
+      const response = await this.makeRequest('/api/scan-emails');
+      if (response.success) {
+        const data = response.data as ScanEmailsResponse;
+        return {
+          ...response,
+          data: {
+            ...data,
+            subscriptions: data.subscriptions.map(transformSubscriptionData),
+            priceChanges: data.priceChanges?.map(transformPriceChange) || null
+          }
+        };
+      }
+      return response;
+    } catch (error) {
+      console.error('Error scanning emails:', {
+        error,
+        stack: error instanceof Error ? error.stack : undefined,
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      throw new Error(
+        error instanceof Error 
+          ? `Failed to scan emails: ${error.message}`
+          : 'Failed to scan emails: Unknown error'
+      );
+    }
   }
 
   public async getNotifications(): Promise<ApiResponse<any>> {
@@ -170,5 +226,33 @@ class ApiService {
     return this.makeRequest('/api/subscription-analytics');
   }
 }
+
+// Transform raw subscription data to frontend format
+const transformSubscriptionData = (data: SubscriptionData): SubscriptionData => {
+  return {
+    ...data,
+    // Ensure price is a number or null
+    price: data.price ? Number(data.price) : null,
+    // Ensure renewal_date is in ISO format or null
+    renewal_date: data.renewal_date ? new Date(data.renewal_date).toISOString() : null,
+    // Default to monthly if frequency is not specified
+    frequency: data.frequency || 'monthly',
+    // Ensure term_months is a number or null
+    term_months: data.term_months ? Number(data.term_months) : null
+  };
+};
+
+// Transform raw price change data to frontend format
+const transformPriceChange = (change: PriceChange): PriceChange => {
+  return {
+    ...change,
+    oldPrice: Number(change.oldPrice),
+    newPrice: Number(change.newPrice),
+    change: Number(change.change),
+    percentageChange: Number(change.percentageChange),
+    term_months: change.term_months ? Number(change.term_months) : null,
+    renewal_date: change.renewal_date ? new Date(change.renewal_date).toISOString() : null
+  };
+};
 
 export const apiService = ApiService.getInstance(); 

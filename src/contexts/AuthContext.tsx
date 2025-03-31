@@ -14,12 +14,54 @@ interface AuthContextType {
   login: (tokens: any) => Promise<{ user: User; session: Session }>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface SubscriptionState {
+  isLoading: boolean;
+  error: string | null;
+  subscriptions: SubscriptionData[];
+  priceChanges: PriceChange[] | null;
+  lastScanTime: string | null;
+}
+
+export const AuthContext = createContext<{
+  user: User | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  scanEmails: () => Promise<void>;
+  login: (tokens: any) => Promise<{ user: User; session: Session }>;
+  subscriptionState: SubscriptionState;
+}>({
+  user: null,
+  loading: true,
+  signIn: async () => {},
+  signUp: async () => ({ error: null }),
+  signOut: async () => {},
+  signInWithGoogle: async () => {},
+  scanEmails: async () => {},
+  login: async () => ({ user: null, session: null }),
+  subscriptionState: {
+    isLoading: false,
+    error: null,
+    subscriptions: [],
+    priceChanges: null,
+    lastScanTime: null
+  },
+  scanEmails: async () => {}
+});
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [subscriptionState, setSubscriptionState] = useState<SubscriptionState>({
+    isLoading: false,
+    error: null,
+    subscriptions: [],
+    priceChanges: null,
+    lastScanTime: null
+  });
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -246,22 +288,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const scanEmails = async () => {
-    setLoading(true);
     try {
-      const result = await apiService.scanEmails();
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to scan emails');
+      setSubscriptionState(prev => ({ ...prev, isLoading: true, error: null }));
+      
+      console.log('Starting email scan...');
+      const response = await apiService.scanEmails();
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to scan emails');
       }
-      return result.data;
-    } catch (error: any) {
-      console.error('Error scanning emails:', {
-        error: error.message,
-        type: error.name,
-        stack: error.stack
+
+      console.log('Email scan completed:', {
+        subscriptionCount: response.data.subscriptions.length,
+        priceChangesCount: response.data.priceChanges?.length || 0
       });
-      throw new Error(error.message || 'Failed to scan emails');
-    } finally {
-      setLoading(false);
+
+      setSubscriptionState({
+        isLoading: false,
+        error: null,
+        subscriptions: response.data.subscriptions,
+        priceChanges: response.data.priceChanges,
+        lastScanTime: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error scanning emails:', error);
+      
+      setSubscriptionState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to scan emails'
+      }));
+
+      // If the error is due to expired tokens, trigger a re-authentication
+      if (error instanceof Error && 
+          (error.message.includes('token expired') || 
+           error.message.includes('invalid token'))) {
+        console.log('Token expired, initiating re-authentication...');
+        await signOut(); // This should redirect to login
+      }
     }
   };
 
@@ -273,7 +337,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     signInWithGoogle,
     scanEmails,
-    login
+    login,
+    subscriptionState
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

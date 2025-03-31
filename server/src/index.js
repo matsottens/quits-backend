@@ -37,22 +37,59 @@ app.use(cspMiddleware);
 // Add specific OPTIONS handler for scan-emails
 app.options('/api/scan-emails', (req, res) => {
   const origin = req.headers.origin;
+  const requestId = req.requestId || Math.random().toString(36).substring(7);
   
   // Log the preflight request
-  console.log('Preflight request for scan-emails:', {
+  console.log(`[${requestId}] Preflight request for scan-emails:`, {
     origin,
     method: req.method,
-    headers: req.headers
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+      'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined
+    }
   });
 
-  // Set CORS headers explicitly
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400');
+  // Check if origin is allowed
+  const allowedDomains = ['quits.cc', 'www.quits.cc', 'api.quits.cc'];
+  const originDomain = origin?.toLowerCase().replace(/^https?:\/\//, '');
+  const isAllowed = allowedDomains.includes(originDomain);
+
+  console.log(`[${requestId}] CORS check for scan-emails:`, {
+    originDomain,
+    allowedDomains,
+    isAllowed,
+    requestOrigin: origin
+  });
+
+  if (isAllowed) {
+    // Set CORS headers explicitly for allowed origins using the exact origin
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Max-Age': '86400'
+    };
+
+    // Set all CORS headers
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+
+    console.log(`[${requestId}] Allowing preflight for origin:`, {
+      origin,
+      headers: corsHeaders
+    });
+  } else {
+    console.log(`[${requestId}] Blocking preflight for origin:`, {
+      origin,
+      originDomain,
+      allowedDomains
+    });
+  }
   
-  // Respond to the preflight request
+  // Always respond to OPTIONS with 204
   res.status(204).end();
 });
 
@@ -1173,15 +1210,15 @@ app.get('/api/scan-emails', async (req, res) => {
         });
       }
 
-      await ensureSupabaseConnection();
+    await ensureSupabaseConnection();
 
       // Initialize Gmail API
       const auth = new google.auth.OAuth2(
         GOOGLE_CLIENT_ID,
         GOOGLE_CLIENT_SECRET
       );
-      auth.setCredentials({ access_token: gmailToken });
-      const gmail = google.gmail({ version: 'v1', auth });
+    auth.setCredentials({ access_token: gmailToken });
+    const gmail = google.gmail({ version: 'v1', auth });
 
       // Test Gmail API access
       try {
@@ -1203,9 +1240,9 @@ app.get('/api/scan-emails', async (req, res) => {
       let nextPageToken = null;
       
       do {
-        const response = await gmail.users.messages.list({
-          userId: 'me',
-          maxResults: 100,
+    const response = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 100,
           pageToken: nextPageToken,
           q: 'in:anywhere (subject:(subscription OR payment OR receipt OR invoice OR billing OR netflix OR spotify OR amazon OR hbo OR disney) OR from:(netflix.com OR spotify.com OR amazon.com OR hbo.com OR youtube.com OR disneyplus.com))'
         });
@@ -1221,8 +1258,8 @@ app.get('/api/scan-emails', async (req, res) => {
         console.log(`Retrieved ${messages.length} messages so far`);
       } while (nextPageToken && messages.length < 500); // Limit to 500 emails max
 
-      const subscriptions = [];
-      const processedEmails = new Set();
+    const subscriptions = [];
+    const processedEmails = new Set();
       const priceChanges = [];
 
       // Process emails in batches
@@ -1231,9 +1268,9 @@ app.get('/api/scan-emails', async (req, res) => {
         const batch = messages.slice(i, i + batchSize);
         const batchPromises = batch.map(message => 
           gmail.users.messages.get({
-            userId: 'me',
-            id: message.id,
-            format: 'full'
+        userId: 'me',
+        id: message.id,
+        format: 'full'
           })
         );
 
@@ -1243,18 +1280,18 @@ app.get('/api/scan-emails', async (req, res) => {
           try {
             const details = result.data;
             const headers = details.payload.headers;
-            const emailData = {
+      const emailData = {
               id: details.id,
-              subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
-              from: headers.find(h => h.name === 'From')?.value || 'Unknown',
-              date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
+        subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
+        from: headers.find(h => h.name === 'From')?.value || 'Unknown',
+        date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
               snippet: details.snippet || ''
-            };
+      };
 
-            const subscriptionData = extractSubscriptionData(emailData);
-            
-            if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
-              processedEmails.add(subscriptionData.provider);
+      const subscriptionData = extractSubscriptionData(emailData);
+      
+      if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
+        processedEmails.add(subscriptionData.provider);
               
               // Check for price changes
               const priceChange = await checkPriceChange(supabase, subscriptionData, userId);
@@ -1267,36 +1304,36 @@ app.get('/api/scan-emails', async (req, res) => {
                 });
               }
 
-              subscriptions.push({
-                ...subscriptionData,
-                user_id: userId,
+        subscriptions.push({
+          ...subscriptionData,
+          user_id: userId,
                 email_id: details.id,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
             }
           } catch (error) {
             console.error('Error processing email:', error);
             continue;
           }
-        }
       }
+    }
 
       // Store subscriptions and price changes in batches
-      if (subscriptions.length > 0) {
+    if (subscriptions.length > 0) {
         const batchSize = 50;
         for (let i = 0; i < subscriptions.length; i += batchSize) {
           const batch = subscriptions.slice(i, i + batchSize);
           const { error } = await supabase
-            .from('subscriptions')
+        .from('subscriptions')
             .upsert(batch, {
-              onConflict: 'user_id,provider',
-              returning: true
-            });
+          onConflict: 'user_id,provider',
+          returning: true
+        });
 
-          if (error) {
+      if (error) {
             console.error('Error storing subscription batch:', error);
-            throw new Error('Failed to store subscription data');
+        throw new Error('Failed to store subscription data');
           }
         }
       }
@@ -1317,8 +1354,8 @@ app.get('/api/scan-emails', async (req, res) => {
       await checkAndSendNotifications(userId);
 
       return {
-        success: true,
-        message: 'Subscriptions processed and stored successfully',
+      success: true, 
+      message: 'Subscriptions processed and stored successfully',
         count: subscriptions.length,
         subscriptions,
         priceChanges: priceChanges.length > 0 ? priceChanges : null

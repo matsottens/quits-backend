@@ -96,25 +96,19 @@ const customCorsMiddleware = (req, res, next) => {
   ];
 
   // Check if the origin's domain matches any allowed domain
-  const isAllowed = allowedDomains.some(domain => {
-    const originDomain = origin.toLowerCase().replace(/^https?:\/\//, '');
-    const matches = originDomain === domain || 
-                   originDomain === 'www.' + domain ||
-                   domain === 'www.' + originDomain;
-    
-    console.log(`[${requestId}] CORS Domain Check:`, {
-      originDomain,
-      allowedDomain: domain,
-      matches
-    });
-    
-    return matches;
+  const originDomain = origin.toLowerCase().replace(/^https?:\/\//, '');
+  const isAllowed = allowedDomains.includes(originDomain);
+
+  console.log(`[${requestId}] CORS Domain Check:`, {
+    originDomain,
+    allowedDomains,
+    isAllowed
   });
 
   if (isAllowed) {
-    // Set CORS headers
+    // IMPORTANT: Use the actual request origin instead of a hardcoded value
     const corsHeaders = {
-      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Origin': origin, // Use the actual origin from the request
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID',
       'Access-Control-Allow-Credentials': 'true',
@@ -122,12 +116,22 @@ const customCorsMiddleware = (req, res, next) => {
     };
 
     // Log headers being set
-    console.log(`[${requestId}] Setting CORS headers:`, corsHeaders);
+    console.log(`[${requestId}] Setting CORS headers:`, {
+      ...corsHeaders,
+      origin: origin // Log the actual origin being used
+    });
 
     // Set all CORS headers
     Object.entries(corsHeaders).forEach(([key, value]) => {
       res.setHeader(key, value);
     });
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      console.log(`[${requestId}] Handling OPTIONS preflight request for origin:`, origin);
+      res.status(204).end();
+      return;
+    }
 
     // Log response after headers are set
     res.on('finish', () => {
@@ -137,16 +141,10 @@ const customCorsMiddleware = (req, res, next) => {
         timing: `${Date.now() - req._startTime}ms`
       });
     });
-
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      console.log(`[${requestId}] Handling OPTIONS preflight request`);
-      res.status(204).end();
-      return;
-    }
   } else {
     console.log(`[${requestId}] CORS: Blocked origin:`, {
       origin,
+      originDomain,
       allowedDomains
     });
   }
