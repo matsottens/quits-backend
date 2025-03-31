@@ -14,10 +14,10 @@ const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: ['https://quits.cc', 'https://quits.vercel.app', 'https://www.quits.cc'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID']
 }));
 
 // Add CSP headers middleware
@@ -29,7 +29,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "img-src 'self' data: https://*.supabase.co https://*.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
-    "connect-src 'self' https://*.supabase.co https://*.googleapis.com; " +
+    "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://quits.vercel.app; " +
     "frame-src 'self' https://*.supabase.co https://*.googleapis.com;"
   );
   next();
