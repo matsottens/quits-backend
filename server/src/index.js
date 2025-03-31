@@ -14,10 +14,28 @@ const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 app.use(cors({
-  origin: ['https://quits.cc', 'https://quits.vercel.app', 'https://www.quits.cc'],
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'https://quits.cc',
+      'https://quits.vercel.app',
+      'https://www.quits.cc',
+      'http://localhost:3000'
+    ];
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // Cache preflight requests for 10 minutes
 }));
 
 // Add CSP headers middleware
@@ -29,7 +47,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "img-src 'self' data: https://*.supabase.co https://*.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
-    "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://quits.vercel.app; " +
+    "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://quits.vercel.app https://api.quits.cc; " +
     "frame-src 'self' https://*.supabase.co https://*.googleapis.com;"
   );
   next();
