@@ -11,7 +11,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   scanEmails: () => Promise<void>;
-  login: (authResponse: any) => Promise<void>;
+  login: (tokens: any) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -157,41 +157,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (authResponse: any) => {
+  const login = async (tokens: any) => {
     try {
-      setLoading(true);
-      console.log('AuthContext - Starting login with response:', {
-        hasUser: !!authResponse.user,
-        hasAccessToken: !!authResponse.access_token,
-        hasRefreshToken: !!authResponse.refresh_token,
-        hasIdToken: !!authResponse.id_token
+      console.log('Logging in with tokens:', {
+        hasAccessToken: !!tokens.access_token,
+        hasIdToken: !!tokens.id_token,
+        hasUser: !!tokens.user
       });
 
-      // Sign in with Supabase using the ID token
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: authResponse.id_token,
-      });
-
-      if (error) {
-        console.error('AuthContext - Error signing in with ID token:', error);
-        throw error;
+      // Store the Gmail token for later use
+      if (tokens.access_token) {
+        sessionStorage.setItem('gmail_access_token', tokens.access_token);
       }
 
-      console.log('AuthContext - Supabase sign-in successful');
-      
-      // Store the Gmail access token if available
-      if (authResponse.access_token) {
-        sessionStorage.setItem('gmail_access_token', authResponse.access_token);
-      }
+      // Sign in with Supabase using the Google ID token
+      if (tokens.id_token) {
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: tokens.id_token,
+        });
 
-      // Set the user in the context
-      setUser(data.user);
+        if (error) {
+          console.error('Supabase sign in error:', error);
+          throw error;
+        }
+
+        console.log('Supabase sign in successful:', {
+          hasSession: !!data.session,
+          hasUser: !!data.user
+        });
+
+        setUser(data.user);
+        return data;
+      } else {
+        throw new Error('No ID token provided');
+      }
     } catch (error) {
-      console.error('AuthContext - Error during login:', error);
+      console.error('Login error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to login');
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 

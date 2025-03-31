@@ -611,6 +611,8 @@ app.post('/auth/google/token', async (req, res) => {
       return res.status(400).json({ error: 'Authorization code is required' });
     }
 
+    console.log('Exchanging code for tokens with redirect URI:', redirect_uri);
+
     // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -633,6 +635,11 @@ app.post('/auth/google/token', async (req, res) => {
     }
 
     const tokens = await tokenResponse.json();
+    console.log('Token exchange successful:', {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      hasIdToken: !!tokens.id_token
+    });
 
     // Get user info
     const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -646,23 +653,18 @@ app.post('/auth/google/token', async (req, res) => {
     }
 
     const userInfo = await userResponse.json();
+    console.log('User info retrieved:', {
+      email: userInfo.email,
+      name: userInfo.name
+    });
 
-    // Create or update user in Supabase
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .upsert({
-        email: userInfo.email,
-        google_id: userInfo.id,
-        name: userInfo.name,
-        picture: userInfo.picture,
-        last_login: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (userError) {
-      console.error('Error upserting user:', userError);
-      return res.status(500).json({ error: 'Failed to create or update user' });
+    // Set CORS headers
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
     }
 
     // Return tokens and user info
@@ -670,7 +672,7 @@ app.post('/auth/google/token', async (req, res) => {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       id_token: tokens.id_token,
-      user: userInfo,
+      user: userInfo
     });
   } catch (error) {
     console.error('Error in token exchange:', error);
