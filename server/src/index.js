@@ -13,7 +13,7 @@ const RedisStore = require('connect-redis').default;
 const redis = require('./config/redis');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 
-const { corsOptions, logRequest, authenticateRequest, supabase } = require('./middleware/auth');
+const { corsOptions, logRequest, authenticateRequest, cspMiddleware, supabase } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -30,6 +30,9 @@ const analyticsRouter = require('./routes/analytics');
 
 // Apply CORS middleware first
 app.use(cors(corsOptions));
+
+// Apply CSP middleware
+app.use(cspMiddleware);
 
 // Other middleware
 app.use(bodyParser.json({ limit: '10mb' }));

@@ -15,6 +15,52 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
+// CSP middleware
+const cspMiddleware = (req, res, next) => {
+  // Log CSP request
+  console.log('Setting CSP headers for:', {
+    path: req.path,
+    origin: req.headers.origin
+  });
+
+  // Define CSP directives
+  const cspDirectives = {
+    'default-src': ["'self'"],
+    'script-src': [
+      "'self'",
+      "'unsafe-inline'",
+      "'unsafe-eval'",
+      'https://apis.google.com',
+      'https://*.googleapis.com'
+    ],
+    'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+    'font-src': ["'self'", 'https://fonts.gstatic.com'],
+    'img-src': ["'self'", 'data:', 'https:', 'blob:'],
+    'connect-src': [
+      "'self'",
+      'https://api.quits.cc',
+      'https://quits.cc',
+      'https://*.supabase.co',
+      'wss://*.supabase.co',
+      'https://apis.google.com',
+      'https://*.googleapis.com'
+    ],
+    'frame-src': ["'self'", 'https://accounts.google.com'],
+    'object-src': ["'none'"],
+    'base-uri': ["'self'"]
+  };
+
+  // Build CSP string
+  const cspString = Object.entries(cspDirectives)
+    .map(([key, values]) => `${key} ${values.join(' ')}`)
+    .join('; ');
+
+  // Set CSP header
+  res.setHeader('Content-Security-Policy', cspString);
+  
+  next();
+};
+
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
@@ -147,5 +193,6 @@ module.exports = {
   corsOptions,
   logRequest,
   authenticateRequest,
+  cspMiddleware,
   supabase
 }; 
