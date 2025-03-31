@@ -64,14 +64,11 @@ const requestTracker = (req, res, next) => {
 };
 
 // Apply middleware in the correct order
-app.use(customCorsMiddleware);
-app.use(requestTracker);
-app.use(cspMiddleware);
+app.use(requestTracker); // First, track all requests
+app.use(customCorsMiddleware); // Then handle CORS
+app.use(cspMiddleware); // Then handle CSP
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
-
-// Add request logging
-app.use(logRequest);
 
 // Add routes
 app.use('/api/notifications', notificationsRouter);
@@ -80,49 +77,7 @@ app.use('/api', analyticsRouter);
 // Apply authentication middleware to protected routes
 app.use('/api', authenticateRequest);
 
-// Add specific OPTIONS handler for scan-emails before the route
-app.options('/api/scan-emails', (req, res) => {
-  const origin = req.headers.origin;
-  const requestId = req.requestId || Math.random().toString(36).substring(7);
-  
-  // Log the preflight request
-  console.log(`[${requestId}] Preflight request for scan-emails:`, {
-    origin,
-    method: req.method,
-    headers: {
-      ...req.headers,
-      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
-      'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined
-    }
-  });
-
-  // Check if origin is allowed
-  const allowedDomains = ['quits.cc', 'www.quits.cc', 'api.quits.cc'];
-  const originDomain = origin?.toLowerCase().replace(/^https?:\/\//, '');
-  const isAllowed = allowedDomains.includes(originDomain);
-
-  if (isAllowed && origin) {
-    // Set CORS headers using the exact origin from the request
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', '86400');
-
-    console.log(`[${requestId}] Allowing preflight for origin:`, origin);
-  } else {
-    console.log(`[${requestId}] Blocking preflight for origin:`, {
-      origin,
-      originDomain,
-      allowedDomains
-    });
-  }
-  
-  // Always respond to OPTIONS with 204
-  res.status(204).end();
-});
-
-// Update the scan-emails endpoint to remove CORS handling (it's now handled by the OPTIONS handler)
+// Remove the specific OPTIONS handler for scan-emails since it's handled by customCorsMiddleware
 app.get('/api/scan-emails', async (req, res) => {
   try {
     // Check circuit breaker state
