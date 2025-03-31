@@ -97,25 +97,15 @@ app.options('/api/scan-emails', (req, res) => {
     requestOrigin: origin
   });
 
-  if (isAllowed) {
-    // Set CORS headers explicitly for allowed origins using the exact origin
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID',
-      'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Max-Age': '86400'
-    };
+  if (isAllowed && origin) {
+    // Set CORS headers using the exact origin from the request
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
 
-    // Set all CORS headers
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
-
-    console.log(`[${requestId}] Allowing preflight for origin:`, {
-      origin,
-      headers: corsHeaders
-    });
+    console.log(`[${requestId}] Allowing preflight for origin:`, origin);
   } else {
     console.log(`[${requestId}] Blocking preflight for origin:`, {
       origin,

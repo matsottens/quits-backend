@@ -65,92 +65,64 @@ const cspMiddleware = (req, res, next) => {
 // Custom CORS middleware
 const customCorsMiddleware = (req, res, next) => {
   const origin = req.headers.origin;
-  const requestId = Math.random().toString(36).substring(7);
+  const requestId = req.requestId || Math.random().toString(36).substring(7);
 
-  // Enhanced request logging
-  console.log(`[${requestId}] CORS Request:`, {
-    timestamp: new Date().toISOString(),
+  // Log the request details
+  console.log(`[${requestId}] CORS request:`, {
     origin,
     method: req.method,
     path: req.path,
     headers: {
       ...req.headers,
-      // Redact sensitive data
       authorization: req.headers.authorization ? '[REDACTED]' : undefined,
       'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined
-    },
-    ip: req.ip,
-    originalUrl: req.originalUrl
+    }
   });
 
-  // Allow requests with no origin (like mobile apps or curl requests)
+  // If there's no origin, allow the request (e.g., mobile apps)
   if (!origin) {
-    console.log(`[${requestId}] CORS: Allowing request with no origin`);
     return next();
   }
 
-  const allowedDomains = [
-    'quits.cc',
-    'www.quits.cc',
-    'api.quits.cc'
-  ];
-
-  // Check if the origin's domain matches any allowed domain
+  // List of allowed domains (both www and non-www versions)
+  const allowedDomains = ['quits.cc', 'www.quits.cc', 'api.quits.cc'];
+  
+  // Extract domain from origin
   const originDomain = origin.toLowerCase().replace(/^https?:\/\//, '');
-  const isAllowed = allowedDomains.includes(originDomain);
-
-  console.log(`[${requestId}] CORS Domain Check:`, {
+  
+  // Log the domain check
+  console.log(`[${requestId}] Checking domain:`, {
     originDomain,
     allowedDomains,
-    isAllowed
+    isAllowed: allowedDomains.includes(originDomain)
   });
 
-  if (isAllowed) {
-    // IMPORTANT: Use the actual request origin instead of a hardcoded value
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': origin, // Use the actual origin from the request
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID',
-      'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Max-Age': '86400'
-    };
+  // Check if the origin's domain is in our allowed list
+  if (allowedDomains.includes(originDomain)) {
+    // Set CORS headers using the exact origin that was sent
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
 
-    // Log headers being set
-    console.log(`[${requestId}] Setting CORS headers:`, {
-      ...corsHeaders,
-      origin: origin // Log the actual origin being used
-    });
-
-    // Set all CORS headers
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
-
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      console.log(`[${requestId}] Handling OPTIONS preflight request for origin:`, origin);
-      res.status(204).end();
-      return;
-    }
-
-    // Log response after headers are set
-    res.on('finish', () => {
-      console.log(`[${requestId}] Response completed:`, {
-        statusCode: res.statusCode,
-        headers: res.getHeaders(),
-        timing: `${Date.now() - req._startTime}ms`
-      });
-    });
+    // Log allowed request
+    console.log(`[${requestId}] Allowing CORS for origin:`, origin);
   } else {
-    console.log(`[${requestId}] CORS: Blocked origin:`, {
+    // Log blocked request
+    console.log(`[${requestId}] Blocking CORS for origin:`, {
       origin,
       originDomain,
       allowedDomains
     });
   }
 
-  // Store requestId for use in other middleware
-  req.requestId = requestId;
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
   next();
 };
 
