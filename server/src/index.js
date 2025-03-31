@@ -20,7 +20,7 @@ const allowedOrigins = [
   'http://localhost:3000'
 ];
 
-// Configure CORS
+// Configure CORS - simplified and more robust
 const corsOptions = {
   origin: function (origin, callback) {
     // Log the request origin
@@ -32,23 +32,27 @@ const corsOptions = {
       return;
     }
 
-    // Check if origin is allowed
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      // Direct match
-      if (origin === allowedOrigin) return true;
-      
-      // Match without www
-      const originWithoutWww = origin.replace('www.', '');
-      const allowedWithoutWww = allowedOrigin.replace('www.', '');
-      return originWithoutWww === allowedWithoutWww;
-    });
+    // Normalize the origin and allowed origins
+    const normalizedOrigin = origin.toLowerCase();
+    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase());
+
+    // Direct match check
+    if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
+      callback(null, origin);
+      return;
+    }
+
+    // www/non-www match check
+    const originWithoutWww = normalizedOrigin.replace('www.', '');
+    const isAllowed = normalizedAllowedOrigins.some(allowed => 
+      allowed.replace('www.', '') === originWithoutWww
+    );
 
     if (isAllowed) {
-      // Important: Return the actual origin that was received
       callback(null, origin);
     } else {
       console.log('Origin not allowed:', origin);
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
   credentials: true,
@@ -57,7 +61,7 @@ const corsOptions = {
   maxAge: 86400 // 24 hours
 };
 
-// Apply CORS middleware
+// Apply CORS middleware FIRST
 app.use(cors(corsOptions));
 
 // Enable pre-flight across-the-board
@@ -68,11 +72,35 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
-app.get('/health', cors(corsOptions), (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString()
-  });
+app.get('/health', cors(corsOptions), async (req, res) => {
+  try {
+    // Get the authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization token' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // Verify the token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    res.status(200).json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      user: {
+        id: user.id,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Session configuration with better security
@@ -197,39 +225,55 @@ app.get('/auth/google/callback', async (req, res) => {
     console.log('User info retrieved:', userInfo.email);
 
     // Create or update user in Supabase
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .upsert({
-        email: userInfo.email,
-        google_id: userInfo.id,
-        name: userInfo.name,
-        picture: userInfo.picture,
-        last_login: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (userError) {
-      console.error('Error upserting user:', userError);
-      throw new Error('Failed to create or update user');
-    }
-
-    // Create session
-    const { data: session, error: sessionError } = await supabase.auth.signInWithPassword({
+    const { data: user, error: userError } = await supabase.auth.signUp({
       email: userInfo.email,
-      password: tokens.access_token, // Use access token as password for OAuth users
+      password: tokens.access_token, // Use a secure random password instead
+      options: {
+        data: {
+          google_id: userInfo.id,
+          name: userInfo.name,
+          picture: userInfo.picture,
+          gmail_token: tokens.access_token,
+          gmail_refresh_token: tokens.refresh_token,
+        }
+      }
     });
 
-    if (sessionError) {
-      console.error('Error creating session:', sessionError);
-      throw new Error('Failed to create session');
+    if (userError) {
+      // If user already exists, try signing in
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: userInfo.email,
+        password: tokens.access_token,
+      });
+
+      if (signInError) {
+        console.error('Error signing in:', signInError);
+        throw new Error('Failed to authenticate user');
+      }
+
+      user = signInData;
     }
 
-    // Store Gmail token in session storage
-    sessionStorage.setItem('gmail_access_token', tokens.access_token);
+    // Store tokens in secure session
+    req.session.tokens = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      gmail_token: tokens.access_token
+    };
 
-    // Redirect to frontend with success
-    res.redirect(`${CLIENT_URL}/scanning?success=true`);
+    // Set secure cookies
+    res.cookie('gmail_token', tokens.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    // Redirect to frontend with success and session token
+    const redirectUrl = new URL(`${CLIENT_URL}/scanning`);
+    redirectUrl.searchParams.append('success', 'true');
+    redirectUrl.searchParams.append('session', user.session.access_token);
+    res.redirect(redirectUrl.toString());
   } catch (error) {
     console.error('Error in Google callback:', error);
     res.redirect(`${CLIENT_URL}/auth/error?message=${encodeURIComponent(error.message)}`);
@@ -475,32 +519,68 @@ app.get('/api/scan-emails', async (req, res) => {
   });
   
   if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Invalid or missing authentication token' });
+    return res.status(401).json({ 
+      error: 'Invalid or missing authentication token',
+      details: 'Authorization header must start with Bearer'
+    });
   }
 
   if (!gmailToken) {
-    return res.status(401).json({ error: 'Missing Gmail token' });
+    return res.status(401).json({ 
+      error: 'Missing Gmail token',
+      details: 'X-Gmail-Token header is required'
+    });
   }
 
   if (!userId) {
-    return res.status(401).json({ error: 'Missing user ID' });
+    return res.status(401).json({ 
+      error: 'Missing user ID',
+      details: 'X-User-ID header is required'
+    });
   }
 
   try {
+    // First verify the Supabase token
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return res.status(401).json({ 
+        error: 'Invalid or expired token',
+        details: authError?.message || 'Token validation failed'
+      });
+    }
+
+    // Verify the user ID matches
+    if (user.id !== userId) {
+      return res.status(401).json({ 
+        error: 'User ID mismatch',
+        details: 'Provided user ID does not match authenticated user'
+      });
+    }
+
     await ensureSupabaseConnection();
 
-    const auth = new google.auth.OAuth2();
+    // Initialize Gmail API
+    const auth = new google.auth.OAuth2(
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET
+    );
     auth.setCredentials({ access_token: gmailToken });
-    
     const gmail = google.gmail({ version: 'v1', auth });
 
-    // Test Gmail API access first
+    // Test Gmail API access
     try {
-      await gmail.users.getProfile({ userId: 'me' });
+      const profile = await gmail.users.getProfile({ userId: 'me' });
+      console.log('Gmail API access verified for:', profile.data.emailAddress);
     } catch (error) {
       console.error('Gmail API access error:', error);
       if (error.code === 401) {
-        return res.status(401).json({ error: 'Gmail token expired or invalid. Please sign in again.' });
+        return res.status(401).json({ 
+          error: 'Gmail token expired or invalid',
+          details: 'Please sign in with Google again'
+        });
       }
       throw error;
     }
@@ -686,6 +766,40 @@ app.post('/auth/google/token', async (req, res) => {
   } catch (error) {
     console.error('Error in token exchange:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add a session check endpoint
+app.get('/auth/check', cors(corsOptions), async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization token' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // Verify the token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name
+      }
+    });
+  } catch (error) {
+    console.error('Session check error:', error);
+    res.status(401).json({ 
+      authenticated: false,
+      error: 'Session verification failed'
+    });
   }
 });
 

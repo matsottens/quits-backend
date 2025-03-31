@@ -259,9 +259,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const scanEmails = async () => {
     setLoading(true);
     try {
-      const session = await supabase.auth.getSession();
-      const { data: { session: currentSession } } = session;
-      const gmailToken = localStorage.getItem('gmail_token');
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const gmailToken = localStorage.getItem('gmail_token') || sessionStorage.getItem('gmail_access_token');
       
       console.log('Scan emails - Session:', {
         hasSession: !!currentSession,
@@ -272,7 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (!currentSession?.access_token) {
-        throw new Error('Not authenticated with Supabase');
+        throw new Error('Not authenticated. Please sign in again.');
       }
 
       if (!gmailToken) {
@@ -280,7 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!currentSession.user?.id) {
-        throw new Error('No user ID available');
+        throw new Error('No user ID available. Please sign in again.');
       }
 
       // Use the API URL from environment or fallback to a default
@@ -297,8 +296,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${currentSession.access_token}`,
           'X-Gmail-Token': gmailToken,
-          'X-User-ID': currentSession.user.id,
-          'Origin': window.location.origin
+          'X-User-ID': currentSession.user.id
         }
       };
 
@@ -312,21 +310,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
             method: 'GET',
-            mode: 'cors',
-            credentials: 'include',
-            headers: {
-              'Accept': 'application/json'
-            }
+            ...fetchOptions
           });
           
           if (!healthCheck.ok) {
-            const errorText = await healthCheck.text();
+            const errorData = await healthCheck.json().catch(() => null);
             console.error('Health check failed:', {
               status: healthCheck.status,
               statusText: healthCheck.statusText,
-              error: errorText
+              error: errorData
             });
-            throw new Error(`Health check failed with status ${healthCheck.status}`);
+
+            // If unauthorized, try to refresh the session
+            if (healthCheck.status === 401) {
+              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+              if (refreshError || !newSession) {
+                throw new Error('Session expired. Please sign in again.');
+              }
+              // Update the session and retry with new token
+              currentSession.access_token = newSession.access_token;
+              fetchOptions.headers['Authorization'] = `Bearer ${newSession.access_token}`;
+              continue;
+            }
+
+            throw new Error(errorData?.error || `Health check failed with status ${healthCheck.status}`);
           }
           
           const healthData = await healthCheck.json();
@@ -375,13 +382,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           clearTimeout(timeoutId);
 
           if (!response.ok) {
-            const errorText = await response.text();
+            const errorData = await response.json().catch(() => null);
             console.error(`API error (attempt ${attempt}):`, {
               status: response.status,
               statusText: response.statusText,
-              error: errorText
+              error: errorData
             });
-            throw new Error(`HTTP error! status: ${response.status}`);
+
+            // Handle specific error cases
+            if (response.status === 401) {
+              if (errorData?.error === 'Gmail token expired or invalid') {
+                // Clear Gmail tokens and redirect to Google auth
+                localStorage.removeItem('gmail_token');
+                sessionStorage.removeItem('gmail_access_token');
+                await signInWithGoogle();
+                return;
+              } else {
+                // Other auth errors - clear session and redirect to login
+                await signOut();
+                return;
+              }
+            }
+
+            throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
           }
 
           const data = await response.json();
