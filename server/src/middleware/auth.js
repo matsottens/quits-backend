@@ -97,19 +97,17 @@ const customCorsMiddleware = (req, res, next) => {
     isAllowed: allowedDomains.includes(originDomain)
   });
 
-  // Check if the origin's domain is in our allowed list
-  if (allowedDomains.includes(originDomain)) {
-    // Set CORS headers using the exact origin that was sent
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', '86400');
+  // Always set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', allowedDomains.includes(originDomain) ? origin : 'https://www.quits.cc');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
 
-    // Log allowed request
+  // Log request status
+  if (allowedDomains.includes(originDomain)) {
     console.log(`[${requestId}] Allowing CORS for origin:`, origin);
   } else {
-    // Log blocked request
     console.log(`[${requestId}] Blocking CORS for origin:`, {
       origin,
       originDomain,

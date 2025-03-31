@@ -99,11 +99,13 @@ class ApiService {
         ...options,
         headers: {
           ...headers,
-          ...options.headers
+          ...options.headers,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         signal: controller.signal,
         mode: 'cors',
-        credentials: 'same-origin',
+        credentials: 'include',
         referrerPolicy: 'strict-origin-when-cross-origin'
       });
 
