@@ -167,10 +167,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-            scope: 'https://www.googleapis.com/auth/gmail.readonly'
+            scope: 'https://www.googleapis.com/auth/gmail.readonly email profile',
+            response_type: 'code',
+            client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID
           },
           skipBrowserRedirect: false,
-          // Always show consent screen
           flowType: 'pkce'
         }
       });
@@ -184,11 +185,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No URL returned from Supabase OAuth');
       }
 
+      // Store the state for verification after redirect
+      const urlParams = new URLSearchParams(new URL(data.url).search);
+      const state = urlParams.get('state');
+      if (state) {
+        sessionStorage.setItem('oauth_state', state);
+      }
+
       console.log('Redirecting to OAuth URL:', data.url);
       window.location.href = data.url;
     } catch (error) {
       console.error('Error initiating Google sign-in:', error);
       setError(error instanceof Error ? error.message : 'Failed to start Google sign-in');
+      // Redirect to login page on error
+      window.location.href = '/login';
     } finally {
       setLoading(false);
     }
