@@ -1,112 +1,124 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../supabase');
-const { authenticateUser } = require('../middleware/auth');
+const redisClient = require('../config/redis');
+const { supabase } = require('../middleware/auth');
 
-// Get subscription analytics
-router.get('/subscription-analytics', authenticateUser, async (req, res) => {
+// Cache middleware specific for analytics
+const analyticsCacheMiddleware = async (req, res, next) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) return next();
+
+  try {
+    const cacheKey = `analytics:${userId}`;
+    const cachedData = await redisClient.getCache(cacheKey);
+    if (cachedData) {
+      console.log('Serving analytics from cache for user:', userId);
+      return res.json({ success: true, data: cachedData });
+    }
+    next();
+  } catch (error) {
+    console.error('Cache error:', error);
+    next();
+  }
+};
+
+// Subscription analytics endpoint with caching
+router.get('/subscription-analytics', analyticsCacheMiddleware, async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  
   try {
     // Get all subscriptions for the user
-    const { data: subscriptions, error: subscriptionsError } = await supabase
+    const { data: subscriptions, error: subError } = await supabase
       .from('subscriptions')
       .select('*')
-      .eq('user_id', req.user.id);
+      .eq('user_id', userId);
 
-    if (subscriptionsError) throw subscriptionsError;
+    if (subError) throw subError;
 
-    // Get price history for all subscriptions
-    const { data: priceHistory, error: priceHistoryError } = await supabase
+    // Get price history
+    const { data: priceHistory, error: priceError } = await supabase
       .from('subscription_prices')
       .select('*')
-      .in('subscription_id', subscriptions.map(s => s.id))
-      .order('detected_at', { ascending: false });
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
 
-    if (priceHistoryError) throw priceHistoryError;
+    if (priceError) throw priceError;
 
-    // Calculate monthly and yearly totals
-    const monthlyTotal = subscriptions.reduce((total, sub) => {
-      if (sub.frequency === 'monthly') return total + sub.price;
-      if (sub.frequency === 'yearly') return total + (sub.price / 12);
-      return total;
-    }, 0);
+    // Calculate analytics
+    const analytics = {
+      subscriptions: subscriptions.length,
+      monthlyTotal: subscriptions.reduce((sum, sub) => {
+        if (sub.frequency === 'monthly') return sum + (sub.price || 0);
+        return sum;
+      }, 0),
+      yearlyTotal: subscriptions.reduce((sum, sub) => {
+        if (sub.frequency === 'yearly') return sum + (sub.price || 0);
+        return sum + ((sub.price || 0) * 12);
+      }, 0),
+      priceChanges: calculatePriceChanges(priceHistory),
+      upcomingRenewals: getUpcomingRenewals(subscriptions),
+      priceHistory: groupPriceHistory(priceHistory)
+    };
 
-    const yearlyTotal = subscriptions.reduce((total, sub) => {
-      if (sub.frequency === 'monthly') return total + (sub.price * 12);
-      if (sub.frequency === 'yearly') return total + sub.price;
-      return total;
-    }, 0);
-
-    // Group price history by subscription and find price changes
-    const priceChanges = [];
-    const priceHistoryBySubscription = {};
-
-    priceHistory.forEach(price => {
-      if (!priceHistoryBySubscription[price.subscription_id]) {
-        priceHistoryBySubscription[price.subscription_id] = [];
-      }
-      priceHistoryBySubscription[price.subscription_id].push(price);
-    });
-
-    // Find price changes for each subscription
-    Object.entries(priceHistoryBySubscription).forEach(([subscriptionId, prices]) => {
-      if (prices.length >= 2) {
-        const latestPrice = prices[0];
-        const previousPrice = prices[1];
-        const change = latestPrice.price - previousPrice.price;
-        const percentageChange = (change / previousPrice.price) * 100;
-
-        if (change !== 0) {
-          const subscription = subscriptions.find(s => s.id === subscriptionId);
-          priceChanges.push({
-            provider: subscription.provider,
-            oldPrice: previousPrice.price,
-            newPrice: latestPrice.price,
-            change,
-            percentageChange,
-            firstDetected: latestPrice.detected_at,
-            lastUpdated: latestPrice.detected_at
-          });
-        }
-      }
-    });
-
-    // Get upcoming renewals
-    const upcomingRenewals = subscriptions
-      .filter(sub => sub.renewal_date)
-      .map(sub => {
-        const renewalDate = new Date(sub.renewal_date);
-        const today = new Date();
-        const daysUntilRenewal = Math.ceil((renewalDate - today) / (1000 * 60 * 60 * 24));
-
-        return {
-          provider: sub.provider,
-          renewal_date: sub.renewal_date,
-          daysUntilRenewal,
-          price: sub.price,
-          frequency: sub.frequency
-        };
-      })
-      .filter(renewal => renewal.daysUntilRenewal > 0)
-      .sort((a, b) => a.daysUntilRenewal - b.daysUntilRenewal)
-      .slice(0, 5); // Get next 5 renewals
-
+    // Cache the results for 1 hour
+    await redisClient.setCache(`analytics:${userId}`, analytics, 3600);
+    
     res.json({
-      status: 'ok',
-      data: {
-        subscriptions: subscriptions.length,
-        monthlyTotal,
-        yearlyTotal,
-        priceChanges,
-        upcomingRenewals
-      }
+      success: true,
+      data: analytics
     });
   } catch (error) {
-    console.error('Error fetching subscription analytics:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to fetch subscription analytics'
+    console.error('Error getting subscription analytics:', error);
+    res.status(500).json({ 
+      error: 'Failed to get subscription analytics',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
+
+// Helper functions
+function calculatePriceChanges(priceHistory) {
+  const byProvider = groupPriceHistory(priceHistory);
+  
+  return Object.entries(byProvider).map(([provider, history]) => {
+    if (history.length < 2) return null;
+    
+    const latest = history[history.length - 1];
+    const oldest = history[0];
+    
+    return {
+      provider,
+      oldPrice: oldest.newPrice,
+      newPrice: latest.newPrice,
+      change: latest.newPrice - oldest.newPrice,
+      percentageChange: ((latest.newPrice - oldest.newPrice) / oldest.newPrice) * 100,
+      firstDetected: oldest.created_at,
+      lastUpdated: latest.created_at
+    };
+  }).filter(Boolean);
+}
+
+function getUpcomingRenewals(subscriptions) {
+  return subscriptions
+    .filter(sub => sub.renewal_date)
+    .map(sub => ({
+      ...sub,
+      renewal_date: new Date(sub.renewal_date),
+      daysUntilRenewal: Math.ceil((new Date(sub.renewal_date) - new Date()) / (1000 * 60 * 60 * 24))
+    }))
+    .filter(sub => sub.daysUntilRenewal > 0)
+    .sort((a, b) => a.daysUntilRenewal - b.daysUntilRenewal)
+    .slice(0, 5);
+}
+
+function groupPriceHistory(priceHistory) {
+  return priceHistory.reduce((acc, entry) => {
+    if (!acc[entry.provider]) {
+      acc[entry.provider] = [];
+    }
+    acc[entry.provider].push(entry);
+    return acc;
+  }, {});
+}
 
 module.exports = router; 

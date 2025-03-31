@@ -11,6 +11,7 @@ const fetch = require('cross-fetch');
 const FileStore = require('session-file-store')(session);
 const RedisStore = require('connect-redis').default;
 const redis = require('./config/redis');
+const rateLimitMiddleware = require('./middleware/rateLimit');
 
 const { corsOptions, logRequest, authenticateRequest, supabase } = require('./middleware/auth');
 
@@ -102,8 +103,13 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Session configuration with better security
+// Session configuration with Redis store
 const sessionConfig = {
+  store: new RedisStore({ 
+    client: redis.getClient(),
+    prefix: 'session:',
+    ttl: 24 * 60 * 60 // 24 hours
+  }),
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
@@ -113,29 +119,11 @@ const sessionConfig = {
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   },
-  name: 'sessionId', // Don't use default connect.sid
-  rolling: true, // Refresh session on each request
-  unset: 'destroy' // Remove session when browser closes
+  name: 'sessionId'
 };
 
-// Use Redis in production, FileStore in development
-if (process.env.NODE_ENV === 'production' && process.env.REDIS_URL) {
-  sessionConfig.store = new RedisStore({ 
-    client: redis,
-    prefix: 'session:', // Prefix for session keys in Redis
-    ttl: 24 * 60 * 60 // 24 hours
-  });
-  console.log('Using Redis for session storage');
-} else {
-  sessionConfig.store = new FileStore({
-    path: './sessions',
-    ttl: 24 * 60 * 60 // 24 hours
-  });
-  console.log('Using FileStore for session storage');
-}
-
+// Apply middleware
 app.use(session(sessionConfig));
-
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -1438,6 +1426,39 @@ app.get('/api/subscription-analytics', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to get subscription analytics',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Cache middleware for expensive operations
+const cacheMiddleware = async (req, res, next) => {
+  const cacheKey = `${req.user.id}:${req.path}`;
+  try {
+    const cachedData = await redis.getCache(cacheKey);
+    if (cachedData) {
+      return res.json({ success: true, data: cachedData });
+    }
+  } catch (error) {
+    console.error('Cache error:', error);
+  }
+  next();
+};
+
+// Example of using cache middleware for subscription analytics
+app.get('/api/subscription-analytics', cacheMiddleware, async (req, res) => {
+  try {
+    // Your existing analytics logic here
+    const data = {}; // Your analytics data
+    
+    // Cache the results
+    await redis.setCache(`${req.user.id}:${req.path}`, data, 3600); // Cache for 1 hour
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error fetching subscription analytics:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch subscription analytics' 
     });
   }
 });
