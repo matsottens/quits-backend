@@ -119,6 +119,7 @@ const customCorsMiddleware = (req, res, next) => {
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
+    // For preflight requests, we need to respond with 204 and end the response
     res.status(204).end();
     return;
   }
@@ -200,10 +201,71 @@ const authenticateRequest = async (req, res, next) => {
   }
 };
 
+// Error handling middleware
+const errorHandler = (err, req, res, next) => {
+  const requestId = req.requestId || Math.random().toString(36).substring(7);
+  
+  // Log the error with context
+  console.error(`[${requestId}] Error:`, {
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    path: req.path,
+    method: req.method,
+    origin: req.headers.origin,
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+      'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined
+    }
+  });
+
+  // Handle specific error types
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'Validation Error',
+      details: err.message,
+      requestId
+    });
+  }
+
+  if (err.name === 'UnauthorizedError') {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      details: err.message,
+      requestId
+    });
+  }
+
+  if (err.code === 429) {
+    return res.status(429).json({
+      error: 'Rate Limit Exceeded',
+      details: 'Too many requests. Please try again later.',
+      requestId,
+      retryAfter: err.retryAfter || 60
+    });
+  }
+
+  if (err.message.includes('Gmail token expired') || err.message.includes('invalid_grant')) {
+    return res.status(401).json({
+      error: 'Token Expired',
+      details: 'Your Gmail token has expired. Please sign in with Google again.',
+      requestId
+    });
+  }
+
+  // Default error response
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
+    details: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    requestId
+  });
+};
+
 // Export the middleware
 module.exports = {
   customCorsMiddleware,
   authenticateRequest,
   cspMiddleware,
-  supabase
+  supabase,
+  errorHandler
 }; 
