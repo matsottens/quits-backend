@@ -120,7 +120,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Starting Google sign-in with:', {
         redirectUri,
         clientId: clientId ? 'present' : 'missing',
-        apiUrl: apiUrlWithProtocol
+        apiUrl: apiUrlWithProtocol,
+        origin: window.location.origin
       });
 
       if (!clientId) {
@@ -130,17 +131,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store the API URL in session storage for the callback
       sessionStorage.setItem('api_url', apiUrlWithProtocol);
 
-      const scope = 'email profile https://www.googleapis.com/auth/gmail.readonly';
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-        `client_id=${encodeURIComponent(clientId)}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&response_type=code` +
-        `&scope=${encodeURIComponent(scope)}` +
-        `&access_type=offline` +
-        `&prompt=consent`;
+      // Update scopes to match exactly what Google expects
+      const scope = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'openid',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/userinfo.email'
+      ].join(' ');
 
-      console.log('Redirecting to Google auth URL:', authUrl);
-      window.location.href = authUrl;
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.append('client_id', clientId);
+      authUrl.searchParams.append('redirect_uri', redirectUri);
+      authUrl.searchParams.append('response_type', 'code');
+      authUrl.searchParams.append('scope', scope);
+      authUrl.searchParams.append('access_type', 'offline');
+      authUrl.searchParams.append('prompt', 'consent');
+
+      console.log('Redirecting to Google auth URL:', authUrl.toString());
+      window.location.href = authUrl.toString();
     } catch (error) {
       console.error('Error initiating Google sign-in:', error);
       setError(error instanceof Error ? error.message : 'Failed to start Google sign-in');
