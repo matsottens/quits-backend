@@ -54,6 +54,12 @@ class ApiService {
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
       const headers = await this.getAuthHeaders();
+      console.log('Making API request:', {
+        url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
+        method: options.method || 'GET',
+        headers
+      });
+
       const response = await fetch(`${API_URL_WITH_PROTOCOL}${endpoint}`, {
         ...options,
         headers: {
@@ -62,16 +68,17 @@ class ApiService {
         },
         signal: controller.signal,
         mode: 'cors',
-        credentials: 'include'
+        credentials: 'same-origin'
       });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error('API error:', {
+        console.error('API error response:', {
           status: response.status,
           statusText: response.statusText,
+          url: response.url,
           error: errorData,
           headers: Object.fromEntries(response.headers.entries())
         });

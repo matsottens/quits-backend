@@ -27,9 +27,16 @@ const corsOptions = {
     const allowedOrigins = [
       'https://quits.cc',
       'https://www.quits.cc',
-      'https://quits.vercel.app',
-      'http://localhost:3000'  // Keep for local development
+      'https://api.quits.cc',
+      'http://localhost:3000',  // Keep for local development
+      'http://localhost:10000'  // Allow backend URL
     ];
+
+    // In development, be more permissive
+    if (process.env.NODE_ENV === 'development') {
+      callback(null, origin);
+      return;
+    }
 
     // Normalize origins for comparison
     const normalizedOrigin = origin.toLowerCase();
@@ -51,7 +58,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Gmail-Token', 'X-User-ID'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   maxAge: 86400 // 24 hours
 };
