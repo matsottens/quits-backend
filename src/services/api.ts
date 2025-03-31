@@ -57,7 +57,12 @@ class ApiService {
       console.log('Making API request:', {
         url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
         method: options.method || 'GET',
-        headers
+        headers: {
+          ...headers,
+          // Don't log sensitive data
+          Authorization: headers.Authorization ? '[REDACTED]' : undefined,
+          'X-Gmail-Token': headers['X-Gmail-Token'] ? '[REDACTED]' : undefined
+        }
       });
 
       const response = await fetch(`${API_URL_WITH_PROTOCOL}${endpoint}`, {
@@ -68,29 +73,41 @@ class ApiService {
         },
         signal: controller.signal,
         mode: 'cors',
-        credentials: 'same-origin'
+        credentials: 'include',
+        referrerPolicy: 'strict-origin-when-cross-origin'
       });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
+        const responseHeaders = Object.fromEntries(response.headers.entries());
+        
         console.error('API error response:', {
           status: response.status,
           statusText: response.statusText,
           url: response.url,
           error: errorData,
-          headers: Object.fromEntries(response.headers.entries())
+          headers: {
+            ...responseHeaders,
+            // Don't log sensitive data
+            authorization: responseHeaders.authorization ? '[REDACTED]' : undefined
+          },
+          cors: {
+            origin: response.headers.get('access-control-allow-origin'),
+            methods: response.headers.get('access-control-allow-methods'),
+            headers: response.headers.get('access-control-allow-headers')
+          }
         });
 
         if (response.status === 401) {
           if (errorData?.error === 'Gmail token expired or invalid') {
-            // Clear Gmail tokens and redirect to Google auth
+            console.log('Gmail token expired, redirecting to auth...');
             sessionStorage.removeItem('gmail_access_token');
             window.location.href = '/auth/google';
             return { success: false, error: 'Gmail token expired. Redirecting to Google auth...' };
           } else {
-            // Other auth errors - clear session and redirect to login
+            console.log('Session expired, redirecting to login...');
             await supabase.auth.signOut();
             window.location.href = '/login';
             return { success: false, error: 'Session expired. Please sign in again.' };
@@ -103,12 +120,24 @@ class ApiService {
       const data = await response.json();
       return { success: true, data };
     } catch (error: any) {
+      // Check if it's an AbortError
+      if (error.name === 'AbortError') {
+        console.error('Request timed out after 30 seconds');
+        return { success: false, error: 'Request timed out. Please try again.' };
+      }
+
       console.error('API request error:', {
-        error: error.message,
+        message: error.message,
         type: error.name,
-        stack: error.stack
+        stack: error.stack,
+        url: `${API_URL_WITH_PROTOCOL}${endpoint}`
       });
-      return { success: false, error: error.message || 'Failed to make API request' };
+
+      return { 
+        success: false, 
+        error: error.message || 'Failed to make API request',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      };
     }
   }
 

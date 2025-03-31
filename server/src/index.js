@@ -53,52 +53,86 @@ app.get('/health', async (req, res) => {
       path: req.path,
       origin: req.headers.origin,
       hasAuthHeader: !!req.headers.authorization,
-      headers: req.headers
+      headers: {
+        ...req.headers,
+        // Don't log sensitive data
+        authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+        'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined
+      }
     });
 
     // Set CORS headers explicitly for this endpoint
     const origin = req.headers.origin;
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
       res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400');
     }
+
+    // Check Redis connection
+    const redisStatus = await new Promise((resolve) => {
+      const redisClient = redis.getClient();
+      if (redisClient.status === 'ready') {
+        resolve('connected');
+      } else {
+        resolve('disconnected');
+      }
+    });
+
+    // Check Supabase connection
+    const supabaseStatus = await testSupabaseConnection();
 
     // Get the authorization header
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.log('Missing or invalid authorization header');
-      return res.status(401).json({ 
-        error: 'Missing or invalid authorization token',
-        details: 'Authorization header must start with Bearer'
-      });
-    }
+    let authStatus = 'no_token';
+    let userData = null;
 
-    const token = authHeader.split(' ')[1];
-    
-    // Verify the token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    
-    if (error || !user) {
-      console.log('Invalid or expired token:', error);
-      return res.status(401).json({ 
-        error: 'Invalid or expired token',
-        details: error?.message || 'Token validation failed'
-      });
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        // Verify the token with Supabase
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (error) {
+          authStatus = 'invalid';
+          console.log('Invalid token:', error);
+        } else {
+          authStatus = 'valid';
+          userData = {
+            id: user.id,
+            email: user.email
+          };
+        }
+      } catch (error) {
+        authStatus = 'error';
+        console.error('Auth check error:', error);
+      }
     }
 
     res.status(200).json({ 
       status: 'ok', 
       timestamp: new Date().toISOString(),
-      user: {
-        id: user.id,
-        email: user.email
+      environment: process.env.NODE_ENV || 'development',
+      services: {
+        redis: redisStatus,
+        supabase: supabaseStatus
+      },
+      auth: {
+        status: authStatus,
+        user: userData
+      },
+      cors: {
+        origin: req.headers.origin,
+        allowedOrigins: corsOptions.origin
       }
     });
   } catch (error) {
     console.error('Health check error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
     });
   }
 });

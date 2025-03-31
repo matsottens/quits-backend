@@ -18,8 +18,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log('CORS request from origin:', origin);
+
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
+      console.log('CORS: Allowing request with no origin');
       callback(null, true);
       return;
     }
@@ -28,15 +31,8 @@ const corsOptions = {
       'https://quits.cc',
       'https://www.quits.cc',
       'https://api.quits.cc',
-      'http://localhost:3000',  // Keep for local development
-      'http://localhost:10000'  // Allow backend URL
+      'http://localhost:3000'
     ];
-
-    // In development, be more permissive
-    if (process.env.NODE_ENV === 'development') {
-      callback(null, origin);
-      return;
-    }
 
     // Normalize origins for comparison
     const normalizedOrigin = origin.toLowerCase();
@@ -50,17 +46,27 @@ const corsOptions = {
 
     if (isAllowed) {
       console.log('CORS: Allowing origin:', origin);
-      callback(null, origin); // Return the actual origin to ensure exact match
+      callback(null, origin);
     } else {
       console.log('CORS: Blocking origin:', origin);
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Gmail-Token', 'X-User-ID'],
+  allowedHeaders: [
+    'Origin', 
+    'X-Requested-With', 
+    'Content-Type', 
+    'Accept', 
+    'Authorization', 
+    'X-Gmail-Token', 
+    'X-User-ID'
+  ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 86400 // 24 hours
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 // Request logging middleware
