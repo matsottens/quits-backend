@@ -24,33 +24,34 @@ app.use((req, res, next) => {
 });
 
 // Configure CORS based on environment
+const allowedOrigins = [
+  'https://quits.cc',
+  'https://www.quits.cc',
+  'https://quits.vercel.app',
+  'http://localhost:3000'
+];
+
 const corsOptions = {
-  origin: function(origin, callback) {
-    const allowedOrigins = [
-      'https://quits.cc',
-      'https://quits.vercel.app',
-      'https://www.quits.cc',
-      'http://localhost:3000'
-    ];
+  origin: function (origin, callback) {
+    console.log('Request origin:', origin);
     
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      console.log('CORS blocked for origin:', origin);
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    if (!origin) {
+      callback(null, true);
+      return;
     }
-    console.log('CORS allowed for origin:', origin);
-    return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('Origin allowed:', origin);
+      callback(null, true);
+    } else {
+      console.log('Origin blocked:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID', 'Accept', 'Origin'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 600,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id']
 };
 
 // Apply CORS middleware
@@ -315,20 +316,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Add a health check endpoint
-app.get('/health', (req, res) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Gmail-Token, X-User-ID, Accept, Origin');
-  }
-  res.json({ 
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
+// Health check endpoint
+app.get('/health', cors(corsOptions), (req, res) => {
+  console.log('Health check request from origin:', req.get('origin'));
+  res.status(200).json({ status: 'ok' });
 });
 
 // Initialize Supabase client with custom fetch
