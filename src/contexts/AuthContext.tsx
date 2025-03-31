@@ -184,7 +184,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
-      console.log('Scanning emails using API URL:', apiUrl);
+      const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
+      console.log('Scanning emails using API URL:', apiUrlWithProtocol);
 
       // Add retry logic
       const maxRetries = 3;
@@ -197,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-          const response = await fetch(`${apiUrl}/api/scan-emails`, {
+          const response = await fetch(`${apiUrlWithProtocol}/api/scan-emails`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,

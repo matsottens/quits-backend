@@ -35,4 +35,14 @@ services:
         - server/**
         - server/package.json
         - server/package-lock.json
-        - server/.env 
+        - server/.env
+    headers:
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff 
