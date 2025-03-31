@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../supabase';
+import { Box, CircularProgress, Typography } from '@mui/material';
 
 export const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -19,35 +19,27 @@ export const AuthCallback: React.FC = () => {
           return;
         }
 
-        // Get the stored API URL
-        const apiUrl = sessionStorage.getItem('api_url') || 'https://api.quits.cc';
-        
-        console.log('Exchanging code for tokens at:', `${apiUrl}/auth/google/token`);
-        
-        // Exchange the code for tokens
-        const response = await fetch(`${apiUrl}/auth/google/token`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({ code, redirect_uri: `${window.location.origin}/auth/callback` }),
-          credentials: 'include',
-        });
+        // Exchange the code for a session with Supabase
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-        if (!response.ok) {
-          const error = await response.text();
-          throw new Error(`Token exchange failed: ${error}`);
+        if (error) {
+          console.error('Error exchanging code for session:', error);
+          throw error;
         }
 
-        const tokens = await response.json();
-        console.log('Token exchange successful');
-
-        // Login with the received tokens
-        await login(tokens);
-        
-        // Navigate to the scanning page
-        navigate('/scanning');
+        if (data?.session) {
+          console.log('Successfully authenticated with Supabase');
+          // Store Gmail token if available
+          const gmailToken = data.session.provider_token;
+          if (gmailToken) {
+            sessionStorage.setItem('gmail_access_token', gmailToken);
+          }
+          
+          // Navigate to scanning page
+          navigate('/scanning');
+        } else {
+          throw new Error('No session data received');
+        }
       } catch (error) {
         console.error('Error in auth callback:', error);
         navigate('/login');
@@ -55,14 +47,20 @@ export const AuthCallback: React.FC = () => {
     };
 
     handleCallback();
-  }, [navigate, login]);
+  }, [navigate]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Completing sign in...</p>
-      </div>
-    </div>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+      }}
+    >
+      <CircularProgress />
+      <Typography sx={{ mt: 2 }}>Completing sign in...</Typography>
+    </Box>
   );
 }; 

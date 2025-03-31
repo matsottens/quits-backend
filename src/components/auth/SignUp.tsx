@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../supabase';
 import { Box, Button, TextField, Typography, Alert } from '@mui/material';
 
@@ -9,13 +8,14 @@ export const SignUp: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
 
     // Validate passwords match
     if (password !== confirmPassword) {
@@ -36,6 +36,9 @@ export const SignUp: React.FC = () => {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
       });
 
       if (signUpError) {
@@ -44,25 +47,39 @@ export const SignUp: React.FC = () => {
 
       if (signUpData.user) {
         console.log('Sign up successful:', signUpData.user.email);
-
-        // Automatically sign in after registration
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (signInError) {
-          throw signInError;
+        
+        if (signUpData.user.identities?.length === 0) {
+          setError('An account with this email already exists');
+          return;
         }
 
-        console.log('Auto login successful');
-        
-        // Navigate to dashboard after successful signup and login
-        navigate('/dashboard');
+        if (signUpData.user.confirmed_at) {
+          // User is already confirmed, proceed with login
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (signInError) {
+            throw signInError;
+          }
+
+          navigate('/scanning');
+        } else {
+          // User needs to confirm email
+          setSuccess('Please check your email for a confirmation link to complete your registration.');
+          setTimeout(() => {
+            navigate('/login');
+          }, 5000);
+        }
       }
     } catch (error) {
       console.error('Error during signup:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred during signup');
+      if (error instanceof Error && error.message.includes('rate limit')) {
+        setError('Too many signup attempts. Please try again later.');
+      } else {
+        setError(error instanceof Error ? error.message : 'An error occurred during signup');
+      }
     } finally {
       setLoading(false);
     }
@@ -98,6 +115,12 @@ export const SignUp: React.FC = () => {
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {success}
           </Alert>
         )}
 
@@ -154,7 +177,7 @@ export const SignUp: React.FC = () => {
         </Button>
 
         <Box sx={{ textAlign: 'center' }}>
-          <Link href="/login" variant="body2">
+          <Link to="/login" style={{ textDecoration: 'none', color: 'inherit' }}>
             Already have an account? Sign in
           </Link>
         </Box>
