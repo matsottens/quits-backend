@@ -41,13 +41,17 @@ const corsOptions = {
       return;
     }
 
+    // Normalize origins by removing trailing slashes and converting to lowercase
+    const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
+    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase().replace(/\/$/, ''));
+
     // Check if the origin matches any allowed origin
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
+    const isAllowed = normalizedAllowedOrigins.some(allowedOrigin => {
       // Exact match
-      if (origin === allowedOrigin) return true;
+      if (normalizedOrigin === allowedOrigin) return true;
       
       // Match with or without www.
-      const originWithoutWww = origin.replace('www.', '');
+      const originWithoutWww = normalizedOrigin.replace('www.', '');
       const allowedWithoutWww = allowedOrigin.replace('www.', '');
       return originWithoutWww === allowedWithoutWww;
     });
@@ -329,16 +333,30 @@ app.use((err, req, res, next) => {
 });
 
 // Health check endpoint with explicit CORS handling
-app.get('/health', cors(corsOptions), (req, res) => {
+app.get('/health', (req, res) => {
   const origin = req.get('origin');
   console.log('Health check request from origin:', origin);
   
   // Set CORS headers explicitly for this endpoint
   if (origin) {
-    res.set('Access-Control-Allow-Origin', origin);
-    res.set('Access-Control-Allow-Credentials', 'true');
-    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
+    // Use the actual requesting origin if it's allowed
+    const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
+    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase().replace(/\/$/, ''));
+    
+    const isAllowed = normalizedAllowedOrigins.some(allowedOrigin => {
+      if (normalizedOrigin === allowedOrigin) return true;
+      const originWithoutWww = normalizedOrigin.replace('www.', '');
+      const allowedWithoutWww = allowedOrigin.replace('www.', '');
+      return originWithoutWww === allowedWithoutWww;
+    });
+    
+    if (isAllowed) {
+      res.set('Access-Control-Allow-Origin', origin);
+      res.set('Access-Control-Allow-Credentials', 'true');
+      res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
+      res.set('Access-Control-Max-Age', '86400');
+    }
   }
   
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
