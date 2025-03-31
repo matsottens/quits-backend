@@ -19,6 +19,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -111,7 +112,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
-      initiateGoogleAuth();
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
+      const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
+      
+      console.log('Starting Google sign-in with:', {
+        redirectUri,
+        clientId: clientId ? 'present' : 'missing',
+        apiUrl: apiUrlWithProtocol
+      });
+
+      if (!clientId) {
+        throw new Error('Google Client ID is not configured');
+      }
+
+      // Store the API URL in session storage for the callback
+      sessionStorage.setItem('api_url', apiUrlWithProtocol);
+
+      const scope = 'email profile https://www.googleapis.com/auth/gmail.readonly';
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${encodeURIComponent(clientId)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_type=code` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&access_type=offline` +
+        `&prompt=consent`;
+
+      console.log('Redirecting to Google auth URL:', authUrl);
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Error initiating Google sign-in:', error);
+      setError(error instanceof Error ? error.message : 'Failed to start Google sign-in');
     } finally {
       setLoading(false);
     }

@@ -156,20 +156,97 @@ app.get('/auth/google',
   })
 );
 
-// Callback route
-app.get('/auth/google/callback',
-  (req, res, next) => {
-    console.log('Received Google callback...');
-    next();
-  },
-  passport.authenticate('google', {
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/login`
-  }),
-  (req, res) => {
-    console.log('Authentication successful, user:', req.user);
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/scanning`);
+// Google OAuth configuration
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'https://api.quits.cc/auth/google/callback';
+const CLIENT_URL = process.env.CLIENT_URL || 'https://quits.vercel.app';
+
+// Google OAuth callback endpoint
+app.get('/auth/google/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) {
+      throw new Error('No authorization code provided');
+    }
+
+    // Exchange code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: GOOGLE_CALLBACK_URL,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.text();
+      console.error('Token exchange failed:', error);
+      throw new Error('Failed to exchange authorization code for tokens');
+    }
+
+    const tokens = await tokenResponse.json();
+    console.log('Token exchange successful');
+
+    // Get user info
+    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${tokens.access_token}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      throw new Error('Failed to get user info');
+    }
+
+    const userInfo = await userResponse.json();
+    console.log('User info retrieved:', userInfo.email);
+
+    // Create or update user in Supabase
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .upsert({
+        email: userInfo.email,
+        google_id: userInfo.id,
+        name: userInfo.name,
+        picture: userInfo.picture,
+        last_login: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (userError) {
+      console.error('Error upserting user:', userError);
+      throw new Error('Failed to create or update user');
+    }
+
+    // Create session
+    const { data: session, error: sessionError } = await supabase.auth.signInWithPassword({
+      email: userInfo.email,
+      password: tokens.access_token, // Use access token as password for OAuth users
+    });
+
+    if (sessionError) {
+      console.error('Error creating session:', sessionError);
+      throw new Error('Failed to create session');
+    }
+
+    // Store Gmail token in session storage
+    sessionStorage.setItem('gmail_access_token', tokens.access_token);
+
+    // Redirect to frontend with success
+    res.redirect(`${CLIENT_URL}/scanning?success=true`);
+  } catch (error) {
+    console.error('Error in Google callback:', error);
+    res.redirect(`${CLIENT_URL}/auth/error?message=${encodeURIComponent(error.message)}`);
   }
-);
+});
 
 // Add a route to handle the frontend callback
 app.post('/auth/google/frontend-callback', (req, res) => {
