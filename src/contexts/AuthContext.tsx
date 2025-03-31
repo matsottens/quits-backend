@@ -112,43 +112,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
-      const redirectUri = `${window.location.origin}/auth/callback`;
-      const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
-      const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
-      
-      console.log('Starting Google sign-in with:', {
-        redirectUri,
-        clientId: clientId ? 'present' : 'missing',
-        apiUrl: apiUrlWithProtocol,
-        origin: window.location.origin
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        }
       });
 
-      if (!clientId) {
-        throw new Error('Google Client ID is not configured');
+      if (error) {
+        throw error;
       }
 
-      // Store the API URL in session storage for the callback
-      sessionStorage.setItem('api_url', apiUrlWithProtocol);
+      if (!data.url) {
+        throw new Error('No URL returned from Supabase OAuth');
+      }
 
-      // Update scopes to match exactly what Google expects
-      const scope = [
-        'https://www.googleapis.com/auth/gmail.readonly',
-        'openid',
-        'https://www.googleapis.com/auth/userinfo.profile',
-        'https://www.googleapis.com/auth/userinfo.email'
-      ].join(' ');
-
-      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      authUrl.searchParams.append('client_id', clientId);
-      authUrl.searchParams.append('redirect_uri', redirectUri);
-      authUrl.searchParams.append('response_type', 'code');
-      authUrl.searchParams.append('scope', scope);
-      authUrl.searchParams.append('access_type', 'offline');
-      authUrl.searchParams.append('prompt', 'consent');
-
-      console.log('Redirecting to Google auth URL:', authUrl.toString());
-      window.location.href = authUrl.toString();
+      // Redirect to the Google OAuth URL
+      window.location.href = data.url;
     } catch (error) {
       console.error('Error initiating Google sign-in:', error);
       setError(error instanceof Error ? error.message : 'Failed to start Google sign-in');

@@ -52,9 +52,11 @@ export const SignUp: React.FC = () => {
         });
         
         // If user exists but is not confirmed
-        if (signUpData.user.identities?.length === 0 && !signUpData.user.confirmed_at) {
-          // Resend confirmation email
-          const { error: resendError } = await supabase.auth.resend({
+        if (signUpData.user.identities?.length === 0) {
+          console.log('Attempting to resend confirmation email');
+          
+          // First try resending with signup type
+          let { data: resendData, error: resendError } = await supabase.auth.resend({
             type: 'signup',
             email,
             options: {
@@ -62,20 +64,26 @@ export const SignUp: React.FC = () => {
             }
           });
 
+          // If that fails, try with recovery type
           if (resendError) {
+            console.log('Signup resend failed, trying recovery:', resendError);
+            const result = await supabase.auth.resetPasswordForEmail(email, {
+              redirectTo: 'https://www.quits.cc/auth/callback'
+            });
+            resendError = result.error;
+            resendData = result.data;
+          }
+
+          if (resendError) {
+            console.error('Failed to resend confirmation:', resendError);
             throw resendError;
           }
 
+          console.log('Confirmation email resent successfully');
           setSuccess('A new confirmation email has been sent. Please check your inbox.');
           setTimeout(() => {
             navigate('/login');
           }, 5000);
-          return;
-        }
-
-        // If user exists and is confirmed
-        if (signUpData.user.identities?.length === 0 && signUpData.user.confirmed_at) {
-          setError('An account with this email already exists and is verified. Please sign in.');
           return;
         }
 

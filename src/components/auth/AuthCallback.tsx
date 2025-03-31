@@ -9,37 +9,31 @@ export const AuthCallback: React.FC = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get the code from URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        
-        if (!code) {
-          console.error('No authorization code found in URL');
-          navigate('/login');
-          return;
-        }
-
-        // Exchange the code for a session with Supabase
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        // Get the session from the URL
+        const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
-          console.error('Error exchanging code for session:', error);
+          console.error('Error getting session:', error);
           throw error;
         }
 
-        if (data?.session) {
-          console.log('Successfully authenticated with Supabase');
-          // Store Gmail token if available
-          const gmailToken = data.session.provider_token;
-          if (gmailToken) {
-            sessionStorage.setItem('gmail_access_token', gmailToken);
+        if (!session) {
+          console.log('No session found, checking for hash parameters');
+          // Handle the OAuth callback
+          const { error: signInError } = await supabase.auth.getUser();
+          if (signInError) {
+            throw signInError;
           }
-          
-          // Navigate to scanning page
-          navigate('/scanning');
-        } else {
-          throw new Error('No session data received');
         }
+
+        // Store Gmail token if available
+        if (session?.provider_token) {
+          console.log('Storing Gmail token');
+          sessionStorage.setItem('gmail_access_token', session.provider_token);
+        }
+
+        // Navigate to scanning page
+        navigate('/scanning');
       } catch (error) {
         console.error('Error in auth callback:', error);
         navigate('/login');
