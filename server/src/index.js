@@ -13,57 +13,65 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration
-app.use(cors({
-  origin: function(origin, callback) {
-    const allowedOrigins = [
-      'https://quits.cc',
-      'https://quits.vercel.app',
-      'https://www.quits.cc',
-      'http://localhost:3000'
-    ];
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+app.use((req, res, next) => {
+  console.log('Incoming request:', {
+    method: req.method,
+    path: req.path,
+    origin: req.headers.origin,
+    headers: req.headers
+  });
+  next();
+});
+
+// Configure CORS based on environment
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://quits.cc', 'https://quits.vercel.app', 'https://www.quits.cc']
+    : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID', 'Accept'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 600 // Cache preflight requests for 10 minutes
-}));
+  maxAge: 600,
+  preflightContinue: false
+};
+
+app.use(cors(corsOptions));
 
 // Add CSP headers middleware
 app.use((req, res, next) => {
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pihflemmavointdxjdsx.supabase.co https://*.supabase.co; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-    "img-src 'self' data: https://*.supabase.co https://*.googleapis.com; " +
-    "font-src 'self' https://fonts.gstatic.com; " +
-    "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://quits.vercel.app https://api.quits.cc; " +
-    "frame-src 'self' https://*.supabase.co https://*.googleapis.com;"
-  );
+  const cspHeader = process.env.NODE_ENV === 'production'
+    ? "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pihflemmavointdxjdsx.supabase.co https://*.supabase.co; " +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "img-src 'self' data: https://*.supabase.co https://*.googleapis.com; " +
+      "font-src 'self' https://fonts.gstatic.com; " +
+      "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://quits.vercel.app https://api.quits.cc; " +
+      "frame-src 'self' https://*.supabase.co https://*.googleapis.com;"
+    : "default-src 'self' 'unsafe-inline' 'unsafe-eval';";
+  
+  res.setHeader('Content-Security-Policy', cspHeader);
   next();
 });
 
 // Middleware
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// Session configuration with better security
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+  },
+  name: 'sessionId', // Don't use default connect.sid
+  rolling: true, // Refresh session on each request
+  unset: 'destroy' // Remove session when browser closes
 }));
 
 app.use(passport.initialize());
@@ -169,12 +177,35 @@ app.get('/auth/logout', (req, res) => {
   });
 });
 
-// Error handling middleware
+// Improved error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    error: err.message || 'Internal server error',
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  console.error('Error:', {
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    path: req.path,
+    method: req.method,
+    origin: req.headers.origin
+  });
+
+  // Handle specific error types
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'Validation Error',
+      details: err.message
+    });
+  }
+
+  if (err.name === 'UnauthorizedError') {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      details: err.message
+    });
+  }
+
+  // Default error response
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
+    details: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
 
@@ -235,18 +266,22 @@ testSupabaseConnection().then(success => {
   }
 });
 
-// Helper function to ensure Supabase connection
+// Improved Supabase connection handling
 async function ensureSupabaseConnection() {
   try {
     const { data, error } = await supabase.from('subscriptions').select('count');
     if (error) {
+      if (error.code === '42P01') {
+        console.log('Database table not ready yet, will retry on requests');
+        return true;
+      }
       console.error('Database connection error:', error);
-      throw new Error('Could not connect to database: ' + error.message);
+      throw new Error(`Database connection error: ${error.message}`);
     }
     return true;
   } catch (error) {
     console.error('Database connection error:', error);
-    throw new Error('Could not connect to database: ' + error.message);
+    throw new Error(`Database connection error: ${error.message}`);
   }
 }
 
@@ -300,104 +335,128 @@ function extractSubscriptionData(emailBody) {
   return data;
 }
 
+// Improved email scanning endpoint
 app.get('/api/scan-emails', async (req, res) => {
   const authHeader = req.headers.authorization;
   const gmailToken = req.headers['x-gmail-token'];
   const userId = req.headers['x-user-id'];
   
-  console.log('Starting email scan, auth header:', authHeader ? 'present' : 'missing', 'gmail token:', gmailToken ? 'present' : 'missing');
+  console.log('Starting email scan', {
+    hasAuthHeader: !!authHeader,
+    hasGmailToken: !!gmailToken,
+    hasUserId: !!userId
+  });
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No authentication token provided' });
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Invalid or missing authentication token' });
   }
 
   if (!gmailToken) {
-    return res.status(401).json({ error: 'No Gmail token provided' });
+    return res.status(401).json({ error: 'Missing Gmail token' });
   }
 
   if (!userId) {
-    return res.status(401).json({ error: 'No user ID provided' });
+    return res.status(401).json({ error: 'Missing user ID' });
   }
 
   try {
-    // Ensure database connection
     await ensureSupabaseConnection();
 
-    // Create Gmail API client
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: gmailToken });
     
     const gmail = google.gmail({ version: 'v1', auth });
 
-    // List emails from inbox
-    const response = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults: 100,
-      q: 'in:inbox subject:(subscription OR payment OR receipt OR invoice)'
-    });
+    // List emails with pagination
+    let messages = [];
+    let nextPageToken = null;
+    
+    do {
+      const response = await gmail.users.messages.list({
+        userId: 'me',
+        maxResults: 100,
+        pageToken: nextPageToken,
+        q: 'in:inbox subject:(subscription OR payment OR receipt OR invoice)'
+      });
 
-    const messages = response.data.messages || [];
+      messages = messages.concat(response.data.messages || []);
+      nextPageToken = response.data.nextPageToken;
+    } while (nextPageToken && messages.length < 500); // Limit to 500 emails max
+
     const subscriptions = [];
     const processedEmails = new Set();
 
-    // Get details for each email
-    for (const message of messages) {
-      const details = await gmail.users.messages.get({
-        userId: 'me',
-        id: message.id,
-        format: 'full'
-      });
+    // Process emails in batches
+    const batchSize = 10;
+    for (let i = 0; i < messages.length; i += batchSize) {
+      const batch = messages.slice(i, i + batchSize);
+      const batchPromises = batch.map(message => 
+        gmail.users.messages.get({
+          userId: 'me',
+          id: message.id,
+          format: 'full'
+        })
+      );
 
-      const headers = details.data.payload.headers;
-      const emailData = {
-        id: message.id,
-        subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
-        from: headers.find(h => h.name === 'From')?.value || 'Unknown',
-        date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
-        snippet: details.data.snippet || ''
-      };
-
-      // Extract subscription data
-      const subscriptionData = extractSubscriptionData(emailData);
+      const batchResults = await Promise.all(batchPromises);
       
-      // Only add if we have meaningful data and haven't processed this provider
-      if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
-        processedEmails.add(subscriptionData.provider);
-        subscriptions.push({
-          ...subscriptionData,
-          user_id: userId,
-          email_id: message.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+      for (const result of batchResults) {
+        const details = result.data;
+        const headers = details.payload.headers;
+        const emailData = {
+          id: details.id,
+          subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
+          from: headers.find(h => h.name === 'From')?.value || 'Unknown',
+          date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
+          snippet: details.snippet || ''
+        };
+
+        const subscriptionData = extractSubscriptionData(emailData);
+        
+        if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
+          processedEmails.add(subscriptionData.provider);
+          subscriptions.push({
+            ...subscriptionData,
+            user_id: userId,
+            email_id: details.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
       }
     }
 
-    // Store subscriptions in Supabase
+    // Store subscriptions in batches
     if (subscriptions.length > 0) {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .upsert(subscriptions, {
-          onConflict: 'user_id,provider',
-          returning: true
-        });
+      const batchSize = 50;
+      for (let i = 0; i < subscriptions.length; i += batchSize) {
+        const batch = subscriptions.slice(i, i + batchSize);
+        const { error } = await supabase
+          .from('subscriptions')
+          .upsert(batch, {
+            onConflict: 'user_id,provider',
+            returning: true
+          });
 
-      if (error) {
-        console.error('Error storing subscriptions:', error);
-        throw new Error('Failed to store subscription data');
+        if (error) {
+          console.error('Error storing subscription batch:', error);
+          throw new Error('Failed to store subscription data');
+        }
       }
-
-      console.log('Successfully stored subscriptions:', data);
     }
 
     return res.json({ 
       success: true, 
       message: 'Subscriptions processed and stored successfully',
+      count: subscriptions.length,
       subscriptions
     });
   } catch (error) {
     console.error('Error in email scan:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(500).json({ 
+      error: 'Failed to scan emails',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
