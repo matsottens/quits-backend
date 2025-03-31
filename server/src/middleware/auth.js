@@ -28,7 +28,7 @@ const corsOptions = {
       'https://quits.cc',
       'https://www.quits.cc',
       'https://quits.vercel.app',
-      'http://localhost:3000'
+      'http://localhost:3000'  // Keep for local development
     ];
 
     // Normalize origins for comparison

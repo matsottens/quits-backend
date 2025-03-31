@@ -8,11 +8,21 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { google } = require('googleapis');
 const { createClient } = require('@supabase/supabase-js');
 const fetch = require('cross-fetch');
+const FileStore = require('session-file-store')(session);
+const RedisStore = require('connect-redis').default;
+const redis = require('./config/redis');
 
 const { corsOptions, logRequest, authenticateRequest, supabase } = require('./middleware/auth');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
+
+// Log the environment and port configuration
+console.log('Server configuration:', {
+  environment: process.env.NODE_ENV || 'development',
+  port: PORT,
+  isProduction: process.env.NODE_ENV === 'production'
+});
 
 const notificationsRouter = require('./routes/notifications');
 const analyticsRouter = require('./routes/analytics');
@@ -93,8 +103,8 @@ app.get('/health', async (req, res) => {
 });
 
 // Session configuration with better security
-app.use(session({
-  secret: process.env.SESSION_SECRET,
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -106,7 +116,25 @@ app.use(session({
   name: 'sessionId', // Don't use default connect.sid
   rolling: true, // Refresh session on each request
   unset: 'destroy' // Remove session when browser closes
-}));
+};
+
+// Use Redis in production, FileStore in development
+if (process.env.NODE_ENV === 'production' && process.env.REDIS_URL) {
+  sessionConfig.store = new RedisStore({ 
+    client: redis,
+    prefix: 'session:', // Prefix for session keys in Redis
+    ttl: 24 * 60 * 60 // 24 hours
+  });
+  console.log('Using Redis for session storage');
+} else {
+  sessionConfig.store = new FileStore({
+    path: './sessions',
+    ttl: 24 * 60 * 60 // 24 hours
+  });
+  console.log('Using FileStore for session storage');
+}
+
+app.use(session(sessionConfig));
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -165,7 +193,7 @@ app.get('/auth/google',
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'https://api.quits.cc/auth/google/callback';
-const CLIENT_URL = process.env.CLIENT_URL || 'https://quits.vercel.app';
+const CLIENT_URL = process.env.CLIENT_URL || 'https://quits.cc';
 
 // Google OAuth callback endpoint
 app.get('/auth/google/callback', async (req, res) => {
@@ -1415,5 +1443,5 @@ app.get('/api/subscription-analytics', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 }); 
