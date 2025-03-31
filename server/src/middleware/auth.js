@@ -62,61 +62,98 @@ const cspMiddleware = (req, res, next) => {
   next();
 };
 
-// CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    console.log('CORS request from origin:', origin);
+// Custom CORS middleware
+const customCorsMiddleware = (req, res, next) => {
+  const origin = req.headers.origin;
+  const requestId = Math.random().toString(36).substring(7);
 
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      console.log('CORS: Allowing request with no origin');
-      callback(null, true);
-      return;
-    }
+  // Enhanced request logging
+  console.log(`[${requestId}] CORS Request:`, {
+    timestamp: new Date().toISOString(),
+    origin,
+    method: req.method,
+    path: req.path,
+    headers: {
+      ...req.headers,
+      // Redact sensitive data
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+      'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined
+    },
+    ip: req.ip,
+    originalUrl: req.originalUrl
+  });
 
-    const allowedOrigins = [
-      'https://quits.cc',
-      'https://www.quits.cc',
-      'https://api.quits.cc',
-      'http://localhost:3000'
-    ];
+  // Allow requests with no origin (like mobile apps or curl requests)
+  if (!origin) {
+    console.log(`[${requestId}] CORS: Allowing request with no origin`);
+    return next();
+  }
 
-    // Normalize origins for comparison
-    const normalizedOrigin = origin.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const normalizedAllowedOrigins = allowedOrigins.map(o => 
-      o.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-    );
+  const allowedDomains = [
+    'quits.cc',
+    'www.quits.cc',
+    'api.quits.cc'
+  ];
 
-    // Check if the origin matches any allowed origin
-    const isAllowed = normalizedAllowedOrigins.some(allowed => {
-      const originWithoutWWW = normalizedOrigin.replace(/^www\./, '');
-      const allowedWithoutWWW = allowed.replace(/^www\./, '');
-      return originWithoutWWW === allowedWithoutWWW;
+  // Check if the origin's domain matches any allowed domain
+  const isAllowed = allowedDomains.some(domain => {
+    const originDomain = origin.toLowerCase().replace(/^https?:\/\//, '');
+    const matches = originDomain === domain || 
+                   originDomain === 'www.' + domain ||
+                   domain === 'www.' + originDomain;
+    
+    console.log(`[${requestId}] CORS Domain Check:`, {
+      originDomain,
+      allowedDomain: domain,
+      matches
+    });
+    
+    return matches;
+  });
+
+  if (isAllowed) {
+    // Set CORS headers
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Max-Age': '86400'
+    };
+
+    // Log headers being set
+    console.log(`[${requestId}] Setting CORS headers:`, corsHeaders);
+
+    // Set all CORS headers
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
     });
 
-    if (isAllowed) {
-      console.log('CORS: Allowing origin:', origin);
-      callback(null, origin); // Return the actual origin
-    } else {
-      console.log('CORS: Blocking origin:', origin);
-      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    // Log response after headers are set
+    res.on('finish', () => {
+      console.log(`[${requestId}] Response completed:`, {
+        statusCode: res.statusCode,
+        headers: res.getHeaders(),
+        timing: `${Date.now() - req._startTime}ms`
+      });
+    });
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      console.log(`[${requestId}] Handling OPTIONS preflight request`);
+      res.status(204).end();
+      return;
     }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Origin', 
-    'X-Requested-With', 
-    'Content-Type', 
-    'Accept', 
-    'Authorization', 
-    'X-Gmail-Token', 
-    'X-User-ID'
-  ],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 86400, // 24 hours
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  } else {
+    console.log(`[${requestId}] CORS: Blocked origin:`, {
+      origin,
+      allowedDomains
+    });
+  }
+
+  // Store requestId for use in other middleware
+  req.requestId = requestId;
+  next();
 };
 
 // Request logging middleware
@@ -193,9 +230,9 @@ const authenticateRequest = async (req, res, next) => {
   }
 };
 
+// Export the middleware
 module.exports = {
-  corsOptions,
-  logRequest,
+  customCorsMiddleware,
   authenticateRequest,
   cspMiddleware,
   supabase

@@ -13,7 +13,7 @@ const RedisStore = require('connect-redis').default;
 const redis = require('./config/redis');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 
-const { corsOptions, logRequest, authenticateRequest, cspMiddleware, supabase } = require('./middleware/auth');
+const { customCorsMiddleware, authenticateRequest, cspMiddleware, supabase } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -28,11 +28,33 @@ console.log('Server configuration:', {
 const notificationsRouter = require('./routes/notifications');
 const analyticsRouter = require('./routes/analytics');
 
-// Apply CORS middleware first
-app.use(cors(corsOptions));
+// Apply custom CORS middleware first
+app.use(customCorsMiddleware);
 
 // Apply CSP middleware
 app.use(cspMiddleware);
+
+// Add specific OPTIONS handler for scan-emails
+app.options('/api/scan-emails', (req, res) => {
+  const origin = req.headers.origin;
+  
+  // Log the preflight request
+  console.log('Preflight request for scan-emails:', {
+    origin,
+    method: req.method,
+    headers: req.headers
+  });
+
+  // Set CORS headers explicitly
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  
+  // Respond to the preflight request
+  res.status(204).end();
+});
 
 // Other middleware
 app.use(bodyParser.json({ limit: '10mb' }));
@@ -1019,17 +1041,92 @@ async function checkAndSendNotifications(userId) {
   }
 }
 
-// Improved email scanning endpoint
+// Circuit breaker state
+const circuitBreaker = {
+  state: 'CLOSED', // CLOSED, OPEN, HALF_OPEN
+  failures: 0,
+  lastFailure: null,
+  failureThreshold: 5,
+  resetTimeout: 60000, // 1 minute
+};
+
+// Retry configuration
+const retryConfig = {
+  maxRetries: 3,
+  initialDelay: 1000, // 1 second
+  maxDelay: 5000, // 5 seconds
+  factor: 2, // exponential backoff factor
+};
+
+// Helper function for exponential backoff retry
+const retry = async (fn, retries = retryConfig.maxRetries) => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries === 0) throw error;
+    
+    const delay = Math.min(
+      retryConfig.initialDelay * Math.pow(retryConfig.factor, retryConfig.maxRetries - retries),
+      retryConfig.maxDelay
+    );
+    
+    console.log(`Retrying after ${delay}ms, ${retries} retries left`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return retry(fn, retries - 1);
+  }
+};
+
+// Circuit breaker check
+const checkCircuitBreaker = () => {
+  if (circuitBreaker.state === 'OPEN') {
+    const now = Date.now();
+    if (now - circuitBreaker.lastFailure >= circuitBreaker.resetTimeout) {
+      console.log('Circuit breaker entering HALF-OPEN state');
+      circuitBreaker.state = 'HALF-OPEN';
+    } else {
+      throw new Error('Circuit breaker is OPEN');
+    }
+  }
+};
+
+// Circuit breaker success handler
+const handleSuccess = () => {
+  if (circuitBreaker.state === 'HALF-OPEN') {
+    console.log('Circuit breaker reset to CLOSED state');
+    circuitBreaker.state = 'CLOSED';
+    circuitBreaker.failures = 0;
+  }
+};
+
+// Circuit breaker failure handler
+const handleFailure = (error) => {
+  circuitBreaker.failures++;
+  circuitBreaker.lastFailure = Date.now();
+  
+  console.log(`Circuit breaker failure count: ${circuitBreaker.failures}`);
+  
+  if (circuitBreaker.failures >= circuitBreaker.failureThreshold) {
+    console.log('Circuit breaker entering OPEN state');
+    circuitBreaker.state = 'OPEN';
+  }
+  
+  throw error;
+};
+
+// Improved email scanning endpoint with retry and circuit breaker
 app.get('/api/scan-emails', async (req, res) => {
+  const requestId = req.requestId || Math.random().toString(36).substring(7);
   const authHeader = req.headers.authorization;
   const gmailToken = req.headers['x-gmail-token'];
   const userId = req.headers['x-user-id'];
   
-  console.log('Starting email scan', {
+  console.log(`[${requestId}] Starting email scan`, {
+    timestamp: new Date().toISOString(),
     hasAuthHeader: !!authHeader,
     hasGmailToken: !!gmailToken,
     hasUserId: !!userId,
-    origin: req.headers.origin
+    origin: req.headers.origin,
+    circuitBreakerState: circuitBreaker.state
   });
   
   if (!authHeader?.startsWith('Bearer ')) {
@@ -1054,181 +1151,207 @@ app.get('/api/scan-emails', async (req, res) => {
   }
 
   try {
-    // First verify the Supabase token
-    const token = authHeader.split(' ')[1];
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      return res.status(401).json({ 
-        error: 'Invalid or expired token',
-        details: authError?.message || 'Token validation failed'
-      });
-    }
+    // Check circuit breaker state
+    checkCircuitBreaker();
 
-    // Verify the user ID matches
-    if (user.id !== userId) {
-      return res.status(401).json({ 
-        error: 'User ID mismatch',
-        details: 'Provided user ID does not match authenticated user'
-      });
-    }
+    // Wrap the entire email scanning process in retry logic
+    const result = await retry(async () => {
+      // First verify the Supabase token
+      const token = authHeader.split(' ')[1];
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError || !user) {
+        console.error(`[${requestId}] Auth error:`, authError);
+        throw new Error('Authentication failed');
+      }
 
-    await ensureSupabaseConnection();
-
-    // Initialize Gmail API
-    const auth = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET
-    );
-    auth.setCredentials({ access_token: gmailToken });
-    const gmail = google.gmail({ version: 'v1', auth });
-
-    // Test Gmail API access
-    try {
-      const profile = await gmail.users.getProfile({ userId: 'me' });
-      console.log('Gmail API access verified for:', profile.data.emailAddress);
-    } catch (error) {
-      console.error('Gmail API access error:', error);
-      if (error.code === 401) {
+      // Verify the user ID matches
+      if (user.id !== userId) {
         return res.status(401).json({ 
-          error: 'Gmail token expired or invalid',
-          details: 'Please sign in with Google again'
+          error: 'User ID mismatch',
+          details: 'Provided user ID does not match authenticated user'
         });
       }
-      throw error;
-    }
 
-    // List emails with pagination
-    let messages = [];
-    let nextPageToken = null;
-    
-    do {
-      const response = await gmail.users.messages.list({
-        userId: 'me',
-        maxResults: 100,
-        pageToken: nextPageToken,
-        q: 'in:anywhere (subject:(subscription OR payment OR receipt OR invoice OR billing OR netflix OR spotify OR amazon OR hbo OR disney) OR from:(netflix.com OR spotify.com OR amazon.com OR hbo.com OR youtube.com OR disneyplus.com))'
-      });
+      await ensureSupabaseConnection();
 
-      if (!response.data.messages) {
-        console.log('No messages found');
-        break;
+      // Initialize Gmail API
+      const auth = new google.auth.OAuth2(
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET
+      );
+      auth.setCredentials({ access_token: gmailToken });
+      const gmail = google.gmail({ version: 'v1', auth });
+
+      // Test Gmail API access
+      try {
+        const profile = await gmail.users.getProfile({ userId: 'me' });
+        console.log('Gmail API access verified for:', profile.data.emailAddress);
+      } catch (error) {
+        console.error('Gmail API access error:', error);
+        if (error.code === 401) {
+          return res.status(401).json({ 
+            error: 'Gmail token expired or invalid',
+            details: 'Please sign in with Google again'
+          });
+        }
+        throw error;
       }
 
-      messages = messages.concat(response.data.messages);
-      nextPageToken = response.data.nextPageToken;
+      // List emails with pagination
+      let messages = [];
+      let nextPageToken = null;
       
-      console.log(`Retrieved ${messages.length} messages so far`);
-    } while (nextPageToken && messages.length < 500); // Limit to 500 emails max
-
-    const subscriptions = [];
-    const processedEmails = new Set();
-    const priceChanges = [];
-
-    // Process emails in batches
-    const batchSize = 10;
-    for (let i = 0; i < messages.length; i += batchSize) {
-      const batch = messages.slice(i, i + batchSize);
-      const batchPromises = batch.map(message => 
-        gmail.users.messages.get({
+      do {
+        const response = await gmail.users.messages.list({
           userId: 'me',
-          id: message.id,
-          format: 'full'
-        })
-      );
+          maxResults: 100,
+          pageToken: nextPageToken,
+          q: 'in:anywhere (subject:(subscription OR payment OR receipt OR invoice OR billing OR netflix OR spotify OR amazon OR hbo OR disney) OR from:(netflix.com OR spotify.com OR amazon.com OR hbo.com OR youtube.com OR disneyplus.com))'
+        });
 
-      const batchResults = await Promise.all(batchPromises);
-      
-      for (const result of batchResults) {
-        try {
-          const details = result.data;
-          const headers = details.payload.headers;
-          const emailData = {
-            id: details.id,
-            subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
-            from: headers.find(h => h.name === 'From')?.value || 'Unknown',
-            date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
-            snippet: details.snippet || ''
-          };
+        if (!response.data.messages) {
+          console.log('No messages found');
+          break;
+        }
 
-          const subscriptionData = extractSubscriptionData(emailData);
-          
-          if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
-            processedEmails.add(subscriptionData.provider);
+        messages = messages.concat(response.data.messages);
+        nextPageToken = response.data.nextPageToken;
+        
+        console.log(`Retrieved ${messages.length} messages so far`);
+      } while (nextPageToken && messages.length < 500); // Limit to 500 emails max
+
+      const subscriptions = [];
+      const processedEmails = new Set();
+      const priceChanges = [];
+
+      // Process emails in batches
+      const batchSize = 10;
+      for (let i = 0; i < messages.length; i += batchSize) {
+        const batch = messages.slice(i, i + batchSize);
+        const batchPromises = batch.map(message => 
+          gmail.users.messages.get({
+            userId: 'me',
+            id: message.id,
+            format: 'full'
+          })
+        );
+
+        const batchResults = await Promise.all(batchPromises);
+        
+        for (const result of batchResults) {
+          try {
+            const details = result.data;
+            const headers = details.payload.headers;
+            const emailData = {
+              id: details.id,
+              subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
+              from: headers.find(h => h.name === 'From')?.value || 'Unknown',
+              date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
+              snippet: details.snippet || ''
+            };
+
+            const subscriptionData = extractSubscriptionData(emailData);
             
-            // Check for price changes
-            const priceChange = await checkPriceChange(supabase, subscriptionData, userId);
-            if (priceChange) {
-              priceChanges.push({
-                ...priceChange,
-                provider: subscriptionData.provider,
+            if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
+              processedEmails.add(subscriptionData.provider);
+              
+              // Check for price changes
+              const priceChange = await checkPriceChange(supabase, subscriptionData, userId);
+              if (priceChange) {
+                priceChanges.push({
+                  ...priceChange,
+                  provider: subscriptionData.provider,
+                  user_id: userId,
+                  created_at: new Date().toISOString()
+                });
+              }
+
+              subscriptions.push({
+                ...subscriptionData,
                 user_id: userId,
-                created_at: new Date().toISOString()
+                email_id: details.id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
               });
             }
-
-            subscriptions.push({
-              ...subscriptionData,
-              user_id: userId,
-              email_id: details.id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
+          } catch (error) {
+            console.error('Error processing email:', error);
+            continue;
           }
-        } catch (error) {
-          console.error('Error processing email:', error);
-          continue;
         }
       }
-    }
 
-    // Store subscriptions and price changes in batches
-    if (subscriptions.length > 0) {
-      const batchSize = 50;
-      for (let i = 0; i < subscriptions.length; i += batchSize) {
-        const batch = subscriptions.slice(i, i + batchSize);
+      // Store subscriptions and price changes in batches
+      if (subscriptions.length > 0) {
+        const batchSize = 50;
+        for (let i = 0; i < subscriptions.length; i += batchSize) {
+          const batch = subscriptions.slice(i, i + batchSize);
+          const { error } = await supabase
+            .from('subscriptions')
+            .upsert(batch, {
+              onConflict: 'user_id,provider',
+              returning: true
+            });
+
+          if (error) {
+            console.error('Error storing subscription batch:', error);
+            throw new Error('Failed to store subscription data');
+          }
+        }
+      }
+
+      // Store price changes
+      if (priceChanges.length > 0) {
         const { error } = await supabase
-          .from('subscriptions')
-          .upsert(batch, {
-            onConflict: 'user_id,provider',
-            returning: true
-          });
+          .from('subscription_prices')
+          .insert(priceChanges);
 
         if (error) {
-          console.error('Error storing subscription batch:', error);
-          throw new Error('Failed to store subscription data');
+          console.error('Error storing price changes:', error);
+          throw new Error('Failed to store price change data');
         }
       }
-    }
 
-    // Store price changes
-    if (priceChanges.length > 0) {
-      const { error } = await supabase
-        .from('subscription_prices')
-        .insert(priceChanges);
+      // After processing emails and storing data
+      await checkAndSendNotifications(userId);
 
-      if (error) {
-        console.error('Error storing price changes:', error);
-        throw new Error('Failed to store price change data');
-      }
-    }
-
-    // After processing emails and storing data
-    await checkAndSendNotifications(userId);
-
-    return res.json({ 
-      success: true, 
-      message: 'Subscriptions processed and stored successfully',
-      count: subscriptions.length,
-      subscriptions,
-      priceChanges: priceChanges.length > 0 ? priceChanges : null
+      return {
+        success: true,
+        message: 'Subscriptions processed and stored successfully',
+        count: subscriptions.length,
+        subscriptions,
+        priceChanges: priceChanges.length > 0 ? priceChanges : null
+      };
     });
+
+    // Handle success
+    handleSuccess();
+    
+    // Log success metrics
+    console.log(`[${requestId}] Email scan completed successfully`, {
+      timestamp: new Date().toISOString(),
+      duration: `${Date.now() - req._startTime}ms`,
+      subscriptionCount: result.count,
+      priceChangesCount: result.priceChanges?.length || 0
+    });
+
+    return res.json(result);
   } catch (error) {
-    console.error('Error in email scan:', error);
+    // Handle failure
+    handleFailure(error);
+
+    console.error(`[${requestId}] Error in email scan:`, {
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      circuitBreakerState: circuitBreaker.state,
+      failures: circuitBreaker.failures
+    });
+
     return res.status(500).json({ 
       error: 'Failed to scan emails',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      retryAfter: circuitBreaker.state === 'OPEN' ? Math.ceil((circuitBreaker.resetTimeout - (Date.now() - circuitBreaker.lastFailure)) / 1000) : null
     });
   }
 });
