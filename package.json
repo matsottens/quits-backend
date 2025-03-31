@@ -71,7 +71,7 @@
     "react-hook-form": "^7.55.0",
     "react-resizable-panels": "^2.1.7",
     "react-router-dom": "^6.30.0",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^3.0.1",
     "recharts": "^2.15.1",
     "sonner": "^2.0.2",
     "tailwind-merge": "^3.0.2",
@@ -82,7 +82,11 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:dev": "env-cmd -f .env.development react-scripts start",
+    "start:preview": "env-cmd -f .env.preview react-scripts start",
     "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
+    "build:preview": "DISABLE_ESLINT_PLUGIN=true env-cmd -f .env.preview react-scripts build",
+    "build:prod": "DISABLE_ESLINT_PLUGIN=true env-cmd -f .env.production react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -108,6 +112,7 @@
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "autoprefixer": "^10.4.17",
+    "env-cmd": "^10.1.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1"
   }

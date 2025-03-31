@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: quits-api
+    env: node
+    buildCommand: cd server && npm install
+    startCommand: cd server && node src/index.js
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: PORT
+        value: 10000
+      - key: NODE_VERSION
+        value: "22.x"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+    buildFilter:
+      paths:
+        - server/src/**
+        - server/package.json
+        - server/package-lock.json 

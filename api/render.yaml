@@ -2,8 +2,8 @@ services:
   - type: web
     name: quits-api
     env: node
-    buildCommand: cd api && npm install
-    startCommand: cd api && node index.js
+    buildCommand: npm install
+    startCommand: node src/index.js
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -12,4 +12,9 @@ services:
       - key: PORT
         value: 10000
       - key: NODE_VERSION
-        value: 22.x 
+        value: 22.x
+    buildFilter:
+      paths:
+      - src/**
+      - package.json
+      - package-lock.json 
