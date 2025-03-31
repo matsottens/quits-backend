@@ -312,16 +312,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-          console.log('Making health check request to:', `${apiUrlWithProtocol}/health`);
+          // Ensure consistent URL format
+          const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
+          const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
+          const healthCheckUrl = `${apiUrlWithProtocol}/health`;
           
-          const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
+          console.log('Making health check request to:', healthCheckUrl);
+          
+          const healthCheck = await fetch(healthCheckUrl, {
             method: 'GET',
             ...fetchOptions,
             signal: controller.signal,
             // Add additional fetch options for CORS
             cache: 'no-cache',
             redirect: 'follow',
-            referrerPolicy: 'no-referrer'
+            referrerPolicy: 'no-referrer',
+            // Ensure consistent origin handling
+            mode: 'cors',
+            credentials: 'include'
           });
           
           clearTimeout(timeoutId);

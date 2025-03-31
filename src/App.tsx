@@ -12,9 +12,9 @@ import { SubscriptionSelection } from './components/auth/SubscriptionSelection';
 import { EmailOAuthConsent } from './components/auth/EmailOAuthConsent';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import SubscriptionDashboard from './components/subscription/SubscriptionDashboard';
 import { Box, CircularProgress } from '@mui/material';
 import { AuthCallback } from './components/auth/AuthCallback';
+import { PrivateRoute } from './components/PrivateRoute';
 
 // Protected Route component with Layout
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -60,7 +60,7 @@ function App() {
       <AuthProvider>
         <Router>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/signup" element={<PublicRoute><SignUp /></PublicRoute>} />
             <Route path="/auth/google/callback" element={<OAuthRedirect />} />
@@ -95,14 +95,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Settings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/subscription-dashboard"
-              element={
-                <ProtectedRoute>
-                  <SubscriptionDashboard />
                 </ProtectedRoute>
               }
             />

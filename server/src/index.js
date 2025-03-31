@@ -12,35 +12,60 @@ const fetch = require('cross-fetch');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const notificationsRouter = require('./routes/notifications');
+const analyticsRouter = require('./routes/analytics');
+
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
     const allowedOrigins = [
       'https://quits.cc',
       'https://www.quits.cc',
       'https://quits.vercel.app',
       'http://localhost:3000'
     ];
-    
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+
+    // Normalize origins for comparison
+    const normalizedOrigin = origin.toLowerCase();
+    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase());
+
+    // Check if the origin matches any allowed origin
+    const isAllowed = normalizedAllowedOrigins.some(allowed => 
+      allowed === normalizedOrigin || 
+      allowed.replace('www.', '') === normalizedOrigin.replace('www.', '')
+    );
+
+    if (isAllowed) {
+      console.log('CORS: Allowing origin:', origin);
+      callback(null, origin); // Return the actual origin to ensure exact match
     } else {
-      console.log('Origin not allowed:', origin);
+      console.log('CORS: Blocking origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
   maxAge: 86400 // 24 hours
 };
 
-// Apply CORS middleware
+// Apply CORS middleware first
 app.use(cors(corsOptions));
 
 // Other middleware
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// Add routes
+app.use('/api/notifications', notificationsRouter);
+app.use('/api', analyticsRouter);
 
 // Add a middleware to log all requests
 app.use((req, res, next) => {
@@ -433,25 +458,30 @@ async function ensureSupabaseConnection() {
 // Helper function to extract subscription data from email
 function extractSubscriptionData(emailBody) {
   const subscriptionPatterns = [
-    // Common subscription keywords
+    // Renewal confirmation keywords
     {
-      pattern: /subscription|subscribe|membership|plan|netflix|spotify|disney\+|hbo|amazon prime|youtube|premium/i,
-      type: 'subscription'
+      pattern: /renewal confirmation|subscription renewal|your subscription will renew|renewal notice|renewal reminder/i,
+      type: 'renewal_confirmation'
     },
-    // Payment patterns
+    // Price increase keywords
     {
-      pattern: /monthly|yearly|annual|payment|recurring|billing/i,
-      type: 'recurring'
+      pattern: /price increase|rate increase|new rate|new price|price change|rate change|price adjustment|rate adjustment/i,
+      type: 'price_increase'
     },
     // Price patterns for different currencies
     {
       pattern: /(?:USD|EUR|€|\$)\s*(\d+(?:\.\d{2})?)/i,
       type: 'price'
     },
-    // Additional subscription indicators
+    // Date patterns for renewal
     {
-      pattern: /your.+subscription|thank you for subscribing|subscription confirmation|payment processed/i,
-      type: 'confirmation'
+      pattern: /(?:renewal|next billing|next payment) (?:date|on|at):?\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})/i,
+      type: 'renewal_date'
+    },
+    // Term/duration patterns
+    {
+      pattern: /(?:term|duration|period) (?:of)? (\d+)\s*(?:year|month|yr|mo)/i,
+      type: 'term'
     }
   ];
 
@@ -460,6 +490,9 @@ function extractSubscriptionData(emailBody) {
     price: null,
     provider: null,
     frequency: 'monthly', // default
+    renewal_date: null,
+    term_months: null,
+    is_price_increase: false,
     lastDetectedDate: new Date().toISOString()
   };
 
@@ -495,26 +528,490 @@ function extractSubscriptionData(emailBody) {
   // Combine subject and snippet for better pattern matching
   const fullText = `${emailBody.subject} ${emailBody.snippet}`.toLowerCase();
 
-  // Extract subscription type and price
+  // Extract subscription type, price, and renewal date
   for (const pattern of subscriptionPatterns) {
     const match = fullText.match(pattern.pattern);
     if (match) {
       if (pattern.type === 'price' && match[1]) {
         data.price = parseFloat(match[1]);
+      } else if (pattern.type === 'renewal_date' && match[1]) {
+        // Parse the date string
+        const dateStr = match[1];
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+          data.renewal_date = date.toISOString();
+        }
+      } else if (pattern.type === 'term' && match[1]) {
+        const term = parseInt(match[1]);
+        const unit = match[0].toLowerCase().includes('year') ? 12 : 1;
+        data.term_months = term * unit;
+      } else if (pattern.type === 'price_increase') {
+        data.is_price_increase = true;
       } else if (!data.type) {
         data.type = pattern.type;
       }
     }
   }
 
-  // Determine frequency
-  if (fullText.includes('yearly') || fullText.includes('annual')) {
+  // Determine frequency based on term
+  if (data.term_months) {
+    data.frequency = data.term_months > 12 ? 'yearly' : 'monthly';
+  } else if (fullText.includes('yearly') || fullText.includes('annual')) {
     data.frequency = 'yearly';
   } else if (fullText.includes('monthly')) {
     data.frequency = 'monthly';
   }
 
   return data;
+}
+
+// Helper function to check for price changes
+async function checkPriceChange(supabase, subscription, userId) {
+  if (!subscription.price || !subscription.is_price_increase) return null;
+
+  // Get the current subscription data
+  const { data: currentSub, error } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('provider', subscription.provider)
+    .single();
+
+  if (error) {
+    console.error('Error checking current subscription:', error);
+    return null;
+  }
+
+  // If we have a current subscription and the price is different
+  if (currentSub && currentSub.price !== subscription.price) {
+    return {
+      oldPrice: currentSub.price,
+      newPrice: subscription.price,
+      change: subscription.price - currentSub.price,
+      percentageChange: ((subscription.price - currentSub.price) / currentSub.price) * 100,
+      term_months: subscription.term_months || currentSub.term_months,
+      renewal_date: subscription.renewal_date
+    };
+  }
+
+  return null;
+}
+
+// Notification settings endpoint
+app.get('/api/notification-settings', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const userId = req.headers['x-user-id'];
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ 
+      error: 'Invalid or missing authentication token',
+      details: 'Authorization header must start with Bearer'
+    });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ 
+      error: 'Missing user ID',
+      details: 'X-User-ID header is required'
+    });
+  }
+
+  try {
+    // Verify the token with Supabase
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired token',
+        details: authError?.message || 'Token validation failed'
+      });
+    }
+
+    // Get user's notification settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('notification_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      throw settingsError;
+    }
+
+    res.json({
+      success: true,
+      data: settings || {
+        user_id: userId,
+        email_notifications: true,
+        price_change_threshold: 5, // percentage
+        renewal_reminder_days: 7,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error getting notification settings:', error);
+    res.status(500).json({ 
+      error: 'Failed to get notification settings',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update notification settings
+app.post('/api/notification-settings', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const userId = req.headers['x-user-id'];
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ 
+      error: 'Invalid or missing authentication token',
+      details: 'Authorization header must start with Bearer'
+    });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ 
+      error: 'Missing user ID',
+      details: 'X-User-ID header is required'
+    });
+  }
+
+  try {
+    // Verify the token with Supabase
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired token',
+        details: authError?.message || 'Token validation failed'
+      });
+    }
+
+    const { email_notifications, price_change_threshold, renewal_reminder_days } = req.body;
+
+    // Update or insert notification settings
+    const { data, error } = await supabase
+      .from('notification_settings')
+      .upsert({
+        user_id: userId,
+        email_notifications,
+        price_change_threshold,
+        renewal_reminder_days,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    console.error('Error updating notification settings:', error);
+    res.status(500).json({ 
+      error: 'Failed to update notification settings',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Notification center endpoint
+app.get('/api/notifications', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const userId = req.headers['x-user-id'];
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ 
+      error: 'Invalid or missing authentication token',
+      details: 'Authorization header must start with Bearer'
+    });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ 
+      error: 'Missing user ID',
+      details: 'X-User-ID header is required'
+    });
+  }
+
+  try {
+    // Verify the token with Supabase
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired token',
+        details: authError?.message || 'Token validation failed'
+      });
+    }
+
+    // Get user's notifications
+    const { data: notifications, error: notifError } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (notifError) {
+      throw notifError;
+    }
+
+    // Get unread count
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    res.json({
+      success: true,
+      data: {
+        notifications,
+        unreadCount
+      }
+    });
+  } catch (error) {
+    console.error('Error getting notifications:', error);
+    res.status(500).json({ 
+      error: 'Failed to get notifications',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Mark notification as read
+app.post('/api/notifications/:id/read', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const userId = req.headers['x-user-id'];
+  const notificationId = req.params.id;
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ 
+      error: 'Invalid or missing authentication token',
+      details: 'Authorization header must start with Bearer'
+    });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ 
+      error: 'Missing user ID',
+      details: 'X-User-ID header is required'
+    });
+  }
+
+  try {
+    // Verify the token with Supabase
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired token',
+        details: authError?.message || 'Token validation failed'
+      });
+    }
+
+    // Update notification
+    const { data, error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ 
+      error: 'Failed to mark notification as read',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Helper function to send email notifications
+async function sendEmailNotification(userId, notification) {
+  try {
+    // Get user's email
+    const { data: userData, error: userError } = await supabase.auth.getUser(userId);
+    if (userError || !userData?.user?.email) {
+      console.error('Error getting user email:', userError);
+      return;
+    }
+
+    const userEmail = userData.user.email;
+    const emailSubject = notification.type === 'price_increase' 
+      ? `Price Increase Alert: ${notification.provider} Subscription`
+      : `Upcoming Renewal: ${notification.provider} Subscription`;
+
+    let emailBody = '';
+    if (notification.type === 'price_increase') {
+      emailBody = `
+        Your ${notification.provider} subscription price is increasing.
+        Current price: $${notification.oldPrice}
+        New price: $${notification.newPrice}
+        Increase: ${notification.percentageChange.toFixed(1)}%
+        Renewal date: ${new Date(notification.renewal_date).toLocaleDateString()}
+        Term: ${notification.term_months} months
+      `;
+    } else if (notification.type === 'renewal_reminder') {
+      emailBody = `
+        Your ${notification.provider} subscription is renewing soon.
+        Current price: $${notification.price}
+        Renewal date: ${new Date(notification.renewal_date).toLocaleDateString()}
+        Days until renewal: ${notification.days_until_renewal}
+        Frequency: ${notification.frequency}
+      `;
+    }
+
+    // TODO: Implement email sending logic here
+    // For now, just log the email that would be sent
+    console.log('Would send email to:', userEmail);
+    console.log('Subject:', emailSubject);
+    console.log('Body:', emailBody);
+
+    // Store the email notification in the database
+    const { error: emailError } = await supabase
+      .from('email_notifications')
+      .insert({
+        user_id: userId,
+        notification_id: notification.id,
+        email: userEmail,
+        subject: emailSubject,
+        body: emailBody,
+        status: 'pending'
+      });
+
+    if (emailError) {
+      console.error('Error storing email notification:', emailError);
+    }
+  } catch (error) {
+    console.error('Error sending email notification:', error);
+  }
+}
+
+// Update the checkAndSendNotifications function
+async function checkAndSendNotifications(userId) {
+  try {
+    // Get user's notification settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('notification_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (settingsError || !settings) {
+      console.error('Error getting notification settings:', settingsError);
+      return;
+    }
+
+    // Get recent price changes
+    const { data: recentPriceChanges, error: priceError } = await supabase
+      .from('subscription_prices')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24 hours
+      .order('created_at', { ascending: false });
+
+    if (priceError) {
+      console.error('Error getting recent price changes:', priceError);
+      return;
+    }
+
+    // Get upcoming renewals
+    const { data: subscriptions, error: subError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .not('renewal_date', 'is', null);
+
+    if (subError) {
+      console.error('Error getting subscriptions:', subError);
+      return;
+    }
+
+    const notifications = [];
+
+    // Check price changes
+    if (recentPriceChanges) {
+      for (const change of recentPriceChanges) {
+        if (Math.abs(change.percentageChange) >= settings.price_change_threshold) {
+          const notification = {
+            type: 'price_increase',
+            provider: change.provider,
+            oldPrice: change.oldPrice,
+            newPrice: change.newPrice,
+            percentageChange: change.percentageChange,
+            renewal_date: change.renewal_date,
+            term_months: change.term_months,
+            created_at: change.created_at
+          };
+          notifications.push(notification);
+
+          // Send email notification if enabled
+          if (settings.email_notifications) {
+            await sendEmailNotification(userId, notification);
+          }
+        }
+      }
+    }
+
+    // Check upcoming renewals
+    if (subscriptions) {
+      const now = new Date();
+      for (const sub of subscriptions) {
+        const renewalDate = new Date(sub.renewal_date);
+        const daysUntilRenewal = Math.ceil((renewalDate - now) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilRenewal === settings.renewal_reminder_days) {
+          const notification = {
+            type: 'renewal_reminder',
+            provider: sub.provider,
+            renewal_date: sub.renewal_date,
+            days_until_renewal: daysUntilRenewal,
+            price: sub.price,
+            frequency: sub.frequency
+          };
+          notifications.push(notification);
+
+          // Send email notification if enabled
+          if (settings.email_notifications) {
+            await sendEmailNotification(userId, notification);
+          }
+        }
+      }
+    }
+
+    // Store notifications in the database
+    if (notifications.length > 0) {
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert(notifications.map(n => ({
+          ...n,
+          user_id: userId,
+          read: false
+        })));
+
+      if (notifError) {
+        console.error('Error storing notifications:', notifError);
+      }
+    }
+  } catch (error) {
+    console.error('Error in notification check:', error);
+  }
 }
 
 // Improved email scanning endpoint
@@ -622,6 +1119,7 @@ app.get('/api/scan-emails', async (req, res) => {
 
     const subscriptions = [];
     const processedEmails = new Set();
+    const priceChanges = [];
 
     // Process emails in batches
     const batchSize = 10;
@@ -653,6 +1151,18 @@ app.get('/api/scan-emails', async (req, res) => {
           
           if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
             processedEmails.add(subscriptionData.provider);
+            
+            // Check for price changes
+            const priceChange = await checkPriceChange(supabase, subscriptionData, userId);
+            if (priceChange) {
+              priceChanges.push({
+                ...priceChange,
+                provider: subscriptionData.provider,
+                user_id: userId,
+                created_at: new Date().toISOString()
+              });
+            }
+
             subscriptions.push({
               ...subscriptionData,
               user_id: userId,
@@ -663,13 +1173,12 @@ app.get('/api/scan-emails', async (req, res) => {
           }
         } catch (error) {
           console.error('Error processing email:', error);
-          // Continue with next email instead of failing the entire batch
           continue;
         }
       }
     }
 
-    // Store subscriptions in batches
+    // Store subscriptions and price changes in batches
     if (subscriptions.length > 0) {
       const batchSize = 50;
       for (let i = 0; i < subscriptions.length; i += batchSize) {
@@ -688,11 +1197,27 @@ app.get('/api/scan-emails', async (req, res) => {
       }
     }
 
+    // Store price changes
+    if (priceChanges.length > 0) {
+      const { error } = await supabase
+        .from('subscription_prices')
+        .insert(priceChanges);
+
+      if (error) {
+        console.error('Error storing price changes:', error);
+        throw new Error('Failed to store price change data');
+      }
+    }
+
+    // After processing emails and storing data
+    await checkAndSendNotifications(userId);
+
     return res.json({ 
       success: true, 
       message: 'Subscriptions processed and stored successfully',
       count: subscriptions.length,
-      subscriptions
+      subscriptions,
+      priceChanges: priceChanges.length > 0 ? priceChanges : null
     });
   } catch (error) {
     console.error('Error in email scan:', error);
@@ -811,6 +1336,128 @@ app.get('/auth/check', cors(corsOptions), async (req, res) => {
     res.status(401).json({ 
       authenticated: false,
       error: 'Session verification failed'
+    });
+  }
+});
+
+// Subscription analytics endpoint
+app.get('/api/subscription-analytics', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const userId = req.headers['x-user-id'];
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ 
+      error: 'Invalid or missing authentication token',
+      details: 'Authorization header must start with Bearer'
+    });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ 
+      error: 'Missing user ID',
+      details: 'X-User-ID header is required'
+    });
+  }
+
+  try {
+    // Verify the token with Supabase
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired token',
+        details: authError?.message || 'Token validation failed'
+      });
+    }
+
+    // Get all subscriptions for the user
+    const { data: subscriptions, error: subError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (subError) {
+      throw subError;
+    }
+
+    // Get price history for all subscriptions
+    const { data: priceHistory, error: priceError } = await supabase
+      .from('subscription_prices')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (priceError) {
+      throw priceError;
+    }
+
+    // Calculate monthly and yearly totals
+    const monthlyTotal = subscriptions.reduce((sum, sub) => {
+      if (sub.frequency === 'monthly') return sum + (sub.price || 0);
+      return sum;
+    }, 0);
+
+    const yearlyTotal = subscriptions.reduce((sum, sub) => {
+      if (sub.frequency === 'yearly') return sum + (sub.price || 0);
+      return sum + ((sub.price || 0) * 12); // Convert monthly to yearly
+    }, 0);
+
+    // Group price history by provider
+    const priceHistoryByProvider = priceHistory.reduce((acc, entry) => {
+      if (!acc[entry.provider]) {
+        acc[entry.provider] = [];
+      }
+      acc[entry.provider].push(entry);
+      return acc;
+    }, {});
+
+    // Calculate price changes
+    const priceChanges = Object.entries(priceHistoryByProvider).map(([provider, history]) => {
+      if (history.length < 2) return null;
+
+      const latest = history[history.length - 1];
+      const oldest = history[0];
+      
+      return {
+        provider,
+        oldPrice: oldest.newPrice,
+        newPrice: latest.newPrice,
+        change: latest.newPrice - oldest.newPrice,
+        percentageChange: ((latest.newPrice - oldest.newPrice) / oldest.newPrice) * 100,
+        firstDetected: oldest.created_at,
+        lastUpdated: latest.created_at
+      };
+    }).filter(Boolean);
+
+    // Get upcoming renewals
+    const upcomingRenewals = subscriptions
+      .filter(sub => sub.renewal_date)
+      .map(sub => ({
+        ...sub,
+        renewal_date: new Date(sub.renewal_date),
+        daysUntilRenewal: Math.ceil((new Date(sub.renewal_date) - new Date()) / (1000 * 60 * 60 * 24))
+      }))
+      .filter(sub => sub.daysUntilRenewal > 0)
+      .sort((a, b) => a.daysUntilRenewal - b.daysUntilRenewal)
+      .slice(0, 5); // Get next 5 renewals
+
+    res.json({
+      success: true,
+      data: {
+        subscriptions: subscriptions.length,
+        monthlyTotal,
+        yearlyTotal,
+        priceChanges,
+        upcomingRenewals,
+        priceHistory: priceHistoryByProvider
+      }
+    });
+  } catch (error) {
+    console.error('Error getting subscription analytics:', error);
+    res.status(500).json({ 
+      error: 'Failed to get subscription analytics',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
