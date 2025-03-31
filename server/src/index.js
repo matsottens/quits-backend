@@ -20,71 +20,55 @@ const allowedOrigins = [
   'http://localhost:3000'
 ];
 
-// CORS middleware - MUST be first!
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
+// Configure CORS
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Log the request origin
+    console.log('Request origin:', origin);
 
-  // Log incoming request for debugging
-  console.log('Incoming request:', {
-    method: req.method,
-    path: req.path,
-    origin: origin,
-    headers: req.headers
-  });
-
-  if (!origin) {
-    return next();
-  }
-
-  // Normalize the request origin and allowed origins for comparison
-  const normalizedRequestOrigin = origin.toLowerCase();
-  const requestOriginWithoutWww = normalizedRequestOrigin.replace('www.', '');
-  
-  // Check if origin is allowed
-  const isAllowed = allowedOrigins.some(allowedOrigin => {
-    const normalizedAllowedOrigin = allowedOrigin.toLowerCase();
-    const allowedOriginWithoutWww = normalizedAllowedOrigin.replace('www.', '');
-    
-    return (
-      normalizedRequestOrigin === normalizedAllowedOrigin || // Exact match
-      requestOriginWithoutWww === allowedOriginWithoutWww    // Match without www
-    );
-  });
-
-  if (isAllowed) {
-    // Always use the actual requesting origin in the response header
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
-    res.header('Access-Control-Max-Age', '86400');
-
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      callback(null, true);
+      return;
     }
-  } else {
-    console.log('Origin not allowed:', {
-      requestOrigin: origin,
-      normalizedRequestOrigin,
-      requestOriginWithoutWww,
-      allowedOrigins
-    });
-    return res.status(403).json({ 
-      error: 'Origin not allowed',
-      origin: origin
-    });
-  }
 
-  next();
-});
+    // Check if origin is allowed
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      // Direct match
+      if (origin === allowedOrigin) return true;
+      
+      // Match without www
+      const originWithoutWww = origin.replace('www.', '');
+      const allowedWithoutWww = allowedOrigin.replace('www.', '');
+      return originWithoutWww === allowedWithoutWww;
+    });
+
+    if (isAllowed) {
+      // Important: Return the actual origin that was received
+      callback(null, origin);
+    } else {
+      console.log('Origin not allowed:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id'],
+  maxAge: 86400 // 24 hours
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Enable pre-flight across-the-board
+app.options('*', cors(corsOptions));
 
 // Other middleware
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', cors(corsOptions), (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString()
