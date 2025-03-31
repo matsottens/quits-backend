@@ -13,17 +13,6 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration
-app.use((req, res, next) => {
-  console.log('Incoming request:', {
-    method: req.method,
-    path: req.path,
-    origin: req.headers.origin,
-    headers: req.headers
-  });
-  next();
-});
-
-// Configure CORS based on environment
 const allowedOrigins = [
   'https://quits.cc',
   'https://www.quits.cc',
@@ -31,74 +20,55 @@ const allowedOrigins = [
   'http://localhost:3000'
 ];
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    console.log('Request origin:', origin);
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-
-    // Normalize origins by removing trailing slashes and converting to lowercase
-    const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
-    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase().replace(/\/$/, ''));
-
-    // Check if the origin matches any allowed origin
-    const isAllowed = normalizedAllowedOrigins.some(allowedOrigin => {
-      // Exact match
-      if (normalizedOrigin === allowedOrigin) return true;
-      
-      // Match with or without www.
-      const originWithoutWww = normalizedOrigin.replace('www.', '');
-      const allowedWithoutWww = allowedOrigin.replace('www.', '');
-      return originWithoutWww === allowedWithoutWww;
-    });
-    
-    if (isAllowed) {
-      // Important: Return the actual origin that was received
-      callback(null, origin);
-    } else {
-      console.log('Origin blocked:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id'],
-  maxAge: 86400 // 24 hours
-};
-
-// Apply CORS middleware
-app.use(cors(corsOptions));
-
-// Enable pre-flight across-the-board
-app.options('*', cors(corsOptions));
-
-// Add CSP headers middleware
-app.use((req, res, next) => {
+// Single CORS configuration function
+function handleCors(req, res, next) {
   const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Gmail-Token, X-User-ID, Accept, Origin');
+  
+  // Log the incoming request for debugging
+  console.log('Incoming request:', {
+    method: req.method,
+    path: req.path,
+    origin: origin,
+    headers: req.headers
+  });
+
+  if (!origin) {
+    return next();
   }
-  
-  const cspHeader = process.env.NODE_ENV === 'production'
-    ? "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pihflemmavointdxjdsx.supabase.co https://*.supabase.co; " +
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-      "img-src 'self' data: https://*.supabase.co https://*.googleapis.com; " +
-      "font-src 'self' https://fonts.gstatic.com; " +
-      "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://quits.vercel.app https://api.quits.cc; " +
-      "frame-src 'self' https://*.supabase.co https://*.googleapis.com;"
-    : "default-src 'self' 'unsafe-inline' 'unsafe-eval';";
-  
-  res.setHeader('Content-Security-Policy', cspHeader);
+
+  // Normalize origins
+  const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
+  const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase().replace(/\/$/, ''));
+
+  // Check if origin is allowed
+  const isAllowed = normalizedAllowedOrigins.some(allowedOrigin => {
+    // Exact match
+    if (normalizedOrigin === allowedOrigin) return true;
+    
+    // Match with or without www
+    const originWithoutWww = normalizedOrigin.replace('www.', '');
+    const allowedWithoutWww = allowedOrigin.replace('www.', '');
+    return originWithoutWww === allowedWithoutWww;
+  });
+
+  if (isAllowed) {
+    // Set CORS headers using the actual origin
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
+    res.header('Access-Control-Max-Age', '86400'); // 24 hours
+    
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+  } else {
+    console.log('Origin not allowed:', origin);
+  }
+
   next();
-});
+}
 
 // Middleware
 app.use(bodyParser.json({ limit: '10mb' }));
@@ -332,34 +302,24 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Apply our single CORS handler
+app.use(handleCors);
+
 // Health check endpoint with explicit CORS handling
 app.get('/health', (req, res) => {
-  const origin = req.get('origin');
-  console.log('Health check request from origin:', origin);
-  
-  // Set CORS headers explicitly for this endpoint
-  if (origin) {
-    // Use the actual requesting origin if it's allowed
-    const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
-    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase().replace(/\/$/, ''));
-    
-    const isAllowed = normalizedAllowedOrigins.some(allowedOrigin => {
-      if (normalizedOrigin === allowedOrigin) return true;
-      const originWithoutWww = normalizedOrigin.replace('www.', '');
-      const allowedWithoutWww = allowedOrigin.replace('www.', '');
-      return originWithoutWww === allowedWithoutWww;
-    });
-    
-    if (isAllowed) {
-      res.set('Access-Control-Allow-Origin', origin);
-      res.set('Access-Control-Allow-Credentials', 'true');
-      res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-      res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
-      res.set('Access-Control-Max-Age', '86400');
-    }
-  }
-  
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  // Log the request for debugging
+  console.log('Health check request:', {
+    origin: req.headers.origin,
+    method: req.method,
+    headers: req.headers
+  });
+
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    origin: req.headers.origin, // Include origin in response for debugging
+    headers: req.headers // Include headers in response for debugging
+  });
 });
 
 // Initialize Supabase client with custom fetch

@@ -312,10 +312,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
             method: 'GET',
-            ...fetchOptions
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Origin': window.location.origin
+            }
           });
           
           if (!healthCheck.ok) {
+            const errorText = await healthCheck.text();
+            console.error('Health check failed:', {
+              status: healthCheck.status,
+              statusText: healthCheck.statusText,
+              error: errorText
+            });
             throw new Error(`Health check failed with status ${healthCheck.status}`);
           }
           
