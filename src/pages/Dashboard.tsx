@@ -1,55 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../supabase';
 
 interface Subscription {
   id: string;
-  name: string;
-  logoUrl: string;
-  timeLeft: string;
+  provider: string;
+  type: string;
   price: number;
-  billingCycle: string;
+  frequency: string;
+  lastDetectedDate: string;
+  created_at: string;
 }
 
 const Dashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user, scanEmails } = useAuth();
 
-  // TODO: Replace with actual data from API
-  const subscriptions: Subscription[] = [
-    {
-      id: '1',
-      name: 'Netflix',
-      logoUrl: '/images/netflix-logo.png',
-      timeLeft: '1 year, 8 months',
-      price: 15.99,
-      billingCycle: 'monthly',
-    },
-    {
-      id: '2',
-      name: 'Spotify',
-      logoUrl: '/images/spotify-logo.png',
-      timeLeft: '2 years, 3 months',
-      price: 9.99,
-      billingCycle: 'monthly',
-    },
-    {
-      id: '3',
-      name: 'Amazon Prime',
-      logoUrl: '/images/amazon-logo.png',
-      timeLeft: '6 months',
-      price: 14.99,
-      billingCycle: 'monthly',
-    },
-  ];
+  const fetchSubscriptions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!user) {
+        throw new Error('No user logged in');
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      setSubscriptions(data || []);
+    } catch (err: any) {
+      setError(err.message);
+      console.error('Error fetching subscriptions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleScanEmails = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await scanEmails();
+      await fetchSubscriptions(); // Refresh the list after scanning
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, [user]);
 
   const filteredSubscriptions = subscriptions.filter((sub) => {
-    const matchesSearch = sub.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filter === 'all' || sub.billingCycle === filter;
+    const matchesSearch = sub.provider.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filter === 'all' || sub.frequency === filter;
     return matchesSearch && matchesFilter;
   });
 
+  // Helper function to get provider logo
+  const getProviderLogo = (provider: string) => {
+    const logos: { [key: string]: string } = {
+      netflix: '/images/netflix-logo.png',
+      spotify: '/images/spotify-logo.png',
+      amazon: '/images/amazon-logo.png',
+      youtube: '/images/youtube-logo.png',
+      'disney+': '/images/disney-logo.png',
+      hbo: '/images/hbo-logo.png'
+    };
+    return logos[provider.toLowerCase()] || '/images/default-logo.png';
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#FFEDD6]">
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -65,7 +100,7 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center">
               <Link
                 to="/settings"
-                className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A]"
               >
                 <span className="sr-only">Settings</span>
                 <svg
@@ -100,11 +135,19 @@ const Dashboard: React.FC = () => {
             <h1 className="text-2xl font-semibold text-gray-900">Your Subscriptions</h1>
             <button
               type="button"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              onClick={handleScanEmails}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#26457A] hover:bg-[#1a3156] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A]"
             >
-              Add Subscription
+              {loading ? 'Scanning...' : 'SCAN FOR NEW SUBSCRIPTIONS'}
             </button>
           </div>
+
+          {error && (
+            <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
 
           <div className="mb-6">
             <div className="flex space-x-4">
@@ -112,13 +155,13 @@ const Dashboard: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search subscriptions..."
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#26457A] focus:ring-[#26457A] sm:text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <select
-                className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-[#26457A] focus:ring-[#26457A] sm:text-sm"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
               >
@@ -129,37 +172,54 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredSubscriptions.map((subscription) => (
-              <div
-                key={subscription.id}
-                className="bg-white overflow-hidden shadow rounded-lg"
-              >
-                <div className="p-6">
-                  <div className="flex items-center">
-                    <img
-                      className="h-10 w-10 rounded-full"
-                      src={subscription.logoUrl}
-                      alt={subscription.name}
-                    />
-                    <div className="ml-4">
-                      <h3 className="text-lg font-medium text-gray-900">
-                        {subscription.name}
-                      </h3>
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#26457A]"></div>
+            </div>
+          ) : subscriptions.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No subscriptions found. Click "Scan for New Subscriptions" to find your subscriptions.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredSubscriptions.map((subscription) => (
+                <div
+                  key={subscription.id}
+                  className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
+                >
+                  <div className="p-6">
+                    <div className="flex items-center">
+                      <img
+                        className="h-10 w-10 rounded-full object-contain bg-gray-50"
+                        src={getProviderLogo(subscription.provider)}
+                        alt={subscription.provider}
+                      />
+                      <div className="ml-4">
+                        <h3 className="text-lg font-medium text-gray-900">
+                          {subscription.provider}
+                        </h3>
+                        {subscription.price && (
+                          <p className="text-sm text-gray-500">
+                            ${subscription.price.toFixed(2)}/{subscription.frequency}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-4">
                       <p className="text-sm text-gray-500">
-                        ${subscription.price}/{subscription.billingCycle}
+                        Last detected: {new Date(subscription.lastDetectedDate).toLocaleDateString()}
                       </p>
+                      {subscription.type && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          Type: {subscription.type}
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-500">
-                      Time remaining: {subscription.timeLeft}
-                    </p>
-                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

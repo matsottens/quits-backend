@@ -395,19 +395,26 @@ async function ensureSupabaseConnection() {
 
 // Helper function to extract subscription data from email
 function extractSubscriptionData(emailBody) {
-  // This is a basic implementation - you might want to enhance this based on your specific email formats
   const subscriptionPatterns = [
+    // Common subscription keywords
     {
-      pattern: /subscription|subscribe|membership/i,
-      type: 'general'
+      pattern: /subscription|subscribe|membership|plan|netflix|spotify|disney\+|hbo|amazon prime|youtube|premium/i,
+      type: 'subscription'
     },
+    // Payment patterns
     {
-      pattern: /monthly payment|recurring payment/i,
+      pattern: /monthly|yearly|annual|payment|recurring|billing/i,
       type: 'recurring'
     },
+    // Price patterns for different currencies
     {
-      pattern: /(\$|€)\s*(\d+(\.\d{2})?)/,
+      pattern: /(?:USD|EUR|€|\$)\s*(\d+(?:\.\d{2})?)/i,
       type: 'price'
+    },
+    // Additional subscription indicators
+    {
+      pattern: /your.+subscription|thank you for subscribing|subscription confirmation|payment processed/i,
+      type: 'confirmation'
     }
   ];
 
@@ -419,25 +426,55 @@ function extractSubscriptionData(emailBody) {
     lastDetectedDate: new Date().toISOString()
   };
 
-  // Extract provider from email address
+  // Extract provider from email address and subject
   if (emailBody.from) {
-    const fromMatch = emailBody.from.match(/@([^>]+)/);
+    const fromMatch = emailBody.from.toLowerCase().match(/@([^>]+)/);
     if (fromMatch) {
-      data.provider = fromMatch[1].split('.')[0];
+      const domain = fromMatch[1];
+      // Extract company name from domain
+      data.provider = domain.split('.')[0];
+      
+      // Handle special cases
+      if (domain.includes('spotify')) data.provider = 'spotify';
+      if (domain.includes('netflix')) data.provider = 'netflix';
+      if (domain.includes('youtube')) data.provider = 'youtube';
+      if (domain.includes('amazon')) data.provider = 'amazon';
+      if (domain.includes('hbo')) data.provider = 'hbo';
+      if (domain.includes('disney')) data.provider = 'disney+';
     }
   }
 
+  // Also check subject for provider name if not found in email
+  if (!data.provider && emailBody.subject) {
+    const subjectLower = emailBody.subject.toLowerCase();
+    if (subjectLower.includes('spotify')) data.provider = 'spotify';
+    if (subjectLower.includes('netflix')) data.provider = 'netflix';
+    if (subjectLower.includes('youtube')) data.provider = 'youtube';
+    if (subjectLower.includes('amazon prime')) data.provider = 'amazon';
+    if (subjectLower.includes('hbo')) data.provider = 'hbo';
+    if (subjectLower.includes('disney+')) data.provider = 'disney+';
+  }
+
+  // Combine subject and snippet for better pattern matching
+  const fullText = `${emailBody.subject} ${emailBody.snippet}`.toLowerCase();
+
   // Extract subscription type and price
-  const bodyText = emailBody.snippet || '';
   for (const pattern of subscriptionPatterns) {
-    const match = bodyText.match(pattern.pattern);
+    const match = fullText.match(pattern.pattern);
     if (match) {
-      if (pattern.type === 'price' && match[2]) {
-        data.price = parseFloat(match[2]);
-      } else {
+      if (pattern.type === 'price' && match[1]) {
+        data.price = parseFloat(match[1]);
+      } else if (!data.type) {
         data.type = pattern.type;
       }
     }
+  }
+
+  // Determine frequency
+  if (fullText.includes('yearly') || fullText.includes('annual')) {
+    data.frequency = 'yearly';
+  } else if (fullText.includes('monthly')) {
+    data.frequency = 'monthly';
   }
 
   return data;
@@ -496,7 +533,7 @@ app.get('/api/scan-emails', async (req, res) => {
         userId: 'me',
         maxResults: 100,
         pageToken: nextPageToken,
-        q: 'in:inbox subject:(subscription OR payment OR receipt OR invoice)'
+        q: 'in:anywhere (subject:(subscription OR payment OR receipt OR invoice OR billing OR netflix OR spotify OR amazon OR hbo OR disney) OR from:(netflix.com OR spotify.com OR amazon.com OR hbo.com OR youtube.com OR disneyplus.com))'
       });
 
       if (!response.data.messages) {
