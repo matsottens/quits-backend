@@ -40,6 +40,7 @@ const cspMiddleware = (req, res, next) => {
       "'self'",
       'https://api.quits.cc',
       'https://quits.cc',
+      'https://www.quits.cc',
       'https://*.supabase.co',
       'wss://*.supabase.co',
       'https://apis.google.com',
@@ -81,18 +82,21 @@ const corsOptions = {
     ];
 
     // Normalize origins for comparison
-    const normalizedOrigin = origin.toLowerCase();
-    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase());
+    const normalizedOrigin = origin.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const normalizedAllowedOrigins = allowedOrigins.map(o => 
+      o.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+    );
 
     // Check if the origin matches any allowed origin
-    const isAllowed = normalizedAllowedOrigins.some(allowed => 
-      allowed === normalizedOrigin || 
-      allowed.replace('www.', '') === normalizedOrigin.replace('www.', '')
-    );
+    const isAllowed = normalizedAllowedOrigins.some(allowed => {
+      const originWithoutWWW = normalizedOrigin.replace(/^www\./, '');
+      const allowedWithoutWWW = allowed.replace(/^www\./, '');
+      return originWithoutWWW === allowedWithoutWWW;
+    });
 
     if (isAllowed) {
       console.log('CORS: Allowing origin:', origin);
-      callback(null, origin);
+      callback(null, origin); // Return the actual origin
     } else {
       console.log('CORS: Blocking origin:', origin);
       callback(new Error(`Origin ${origin} not allowed by CORS`));
