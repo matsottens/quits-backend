@@ -287,7 +287,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
       console.log('Scanning emails using API URL:', apiUrlWithProtocol);
 
-      // Common fetch options
+      // Common fetch options with improved configuration
       const fetchOptions = {
         credentials: 'include' as RequestCredentials,
         mode: 'cors' as RequestMode,
@@ -296,9 +296,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${currentSession.access_token}`,
           'X-Gmail-Token': gmailToken,
-          'X-User-ID': currentSession.user.id
+          'X-User-ID': currentSession.user.id,
+          'Origin': window.location.origin
         }
       };
+
+      console.log('Request options:', {
+        ...fetchOptions,
+        headers: {
+          ...fetchOptions.headers,
+          'Authorization': 'Bearer [REDACTED]',
+          'X-Gmail-Token': '[REDACTED]'
+        }
+      });
 
       // First, try a health check with retries
       const maxHealthCheckRetries = 3;
@@ -308,25 +318,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           console.log(`Health check attempt ${attempt} of ${maxHealthCheckRetries}`);
           
+          // Create a new AbortController for each attempt
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+          console.log('Making health check request to:', `${apiUrlWithProtocol}/health`);
+          
           const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
             method: 'GET',
-            ...fetchOptions
+            ...fetchOptions,
+            signal: controller.signal
           });
           
+          clearTimeout(timeoutId);
+
+          // Log response details
+          console.log('Health check response:', {
+            status: healthCheck.status,
+            statusText: healthCheck.statusText,
+            headers: Object.fromEntries(healthCheck.headers.entries()),
+            ok: healthCheck.ok,
+            type: healthCheck.type,
+            url: healthCheck.url
+          });
+
           if (!healthCheck.ok) {
             const errorData = await healthCheck.json().catch(() => null);
             console.error('Health check failed:', {
               status: healthCheck.status,
               statusText: healthCheck.statusText,
-              error: errorData
+              error: errorData,
+              headers: Object.fromEntries(healthCheck.headers.entries())
             });
 
             // If unauthorized, try to refresh the session
             if (healthCheck.status === 401) {
+              console.log('Attempting to refresh session...');
               const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
               if (refreshError || !newSession) {
+                console.error('Session refresh failed:', refreshError);
                 throw new Error('Session expired. Please sign in again.');
               }
+              console.log('Session refreshed successfully');
               // Update the session and retry with new token
               currentSession.access_token = newSession.access_token;
               fetchOptions.headers['Authorization'] = `Bearer ${newSession.access_token}`;
@@ -337,13 +370,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           const healthData = await healthCheck.json();
-          console.log('Health check response:', healthData);
+          console.log('Health check response data:', healthData);
           
           // If we get here, the health check was successful
           break;
-        } catch (error) {
+        } catch (error: any) {
           healthCheckError = error;
-          console.error(`Health check attempt ${attempt} failed:`, error);
+          console.error(`Health check attempt ${attempt} failed:`, {
+            error: error.message,
+            type: error.name,
+            stack: error.stack,
+            cause: error.cause
+          });
           
           if (attempt === maxHealthCheckRetries) {
             console.error('All health check attempts failed');
@@ -351,7 +389,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
@@ -386,7 +426,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error(`API error (attempt ${attempt}):`, {
               status: response.status,
               statusText: response.statusText,
-              error: errorData
+              error: errorData,
+              headers: Object.fromEntries(response.headers.entries())
             });
 
             // Handle specific error cases
@@ -431,7 +472,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return data;
         } catch (error: any) {
           lastError = error;
-          console.error(`Error on attempt ${attempt}:`, error);
+          console.error(`Error on attempt ${attempt}:`, {
+            error: error.message,
+            type: error.name,
+            stack: error.stack
+          });
           
           if (attempt === maxRetries) {
             throw error;
@@ -444,7 +489,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       throw lastError;
     } catch (error: any) {
-      console.error('Error scanning emails:', error);
+      console.error('Error scanning emails:', {
+        error: error.message,
+        type: error.name,
+        stack: error.stack
+      });
       throw new Error(error.message || 'Failed to scan emails');
     } finally {
       setLoading(false);

@@ -20,64 +20,103 @@ const allowedOrigins = [
   'http://localhost:3000'
 ];
 
-// Configure CORS - simplified and more robust
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Log the request origin
-    console.log('Request origin:', origin);
+// Helper function to check origin
+function isOriginAllowed(origin) {
+  if (!origin) return false;
+  
+  const normalizedOrigin = origin.toLowerCase();
+  const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase());
+  
+  return normalizedAllowedOrigins.some(allowed => 
+    allowed === normalizedOrigin || 
+    allowed.replace('www.', '') === normalizedOrigin.replace('www.', '')
+  );
+}
 
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-
-    // Normalize the origin and allowed origins
-    const normalizedOrigin = origin.toLowerCase();
-    const normalizedAllowedOrigins = allowedOrigins.map(o => o.toLowerCase());
-
-    // Direct match check
-    if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
-      callback(null, origin);
-      return;
-    }
-
-    // www/non-www match check
-    const originWithoutWww = normalizedOrigin.replace('www.', '');
-    const isAllowed = normalizedAllowedOrigins.some(allowed => 
-      allowed.replace('www.', '') === originWithoutWww
-    );
-
-    if (isAllowed) {
-      callback(null, origin);
-    } else {
-      console.log('Origin not allowed:', origin);
-      callback(new Error(`Origin ${origin} not allowed by CORS`));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id'],
-  maxAge: 86400 // 24 hours
-};
-
-// Apply CORS middleware FIRST
-app.use(cors(corsOptions));
-
-// Enable pre-flight across-the-board
-app.options('*', cors(corsOptions));
+// Helper function to set CORS headers
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  console.log('Setting CORS headers for origin:', origin);
+  
+  if (origin && isOriginAllowed(origin)) {
+    console.log('Origin is allowed:', origin);
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
+    
+    // Log the headers that were set
+    console.log('CORS headers set:', {
+      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+      'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials'),
+      'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers')
+    });
+    
+    return true;
+  }
+  
+  console.log('Origin not allowed:', origin);
+  return false;
+}
 
 // Other middleware
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// Add a middleware to log all requests
+app.use((req, res, next) => {
+  console.log('Incoming request:', {
+    method: req.method,
+    path: req.path,
+    origin: req.headers.origin,
+    headers: req.headers
+  });
+  
+  // Log response headers after they're sent
+  res.on('finish', () => {
+    console.log('Response sent:', {
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      headers: res.getHeaders()
+    });
+  });
+  
+  next();
+});
+
 // Health check endpoint
-app.get('/health', cors(corsOptions), async (req, res) => {
+app.get('/health', async (req, res) => {
   try {
+    console.log('Health check request:', {
+      method: req.method,
+      path: req.path,
+      origin: req.headers.origin,
+      hasAuthHeader: !!req.headers.authorization,
+      headers: req.headers
+    });
+
+    // Set CORS headers first
+    if (!setCorsHeaders(req, res)) {
+      console.log('CORS check failed for origin:', req.headers.origin);
+      return res.status(403).json({ 
+        error: 'Origin not allowed',
+        details: `Origin ${req.headers.origin} is not allowed by CORS policy`
+      });
+    }
+
+    // Log headers after setting CORS
+    console.log('Headers after setting CORS:', res.getHeaders());
+
     // Get the authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid authorization token' });
+      console.log('Missing or invalid authorization header');
+      return res.status(401).json({ 
+        error: 'Missing or invalid authorization token',
+        details: 'Authorization header must start with Bearer'
+      });
     }
 
     const token = authHeader.split(' ')[1];
@@ -86,7 +125,11 @@ app.get('/health', cors(corsOptions), async (req, res) => {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     
     if (error || !user) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
+      console.log('Invalid or expired token:', error);
+      return res.status(401).json({ 
+        error: 'Invalid or expired token',
+        details: error?.message || 'Token validation failed'
+      });
     }
 
     res.status(200).json({ 
@@ -99,7 +142,28 @@ app.get('/health', cors(corsOptions), async (req, res) => {
     });
   } catch (error) {
     console.error('Health check error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Add OPTIONS handler for health endpoint
+app.options('/health', (req, res) => {
+  if (setCorsHeaders(req, res)) {
+    res.status(204).end();
+  } else {
+    res.status(403).end();
+  }
+});
+
+// Add OPTIONS handler for all routes
+app.options('*', (req, res) => {
+  if (setCorsHeaders(req, res)) {
+    res.status(204).end();
+  } else {
+    res.status(403).end();
   }
 });
 
