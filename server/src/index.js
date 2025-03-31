@@ -1176,42 +1176,45 @@ const handleFailure = (error) => {
 };
 
 // Improved email scanning endpoint with retry and circuit breaker
-app.get('/api/scan-emails', async (req, res) => {
+app.get('/api/scan-emails', (req, res, next) => {
+  const origin = req.headers.origin;
   const requestId = req.requestId || Math.random().toString(36).substring(7);
-  const authHeader = req.headers.authorization;
-  const gmailToken = req.headers['x-gmail-token'];
-  const userId = req.headers['x-user-id'];
   
-  console.log(`[${requestId}] Starting email scan`, {
-    timestamp: new Date().toISOString(),
-    hasAuthHeader: !!authHeader,
-    hasGmailToken: !!gmailToken,
-    hasUserId: !!userId,
-    origin: req.headers.origin,
-    circuitBreakerState: circuitBreaker.state
+  // Log the request
+  console.log(`[${requestId}] Scan-emails request:`, {
+    origin,
+    method: req.method,
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+      'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined
+    }
   });
-  
-  if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ 
-      error: 'Invalid or missing authentication token',
-      details: 'Authorization header must start with Bearer'
+
+  // Check if origin is allowed
+  const allowedDomains = ['quits.cc', 'www.quits.cc', 'api.quits.cc'];
+  const originDomain = origin?.toLowerCase().replace(/^https?:\/\//, '');
+  const isAllowed = allowedDomains.includes(originDomain);
+
+  if (isAllowed && origin) {
+    // Set CORS headers using the exact origin from the request
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+
+    console.log(`[${requestId}] Allowing request for origin:`, origin);
+  } else {
+    console.log(`[${requestId}] Blocking request for origin:`, {
+      origin,
+      originDomain,
+      allowedDomains
     });
   }
 
-  if (!gmailToken) {
-    return res.status(401).json({ 
-      error: 'Missing Gmail token',
-      details: 'X-Gmail-Token header is required'
-    });
-  }
-
-  if (!userId) {
-    return res.status(401).json({ 
-      error: 'Missing user ID',
-      details: 'X-User-ID header is required'
-    });
-  }
-
+  next();
+}, async (req, res) => {
   try {
     // Check circuit breaker state
     checkCircuitBreaker();
@@ -1219,15 +1222,21 @@ app.get('/api/scan-emails', async (req, res) => {
     // Wrap the entire email scanning process in retry logic
     const result = await retry(async () => {
       // First verify the Supabase token
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        throw new Error('Invalid or missing authentication token');
+      }
+
       const token = authHeader.split(' ')[1];
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
       
       if (authError || !user) {
-        console.error(`[${requestId}] Auth error:`, authError);
+        console.error('Auth error:', authError);
         throw new Error('Authentication failed');
       }
 
       // Verify the user ID matches
+      const userId = req.headers['x-user-id'];
       if (user.id !== userId) {
         return res.status(401).json({ 
           error: 'User ID mismatch',
@@ -1242,6 +1251,7 @@ app.get('/api/scan-emails', async (req, res) => {
         GOOGLE_CLIENT_ID,
         GOOGLE_CLIENT_SECRET
       );
+    const gmailToken = req.headers['x-gmail-token'];
     auth.setCredentials({ access_token: gmailToken });
     const gmail = google.gmail({ version: 'v1', auth });
 
