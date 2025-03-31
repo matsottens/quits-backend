@@ -63,18 +63,7 @@ const requestTracker = (req, res, next) => {
   next();
 };
 
-// First, apply CORS middleware
-app.use(customCorsMiddleware);
-
-// Then apply other middleware
-app.use(cspMiddleware);
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
-
-// Apply request tracking after CORS
-app.use(requestTracker);
-
-// Test endpoint for CORS - must be before any authentication middleware
+// Test endpoint for CORS - must be the first route
 app.get('/api/test-cors', (req, res) => {
   const responseData = {
     success: true,
@@ -91,6 +80,17 @@ app.get('/api/test-cors', (req, res) => {
   console.log('Test CORS response:', responseData);
   res.json(responseData);
 });
+
+// First, apply CORS middleware
+app.use(customCorsMiddleware);
+
+// Then apply other middleware
+app.use(cspMiddleware);
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// Apply request tracking after CORS
+app.use(requestTracker);
 
 // Add routes that require authentication
 app.use('/api/notifications', authenticateRequest, notificationsRouter);
