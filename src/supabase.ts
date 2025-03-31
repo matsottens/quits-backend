@@ -13,6 +13,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     storageKey: 'quits_auth_token',
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    // Use production URL in production, localhost in development
+    site: process.env.NODE_ENV === 'production' 
+      ? 'https://www.quits.cc'
+      : 'http://localhost:3000'
   }
 }); 
