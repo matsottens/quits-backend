@@ -197,7 +197,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             'Origin': window.location.origin
           },
           credentials: 'include',
-          mode: 'cors'
+          mode: 'cors',
+          referrerPolicy: 'no-referrer'
         });
         
         if (!healthCheck.ok) {
@@ -242,7 +243,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             headers,
             signal: controller.signal,
             credentials: 'include',
-            mode: 'cors'
+            mode: 'cors',
+            referrerPolicy: 'no-referrer'
           });
 
           clearTimeout(timeoutId);

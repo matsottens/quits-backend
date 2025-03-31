@@ -61,6 +61,14 @@ app.options('*', cors(corsOptions));
 
 // Add CSP headers middleware
 app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Gmail-Token, X-User-ID, Accept, Origin');
+  }
+  
   const cspHeader = process.env.NODE_ENV === 'production'
     ? "default-src 'self'; " +
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pihflemmavointdxjdsx.supabase.co https://*.supabase.co; " +
@@ -71,16 +79,6 @@ app.use((req, res, next) => {
       "frame-src 'self' https://*.supabase.co https://*.googleapis.com;"
     : "default-src 'self' 'unsafe-inline' 'unsafe-eval';";
   
-  // Set CORS headers
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Gmail-Token, X-User-ID, Accept, Origin');
-  }
-  
-  // Set CSP header
   res.setHeader('Content-Security-Policy', cspHeader);
   next();
 });
@@ -242,7 +240,18 @@ app.use((err, req, res, next) => {
 
 // Add a health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Gmail-Token, X-User-ID, Accept, Origin');
+  }
+  res.json({ 
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV
+  });
 });
 
 // Initialize Supabase client with custom fetch
