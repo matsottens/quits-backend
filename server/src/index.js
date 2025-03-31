@@ -63,12 +63,16 @@ const requestTracker = (req, res, next) => {
   next();
 };
 
-// Apply middleware in the correct order
-app.use(requestTracker); // First, track all requests
-app.use(customCorsMiddleware); // Then handle CORS
-app.use(cspMiddleware); // Then handle CSP
+// First, apply CORS middleware
+app.use(customCorsMiddleware);
+
+// Then apply other middleware
+app.use(cspMiddleware);
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// Apply request tracking after CORS
+app.use(requestTracker);
 
 // Add routes
 app.use('/api/notifications', notificationsRouter);
