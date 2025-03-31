@@ -1,7 +1,12 @@
 import { supabase } from '../supabase';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
-const API_URL_WITH_PROTOCOL = API_URL.startsWith('http') ? API_URL : `https://${API_URL.replace(/^\/+/, '')}`;
+const API_URL_WITH_PROTOCOL = API_URL.startsWith('http') 
+  ? API_URL 
+  : `https://${API_URL.replace(/^\/+/, '')}`;
+
+// Ensure we're using www.quits.cc for the frontend URL
+const FRONTEND_URL = 'https://www.quits.cc';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -99,9 +104,7 @@ class ApiService {
         ...options,
         headers: {
           ...headers,
-          ...options.headers,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          ...options.headers
         },
         signal: controller.signal,
         mode: 'cors',
@@ -128,7 +131,8 @@ class ApiService {
           cors: {
             origin: response.headers.get('access-control-allow-origin'),
             methods: response.headers.get('access-control-allow-methods'),
-            headers: response.headers.get('access-control-allow-headers')
+            headers: response.headers.get('access-control-allow-headers'),
+            credentials: response.headers.get('access-control-allow-credentials')
           }
         });
 
@@ -226,6 +230,10 @@ class ApiService {
 
   public async getSubscriptionAnalytics(): Promise<ApiResponse<any>> {
     return this.makeRequest('/api/subscription-analytics');
+  }
+
+  public async testCors(): Promise<ApiResponse<any>> {
+    return this.makeRequest('/api/test-cors');
   }
 }
 

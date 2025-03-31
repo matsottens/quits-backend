@@ -39,7 +39,6 @@ const cspMiddleware = (req, res, next) => {
     'connect-src': [
       "'self'",
       'https://api.quits.cc',
-      'https://quits.cc',
       'https://www.quits.cc',
       'https://*.supabase.co',
       'wss://*.supabase.co',
@@ -86,71 +85,33 @@ const customCorsMiddleware = (req, res, next) => {
     return next();
   }
 
-  // List of allowed domains (both www and non-www versions)
+  // List of allowed domains
   const allowedDomains = [
-    'quits.cc',
-    'www.quits.cc',
-    'api.quits.cc',
-    'localhost',
-    'localhost:3000',
-    'localhost:5000',
-    // Allow any .onrender.com domain
-    '.onrender.com'
+    'https://www.quits.cc',
+    'https://api.quits.cc',
+    'http://localhost:3000',
+    'http://localhost:5000'
   ];
-  
-  // Extract domain from origin
-  const originDomain = origin.toLowerCase().replace(/^https?:\/\//, '');
-  
-  // Log the domain check
-  console.log(`[${requestId}] Checking domain:`, {
-    originDomain,
-    allowedDomains,
-    isAllowed: allowedDomains.some(domain => 
-      domain.startsWith('.') 
-        ? originDomain.endsWith(domain)
-        : originDomain === domain
-    ),
-    environment: process.env.NODE_ENV
-  });
 
   // Always set CORS headers
-  const isAllowed = allowedDomains.some(domain => 
-    domain.startsWith('.') 
-      ? originDomain.endsWith(domain)
-      : originDomain === domain
-  );
+  const isAllowed = allowedDomains.includes(origin);
 
-  // Set the exact origin in the response header
-  if (isAllowed) {
-    // For www.quits.cc, always allow the exact origin
-    if (originDomain === 'www.quits.cc') {
-      res.setHeader('Access-Control-Allow-Origin', 'https://www.quits.cc');
-    } else {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    }
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', 'https://www.quits.cc');
-  }
-
+  // Set the Access-Control-Allow-Origin header
+  res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : 'https://www.quits.cc');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400');
 
   // Log request status
-  if (isAllowed) {
-    console.log(`[${requestId}] Allowing CORS for origin:`, origin);
-  } else {
-    console.log(`[${requestId}] Blocking CORS for origin:`, {
-      origin,
-      originDomain,
-      allowedDomains
-    });
-  }
+  console.log(`[${requestId}] CORS status:`, {
+    origin,
+    isAllowed,
+    allowedOrigin: res.getHeader('Access-Control-Allow-Origin')
+  });
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    // For preflight requests, we need to respond with 204 and end the response
     res.status(204).end();
     return;
   }

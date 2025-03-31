@@ -74,200 +74,27 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // Apply request tracking after CORS
 app.use(requestTracker);
 
-// Add routes
-app.use('/api/notifications', notificationsRouter);
-app.use('/api', analyticsRouter);
+// Test endpoint for CORS - must be before any authentication middleware
+app.get('/api/test-cors', (req, res) => {
+  const responseData = {
+    success: true,
+    message: 'CORS test successful',
+    origin: req.headers.origin,
+    headers: {
+      'access-control-allow-origin': res.getHeader('Access-Control-Allow-Origin'),
+      'access-control-allow-credentials': res.getHeader('Access-Control-Allow-Credentials'),
+      'access-control-allow-methods': res.getHeader('Access-Control-Allow-Methods'),
+      'access-control-allow-headers': res.getHeader('Access-Control-Allow-Headers')
+    }
+  };
 
-// Apply authentication middleware to protected routes
-app.use('/api', authenticateRequest);
-
-// Remove the specific OPTIONS handler for scan-emails since it's handled by customCorsMiddleware
-app.get('/api/scan-emails', async (req, res) => {
-  try {
-    // Check circuit breaker state
-    checkCircuitBreaker();
-
-    const result = await retry(async () => {
-      // Verify authentication
-      const authHeader = req.headers.authorization;
-      if (!authHeader?.startsWith('Bearer ')) {
-        throw new Error('Invalid or missing authentication token');
-      }
-
-      const token = authHeader.split(' ')[1];
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      
-      if (authError || !user) {
-        console.error('Auth error:', authError);
-        throw new Error('Authentication failed');
-      }
-
-      // Verify user ID
-      const userId = req.headers['x-user-id'];
-      if (user.id !== userId) {
-        throw new Error('User ID mismatch');
-      }
-
-      await ensureSupabaseConnection();
-
-      // Initialize Gmail client
-      const gmailToken = req.headers['x-gmail-token'];
-      const gmail = createGmailClient(gmailToken);
-
-      // Test Gmail API access with retry
-      await gmailApiCall(async () => {
-        const profile = await gmail.users.getProfile({ userId: 'me' });
-        console.log('Gmail API access verified for:', profile.data.emailAddress);
-      });
-
-      // List emails with pagination and retry
-      let messages = [];
-      let nextPageToken = null;
-      
-      do {
-        const response = await gmailApiCall(() => 
-          gmail.users.messages.list({
-            userId: 'me',
-            maxResults: 100,
-            pageToken: nextPageToken,
-            q: 'in:anywhere (subject:(subscription OR payment OR receipt OR invoice OR billing OR netflix OR spotify OR amazon OR hbo OR disney) OR from:(netflix.com OR spotify.com OR amazon.com OR hbo.com OR youtube.com OR disneyplus.com))'
-          })
-        );
-
-        if (!response.data.messages) {
-          console.log('No messages found');
-          break;
-        }
-
-        messages = messages.concat(response.data.messages);
-        nextPageToken = response.data.nextPageToken;
-        
-        console.log(`Retrieved ${messages.length} messages so far`);
-      } while (nextPageToken && messages.length < 500);
-
-      // Process emails in batches
-      const emailResults = await processEmailBatch(gmail, messages, userId);
-      
-      const subscriptions = [];
-      const processedEmails = new Set();
-      const priceChanges = [];
-
-      // Process email results
-      for (const result of emailResults) {
-        try {
-          const details = result.data;
-          const headers = details.payload.headers;
-          const emailData = {
-            id: details.id,
-            subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
-            from: headers.find(h => h.name === 'From')?.value || 'Unknown',
-            date: headers.find(h => h.name === 'Date')?.value || 'Unknown',
-            snippet: details.snippet || ''
-          };
-
-          const subscriptionData = extractSubscriptionData(emailData);
-          
-          if (subscriptionData.provider && !processedEmails.has(subscriptionData.provider)) {
-            processedEmails.add(subscriptionData.provider);
-            
-            // Check for price changes
-            const priceChange = await checkPriceChange(supabase, subscriptionData, userId);
-            if (priceChange) {
-              priceChanges.push({
-                ...priceChange,
-                provider: subscriptionData.provider,
-                user_id: userId,
-                created_at: new Date().toISOString()
-              });
-            }
-
-            subscriptions.push({
-              ...subscriptionData,
-              user_id: userId,
-              email_id: details.id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-          }
-        } catch (error) {
-          console.error('Error processing email:', error);
-          continue;
-        }
-      }
-
-      // Store data in batches
-      if (subscriptions.length > 0) {
-        const batchSize = 50;
-        for (let i = 0; i < subscriptions.length; i += batchSize) {
-          const batch = subscriptions.slice(i, i + batchSize);
-          const { error } = await supabase
-            .from('subscriptions')
-            .upsert(batch, {
-              onConflict: 'user_id,provider',
-              returning: true
-            });
-
-          if (error) {
-            console.error('Error storing subscription batch:', error);
-            throw new Error('Failed to store subscription data');
-          }
-        }
-      }
-
-      // Store price changes
-      if (priceChanges.length > 0) {
-        const { error } = await supabase
-          .from('subscription_prices')
-          .insert(priceChanges);
-
-        if (error) {
-          console.error('Error storing price changes:', error);
-          throw new Error('Failed to store price change data');
-        }
-      }
-
-      // Check and send notifications
-      await checkAndSendNotifications(userId);
-
-      return {
-        success: true,
-        message: 'Subscriptions processed and stored successfully',
-        count: subscriptions.length,
-        subscriptions,
-        priceChanges: priceChanges.length > 0 ? priceChanges : null
-      };
-    });
-
-    // Handle success
-    handleSuccess();
-    
-    // Log success metrics
-    console.log(`[${req.requestId}] Email scan completed successfully`, {
-      timestamp: new Date().toISOString(),
-      duration: `${Date.now() - req._startTime}ms`,
-      subscriptionCount: result.count,
-      priceChangesCount: result.priceChanges?.length || 0
-    });
-
-    return res.json(result);
-  } catch (error) {
-    // Handle failure
-    handleFailure(error);
-
-    console.error(`[${req.requestId}] Error in email scan:`, {
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      circuitBreakerState: circuitBreaker.state,
-      failures: circuitBreaker.failures
-    });
-
-    return res.status(500).json({ 
-      error: 'Failed to scan emails',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      retryAfter: circuitBreaker.state === 'OPEN' ? Math.ceil((circuitBreaker.resetTimeout - (Date.now() - circuitBreaker.lastFailure)) / 1000) : null
-    });
-  }
+  console.log('Test CORS response:', responseData);
+  res.json(responseData);
 });
+
+// Add routes that require authentication
+app.use('/api/notifications', authenticateRequest, notificationsRouter);
+app.use('/api', authenticateRequest, analyticsRouter);
 
 // Session configuration with Redis store
 const sessionConfig = {
