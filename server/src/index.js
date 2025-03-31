@@ -28,26 +28,31 @@ app.use((req, res, next) => {
   console.log('Incoming request:', {
     method: req.method,
     path: req.path,
-    origin: origin
+    origin: origin,
+    headers: req.headers
   });
 
   if (!origin) {
     return next();
   }
 
+  // Normalize the request origin and allowed origins for comparison
+  const normalizedRequestOrigin = origin.toLowerCase();
+  const requestOriginWithoutWww = normalizedRequestOrigin.replace('www.', '');
+  
   // Check if origin is allowed
   const isAllowed = allowedOrigins.some(allowedOrigin => {
-    // Direct match
-    if (origin === allowedOrigin) return true;
+    const normalizedAllowedOrigin = allowedOrigin.toLowerCase();
+    const allowedOriginWithoutWww = normalizedAllowedOrigin.replace('www.', '');
     
-    // Match without www
-    const originWithoutWww = origin.replace('www.', '');
-    const allowedWithoutWww = allowedOrigin.replace('www.', '');
-    return originWithoutWww === allowedWithoutWww;
+    return (
+      normalizedRequestOrigin === normalizedAllowedOrigin || // Exact match
+      requestOriginWithoutWww === allowedOriginWithoutWww    // Match without www
+    );
   });
 
   if (isAllowed) {
-    // Set CORS headers
+    // Always use the actual requesting origin in the response header
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -59,8 +64,16 @@ app.use((req, res, next) => {
       return res.status(200).end();
     }
   } else {
-    console.log('Origin not allowed:', origin);
-    return res.status(403).json({ error: 'Origin not allowed' });
+    console.log('Origin not allowed:', {
+      requestOrigin: origin,
+      normalizedRequestOrigin,
+      requestOriginWithoutWww,
+      allowedOrigins
+    });
+    return res.status(403).json({ 
+      error: 'Origin not allowed',
+      origin: origin
+    });
   }
 
   next();
