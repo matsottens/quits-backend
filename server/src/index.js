@@ -602,6 +602,82 @@ app.get('/api/scan-emails', async (req, res) => {
   }
 });
 
+// Token exchange endpoint
+app.post('/auth/google/token', async (req, res) => {
+  try {
+    const { code, redirect_uri } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    // Exchange code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.text();
+      console.error('Token exchange failed:', error);
+      return res.status(400).json({ error: 'Failed to exchange authorization code for tokens' });
+    }
+
+    const tokens = await tokenResponse.json();
+
+    // Get user info
+    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${tokens.access_token}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      throw new Error('Failed to get user info');
+    }
+
+    const userInfo = await userResponse.json();
+
+    // Create or update user in Supabase
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .upsert({
+        email: userInfo.email,
+        google_id: userInfo.id,
+        name: userInfo.name,
+        picture: userInfo.picture,
+        last_login: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (userError) {
+      console.error('Error upserting user:', userError);
+      return res.status(500).json({ error: 'Failed to create or update user' });
+    }
+
+    // Return tokens and user info
+    res.json({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      id_token: tokens.id_token,
+      user: userInfo,
+    });
+  } catch (error) {
+    console.error('Error in token exchange:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 }); 
