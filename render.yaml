@@ -2,8 +2,9 @@ services:
   - type: web
     name: quits-api
     env: node
+    rootDir: .
     buildCommand: npm install
-    startCommand: node server/src/index.js
+    startCommand: node ./server/src/index.js
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -29,4 +30,5 @@ services:
         - server/package.json
         - server/package-lock.json
         - package.json
-        - package-lock.json 
+        - package-lock.json
+        - .env 
