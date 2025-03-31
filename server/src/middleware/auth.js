@@ -44,7 +44,9 @@ const cspMiddleware = (req, res, next) => {
       'https://*.supabase.co',
       'wss://*.supabase.co',
       'https://apis.google.com',
-      'https://*.googleapis.com'
+      'https://*.googleapis.com',
+      'https://*.onrender.com',
+      'wss://*.onrender.com'
     ],
     'frame-src': ["'self'", 'https://accounts.google.com'],
     'object-src': ["'none'"],
@@ -85,7 +87,16 @@ const customCorsMiddleware = (req, res, next) => {
   }
 
   // List of allowed domains (both www and non-www versions)
-  const allowedDomains = ['quits.cc', 'www.quits.cc', 'api.quits.cc'];
+  const allowedDomains = [
+    'quits.cc',
+    'www.quits.cc',
+    'api.quits.cc',
+    'localhost',
+    'localhost:3000',
+    'localhost:5000',
+    // Allow any .onrender.com domain
+    '.onrender.com'
+  ];
   
   // Extract domain from origin
   const originDomain = origin.toLowerCase().replace(/^https?:\/\//, '');
@@ -94,18 +105,31 @@ const customCorsMiddleware = (req, res, next) => {
   console.log(`[${requestId}] Checking domain:`, {
     originDomain,
     allowedDomains,
-    isAllowed: allowedDomains.includes(originDomain)
+    isAllowed: allowedDomains.some(domain => 
+      domain.startsWith('.') 
+        ? originDomain.endsWith(domain)
+        : originDomain === domain
+    ),
+    environment: process.env.NODE_ENV
   });
 
   // Always set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', allowedDomains.includes(originDomain) ? origin : 'https://www.quits.cc');
+  res.setHeader('Access-Control-Allow-Origin', allowedDomains.some(domain => 
+    domain.startsWith('.') 
+      ? originDomain.endsWith(domain)
+      : originDomain === domain
+  ) ? origin : 'https://www.quits.cc');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400');
 
   // Log request status
-  if (allowedDomains.includes(originDomain)) {
+  if (allowedDomains.some(domain => 
+    domain.startsWith('.') 
+      ? originDomain.endsWith(domain)
+      : originDomain === domain
+  )) {
     console.log(`[${requestId}] Allowing CORS for origin:`, origin);
   } else {
     console.log(`[${requestId}] Blocking CORS for origin:`, {
