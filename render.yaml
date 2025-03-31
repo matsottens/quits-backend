@@ -2,9 +2,9 @@ services:
   - type: web
     name: quits-api
     env: node
-    rootDir: .
+    rootDir: server
     buildCommand: npm install
-    startCommand: node ./server/src/index.js
+    startCommand: node src/index.js
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -24,11 +24,15 @@ services:
         sync: false
       - key: SESSION_SECRET
         sync: false
+      - key: NODE_ENV
+        value: production
+      - key: API_URL
+        value: https://api.quits.cc
+      - key: CORS_ORIGIN
+        value: https://quits.cc
     buildFilter:
       paths:
-        - server/src/**
+        - server/**
         - server/package.json
         - server/package-lock.json
-        - package.json
-        - package-lock.json
-        - .env 
+        - server/.env 
