@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase';
-import { Box, Button, TextField, Typography, Alert } from '@mui/material';
 
 export const SignUp: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -37,7 +36,7 @@ export const SignUp: React.FC = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
+          emailRedirectTo: 'https://www.quits.cc/auth/callback'
         }
       });
 
@@ -86,102 +85,109 @@ export const SignUp: React.FC = () => {
   };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        padding: 3,
-      }}
-    >
-      <Box
-        component="form"
-        onSubmit={handleSubmit}
-        sx={{
-          maxWidth: 400,
-          width: '100%',
-          p: 4,
-          borderRadius: 2,
-          bgcolor: 'background.paper',
-          boxShadow: 3,
-        }}
-      >
-        <Typography component="h1" variant="h5" align="center" gutterBottom>
-          Sign Up
-        </Typography>
+    <div className="min-h-screen flex items-center justify-center bg-[#FFEDD6] py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md">
+        <div>
+          <div className="flex justify-center">
+            <img
+              src="/quits-logo.svg"
+              alt="Quits"
+              className="h-20 w-auto mb-6"
+            />
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-foreground">
+            Create your account
+          </h2>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
+            Or{' '}
+            <Link to="/login" className="font-medium text-primary hover:text-primary/90">
+              sign in to your account
+            </Link>
+          </p>
+        </div>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
+          <div className="rounded-md bg-red-50 p-4">
+            <div className="text-sm text-red-700">{error}</div>
+          </div>
         )}
 
         {success && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            {success}
-          </Alert>
+          <div className="rounded-md bg-green-50 p-4">
+            <div className="text-sm text-green-700">{success}</div>
+          </div>
         )}
 
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="email"
-          label="Email Address"
-          name="email"
-          autoComplete="email"
-          autoFocus
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={loading}
-        />
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm -space-y-px">
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-input bg-white placeholder:text-muted-foreground text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                required
+                className="appearance-none relative block w-full px-3 py-2 border border-input bg-white placeholder:text-muted-foreground text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label htmlFor="confirm-password" className="sr-only">
+                Confirm password
+              </label>
+              <input
+                id="confirm-password"
+                name="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                required
+                className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-input bg-white placeholder:text-muted-foreground text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          </div>
 
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          name="password"
-          label="Password"
-          type="password"
-          id="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={loading}
-        />
-
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          name="confirmPassword"
-          label="Confirm Password"
-          type="password"
-          id="confirmPassword"
-          autoComplete="new-password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={loading}
-        />
-
-        <Button
-          type="submit"
-          fullWidth
-          variant="contained"
-          sx={{ mt: 3, mb: 2 }}
-          disabled={loading}
-        >
-          {loading ? 'Signing up...' : 'Sign Up'}
-        </Button>
-
-        <Box sx={{ textAlign: 'center' }}>
-          <Link to="/login" style={{ textDecoration: 'none', color: 'inherit' }}>
-            Already have an account? Sign in
-          </Link>
-        </Box>
-      </Box>
-    </Box>
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[#26457A] hover:bg-[#26457A]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A]"
+            >
+              {loading ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                'Create account'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }; 
