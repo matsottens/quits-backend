@@ -53,7 +53,7 @@ const corsOptions = {
     });
     
     if (isAllowed) {
-      // Send back the origin that was received
+      // Important: Return the actual origin that was received
       callback(null, origin);
     } else {
       console.log('Origin blocked:', origin);
@@ -62,13 +62,14 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id']
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'x-gmail-token', 'x-user-id'],
+  maxAge: 86400 // 24 hours
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
 
-// Add preflight handlers for all routes
+// Enable pre-flight across-the-board
 app.options('*', cors(corsOptions));
 
 // Add CSP headers middleware
@@ -329,8 +330,18 @@ app.use((err, req, res, next) => {
 
 // Health check endpoint with explicit CORS handling
 app.get('/health', cors(corsOptions), (req, res) => {
-  console.log('Health check request from origin:', req.get('origin'));
-  res.status(200).json({ status: 'ok' });
+  const origin = req.get('origin');
+  console.log('Health check request from origin:', origin);
+  
+  // Set CORS headers explicitly for this endpoint
+  if (origin) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Access-Control-Allow-Credentials', 'true');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gmail-token, x-user-id');
+  }
+  
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Initialize Supabase client with custom fetch

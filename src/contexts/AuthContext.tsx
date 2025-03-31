@@ -297,29 +297,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${currentSession.access_token}`,
           'X-Gmail-Token': gmailToken,
-          'X-User-ID': currentSession.user.id
+          'X-User-ID': currentSession.user.id,
+          'Origin': window.location.origin
         }
       };
 
-      // First, try a health check
-      try {
-        const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
-          method: 'GET',
-          ...fetchOptions
-        });
-        
-        if (!healthCheck.ok) {
-          throw new Error(`Health check failed with status ${healthCheck.status}`);
+      // First, try a health check with retries
+      const maxHealthCheckRetries = 3;
+      let healthCheckError;
+
+      for (let attempt = 1; attempt <= maxHealthCheckRetries; attempt++) {
+        try {
+          console.log(`Health check attempt ${attempt} of ${maxHealthCheckRetries}`);
+          
+          const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
+            method: 'GET',
+            ...fetchOptions
+          });
+          
+          if (!healthCheck.ok) {
+            throw new Error(`Health check failed with status ${healthCheck.status}`);
+          }
+          
+          const healthData = await healthCheck.json();
+          console.log('Health check response:', healthData);
+          
+          // If we get here, the health check was successful
+          break;
+        } catch (error) {
+          healthCheckError = error;
+          console.error(`Health check attempt ${attempt} failed:`, error);
+          
+          if (attempt === maxHealthCheckRetries) {
+            console.error('All health check attempts failed');
+            throw new Error('Backend service is not responding. Please try again later.');
+          }
+          
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
-        
-        const healthData = await healthCheck.json();
-        console.log('Health check response:', healthData);
-      } catch (error) {
-        console.error('Health check failed:', error);
-        throw new Error('Backend service is not responding. Please try again later.');
       }
 
-      // Add retry logic
+      // Add retry logic for the main request
       const maxRetries = 3;
       let lastError;
 
