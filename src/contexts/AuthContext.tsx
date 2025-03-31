@@ -191,22 +191,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const scanEmails = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Get the current session and Gmail token
-      const { data: { session } } = await supabase.auth.getSession();
-      const gmailToken = sessionStorage.getItem('gmail_access_token');
+      const session = await supabase.auth.getSession();
+      const { data: { session: currentSession } } = session;
+      const gmailToken = localStorage.getItem('gmail_token');
       
       console.log('Scan emails - Session:', {
-        hasSession: !!session,
-        hasAccessToken: !!session?.access_token,
-        hasProviderToken: !!session?.provider_token,
+        hasSession: !!currentSession,
+        hasAccessToken: !!currentSession?.access_token,
+        hasProviderToken: !!currentSession?.provider_token,
         hasStoredGmailToken: !!gmailToken,
-        userId: session?.user?.id
+        userId: currentSession?.user?.id
       });
       
-      if (!session?.access_token) {
+      if (!currentSession?.access_token) {
         throw new Error('Not authenticated with Supabase');
       }
 
@@ -214,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No Gmail access token available. Please sign in with Google again.');
       }
 
-      if (!session.user?.id) {
+      if (!currentSession.user?.id) {
         throw new Error('No user ID available');
       }
 
@@ -223,24 +222,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const apiUrlWithProtocol = apiUrl.startsWith('http') ? apiUrl : `https://${apiUrl.replace(/^\/+/, '')}`;
       console.log('Scanning emails using API URL:', apiUrlWithProtocol);
 
+      // Common fetch options
+      const fetchOptions = {
+        credentials: 'include' as RequestCredentials,
+        mode: 'cors' as RequestMode,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`,
+          'X-Gmail-Token': gmailToken,
+          'X-User-ID': currentSession.user.id
+        }
+      };
+
       // First, try a health check
       try {
         const healthCheck = await fetch(`${apiUrlWithProtocol}/health`, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Origin': window.location.origin
-          },
-          credentials: 'include',
-          mode: 'cors',
-          referrerPolicy: 'no-referrer'
+          ...fetchOptions
         });
         
         if (!healthCheck.ok) {
           throw new Error(`Health check failed with status ${healthCheck.status}`);
         }
         
-        console.log('Health check response:', healthCheck.ok ? 'OK' : 'Failed', healthCheck.status);
+        const healthData = await healthCheck.json();
+        console.log('Health check response:', healthData);
       } catch (error) {
         console.error('Health check failed:', error);
         throw new Error('Backend service is not responding. Please try again later.');
@@ -257,29 +264,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-          const headers = {
-            'Authorization': `Bearer ${session.access_token}`,
-            'X-Gmail-Token': gmailToken,
-            'X-User-ID': session.user.id,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Origin': window.location.origin
-          };
-
           console.log('Making request to:', `${apiUrlWithProtocol}/api/scan-emails`);
           console.log('With headers:', {
-            ...headers,
+            ...fetchOptions.headers,
             'Authorization': 'Bearer [REDACTED]',
             'X-Gmail-Token': '[REDACTED]'
           });
 
           const response = await fetch(`${apiUrlWithProtocol}/api/scan-emails`, {
             method: 'GET',
-            headers,
             signal: controller.signal,
-            credentials: 'include',
-            mode: 'cors',
-            referrerPolicy: 'no-referrer'
+            ...fetchOptions
           });
 
           clearTimeout(timeoutId);
@@ -306,7 +301,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const { data: existingData, error } = await supabase
               .from('subscriptions')
               .select('*')
-              .eq('user_id', session.user.id);
+              .eq('user_id', currentSession.user.id);
 
             if (error) {
               console.error('Error fetching subscriptions:', error);

@@ -40,10 +40,21 @@ const corsOptions = {
       callback(null, true);
       return;
     }
+
+    // Check if the origin matches any allowed origin
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      // Exact match
+      if (origin === allowedOrigin) return true;
+      
+      // Match with or without www.
+      const originWithoutWww = origin.replace('www.', '');
+      const allowedWithoutWww = allowedOrigin.replace('www.', '');
+      return originWithoutWww === allowedWithoutWww;
+    });
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      console.log('Origin allowed:', origin);
-      callback(null, true);
+    if (isAllowed) {
+      // Send back the origin that was received
+      callback(null, origin);
     } else {
       console.log('Origin blocked:', origin);
       callback(new Error('Not allowed by CORS'));
@@ -316,7 +327,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Health check endpoint
+// Health check endpoint with explicit CORS handling
 app.get('/health', cors(corsOptions), (req, res) => {
   console.log('Health check request from origin:', req.get('origin'));
   res.status(200).json({ status: 'ok' });
