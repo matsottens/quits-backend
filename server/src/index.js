@@ -31,11 +31,37 @@ const analyticsRouter = require('./routes/analytics');
 const testRouter = require('./routes/test');
 const emailsRouter = require('./routes/emails');
 
+// Add request method logging middleware
+app.use((req, res, next) => {
+  console.log('Incoming request:', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+      cookie: req.headers.cookie ? '[REDACTED]' : undefined
+    }
+  });
+  next();
+});
+
 // CORS configuration
 const corsOptions = {
   origin: function(origin, callback) {
-    const allowedOrigins = ['https://www.quits.cc', 'https://quits.cc', 'http://localhost:3000'];
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    const allowedOrigins = [
+      'https://www.quits.cc',
+      'https://quits.cc',
+      'http://localhost:3000'
+    ];
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // Check if the origin is in the allowed list
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.log('CORS: Origin not allowed:', origin);
@@ -54,14 +80,57 @@ const corsOptions = {
     'Origin'
   ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 86400
+  maxAge: 86400,
+  preflightContinue: false
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
 
 // Add preflight handler for scan-emails endpoint
-app.options('/api/scan-emails', cors(corsOptions));
+app.options('/api/scan-emails', (req, res) => {
+  console.log('Handling OPTIONS request for /api/scan-emails:', {
+    origin: req.headers.origin,
+    method: req.method,
+    headers: req.headers
+  });
+  
+  // Set CORS headers
+  const origin = req.headers.origin;
+  if (origin && ['https://www.quits.cc', 'https://quits.cc'].includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, X-User-ID, X-Gmail-Token, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    res.header('Vary', 'Origin');
+  }
+  
+  // Send 204 No Content for preflight requests
+  res.status(204).end();
+});
+
+// Add specific POST handler for scan-emails with logging
+app.post('/api/scan-emails', (req, res, next) => {
+  console.log('Received POST request to /api/scan-emails:', {
+    method: req.method,
+    origin: req.headers.origin,
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+      cookie: req.headers.cookie ? '[REDACTED]' : undefined
+    }
+  });
+  
+  // Set CORS headers for the actual request
+  const origin = req.headers.origin;
+  if (origin && ['https://www.quits.cc', 'https://quits.cc'].includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  
+  next();
+}, cors(corsOptions));
 
 // Then apply other middleware
 app.use(cspMiddleware);

@@ -132,36 +132,40 @@ class ApiService {
     }
   }
 
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
+    try {
       const headers = await this.getAuthHeaders();
-      
-      // Initialize origin variations if not already set
+      const currentOrigin = window.location.origin;
+
+      // Initialize origin variations if not already done
       if (this.originVariations.length === 0) {
-        this.originVariations = getOriginVariations(window.location.origin);
-        console.log('Initialized origin variations:', this.originVariations);
+        this.originVariations = [
+          currentOrigin,
+          currentOrigin.replace('www.', ''),
+          currentOrigin.replace('https://', 'http://')
+        ];
       }
 
-      // Get current origin to try
-      const currentOrigin = this.originVariations[this.retryCount % this.originVariations.length];
-
       const requestUrl = `${API_URL}${endpoint}`;
+      const method = options.method || 'GET';
+      
       console.log('Making API request:', {
         url: requestUrl,
-        method: options.method || 'GET',
+        method,
         origin: currentOrigin,
         retryCount: this.retryCount,
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
         hasUserId: !!headers['X-User-ID'],
         environment: process.env.NODE_ENV,
-        headers: Object.keys(headers)
+        headers: Object.keys(headers),
+        options: {
+          ...options,
+          headers: Object.keys(options.headers || {})
+        }
       });
 
       if (!headers['Authorization']) {
@@ -178,6 +182,7 @@ class ApiService {
 
       const response = await fetch(requestUrl, {
         ...options,
+        method, // Explicitly set the method
         headers: {
           ...headers,
           ...options.headers,
@@ -252,7 +257,13 @@ class ApiService {
       if ((error.message.includes('CORS') || error.message.includes('Failed to fetch')) && this.retryCount < this.MAX_RETRIES) {
         console.log(`CORS error, retrying with different origin (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})`);
         this.retryCount++;
-        return this.makeRequest(endpoint, options);
+        
+        // Try a different origin variation
+        const nextOrigin = this.originVariations[this.retryCount % this.originVariations.length];
+        if (nextOrigin) {
+          window.location.origin = nextOrigin;
+          return this.makeRequest(endpoint, options);
+        }
       }
 
       // Reset retry count and origin variations after max retries or other errors
