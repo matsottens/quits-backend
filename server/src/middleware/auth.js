@@ -40,6 +40,7 @@ const cspMiddleware = (req, res, next) => {
       "'self'",
       'https://api.quits.cc',
       'https://www.quits.cc',
+      'https://quits.cc',
       'https://*.supabase.co',
       'wss://*.supabase.co',
       'https://apis.google.com',
@@ -94,15 +95,18 @@ const customCorsMiddleware = (req, res, next) => {
     'http://localhost:5000'
   ];
 
-  // Always set CORS headers
+  // Check if the origin is allowed
   const isAllowed = allowedDomains.includes(origin);
 
-  // Set the Access-Control-Allow-Origin header
-  res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : null);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400');
+  // Set CORS headers
+  if (isAllowed) {
+    // Always set the exact origin that was requested
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
 
   // Log request status
   console.log(`[${requestId}] CORS status:`, {
@@ -113,7 +117,15 @@ const customCorsMiddleware = (req, res, next) => {
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    res.status(204).end();
+    if (isAllowed) {
+      res.status(204).end();
+    } else {
+      res.status(403).json({
+        error: 'CORS error',
+        message: 'Origin not allowed',
+        origin: origin
+      });
+    }
     return;
   }
 
