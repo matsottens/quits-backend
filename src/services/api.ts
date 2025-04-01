@@ -1,7 +1,9 @@
 import { supabase } from '../supabase';
 
-// Remove the API_URL constant since we'll use relative URLs
-// const API_URL = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
+// Add API URL configuration
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? '' // Use proxy in development
+  : 'https://api.quits.cc'; // Use full URL in production
 
 // Helper function to normalize domain
 const normalizeDomain = (url: string) => {
@@ -145,7 +147,7 @@ class ApiService {
       const currentOrigin = this.originVariations[this.retryCount % this.originVariations.length];
 
       console.log('Making API request:', {
-        url: endpoint,
+        url: `${API_URL}${endpoint}`,
         method: options.method || 'GET',
         origin: currentOrigin,
         retryCount: this.retryCount,
@@ -166,7 +168,7 @@ class ApiService {
         throw new Error('No user ID available. Please sign in again.');
       }
 
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${API_URL}${endpoint}`, {
         ...options,
         headers: {
           ...headers,
