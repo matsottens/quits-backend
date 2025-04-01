@@ -15,18 +15,58 @@ if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing Supabase configuration');
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+// Remove any trailing slashes from URL
+const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
+
+console.log('Initializing Supabase client with URL:', cleanSupabaseUrl);
+
+const supabase = createClient(cleanSupabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
   },
   global: {
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      // Add role claim to bypass RLS
+      'apikey': supabaseServiceKey
     },
     fetch: fetch
   }
 });
+
+// Validate Supabase connection immediately
+(async () => {
+  try {
+    // First, check if we have multiple subscription tables
+    const { data: tables, error: tablesError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .like('table_name', '%subscription%');
+
+    if (tablesError) {
+      console.error('Error checking tables:', tablesError);
+    } else {
+      console.log('Found tables:', tables);
+    }
+
+    // Test subscription table access
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('count')
+      .limit(1);
+
+    if (error) {
+      console.error('Failed to connect to Supabase:', error);
+      throw error;
+    }
+    console.log('Successfully connected to Supabase and verified table access');
+  } catch (err) {
+    console.error('Error validating Supabase connection:', err);
+    // Don't throw here, let the server start anyway
+  }
+})();
 
 // Configure CORS
 const corsOrigins = process.env.CORS_ORIGIN ? 
