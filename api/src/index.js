@@ -7,13 +7,33 @@ const fetch = require('cross-fetch');
 const app = express();
 const port = process.env.PORT || 10000;
 
+// Initialize environment variables validation
+const requiredEnvVars = {
+  'SUPABASE_URL': process.env.SUPABASE_URL,
+  'SUPABASE_SERVICE_KEY': process.env.SUPABASE_SERVICE_KEY,
+  'GOOGLE_CLIENT_ID': process.env.GOOGLE_CLIENT_ID,
+  'GOOGLE_CLIENT_SECRET': process.env.GOOGLE_CLIENT_SECRET,
+  'GOOGLE_REDIRECT_URI': process.env.GOOGLE_REDIRECT_URI
+};
+
+// Validate environment variables
+Object.entries(requiredEnvVars).forEach(([key, value]) => {
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+});
+
+console.log('Environment configuration:', {
+  supabaseUrl: process.env.SUPABASE_URL,
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI,
+  corsOrigins: process.env.CORS_ORIGIN ? 
+    process.env.CORS_ORIGIN.split(',').map(origin => origin.trim()) : 
+    ['https://quits.cc', 'https://www.quits.cc']
+});
+
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase configuration');
-}
 
 // Remove any trailing slashes from URL
 const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
