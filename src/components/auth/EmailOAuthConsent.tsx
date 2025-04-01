@@ -87,7 +87,6 @@ export const EmailOAuthConsent: React.FC = () => {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                onConsent();
               }}
               className="text-blue-600 hover:text-blue-800"
             >
