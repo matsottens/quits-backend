@@ -13,10 +13,11 @@ interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  details?: string;
 }
 
 // Types for subscription data
-interface SubscriptionData {
+export interface SubscriptionData {
   provider: string;
   price: number | null;
   frequency: 'monthly' | 'yearly';
@@ -35,7 +36,7 @@ interface ScanEmailsResponse {
   priceChanges: PriceChange[] | null;
 }
 
-interface PriceChange {
+export interface PriceChange {
   oldPrice: number;
   newPrice: number;
   change: number;
@@ -56,7 +57,7 @@ class ApiService {
     return ApiService.instance;
   }
 
-  private async getAuthHeaders(): Promise<HeadersInit> {
+  private async getAuthHeaders(): Promise<Record<string, string>> {
     try {
       // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -121,13 +122,13 @@ class ApiService {
         url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
         method: options.method || 'GET',
         origin: currentOrigin,
-        hasAuthToken: !!headers.Authorization,
+        hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
         hasUserId: !!headers['X-User-ID']
       });
 
       // Ensure we have all required headers
-      if (!headers.Authorization) {
+      if (!headers['Authorization']) {
         throw new Error('No authentication token available. Please sign in again.');
       }
 
@@ -219,8 +220,8 @@ class ApiService {
 
   public async scanEmails(): Promise<ApiResponse<ScanEmailsResponse>> {
     try {
-      const response = await this.makeRequest('/api/scan-emails');
-      if (response.success) {
+      const response = await this.makeRequest<ScanEmailsResponse>('/api/scan-emails');
+      if (response.success && response.data) {
         const data = response.data as ScanEmailsResponse;
         return {
           ...response,
@@ -231,7 +232,7 @@ class ApiService {
           }
         };
       }
-      return response;
+      return response as ApiResponse<ScanEmailsResponse>;
     } catch (error) {
       console.error('Error scanning emails:', {
         error,

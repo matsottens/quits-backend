@@ -8,6 +8,11 @@ import {
   Grid,
   MenuItem,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  SelectChangeEvent,
+  FormHelperText,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -52,6 +57,11 @@ export interface SubscriptionFormData {
   nextBilling: string;
   category: string;
   description: string;
+  provider: string;
+  type: string;
+  price: string;
+  frequency: string;
+  next_renewal_date: string;
 }
 
 interface AddSubscriptionProps {
@@ -60,6 +70,8 @@ interface AddSubscriptionProps {
 }
 
 const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<SubscriptionFormData>({
     name: '',
     amount: '',
@@ -67,13 +79,28 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) 
     nextBilling: '',
     category: 'entertainment',
     description: '',
+    provider: '',
+    type: '',
+    price: '',
+    frequency: 'monthly',
+    next_renewal_date: '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [name as string]: value,
+      [name]: value
+    }));
+  };
+
+  const handleSelectChange = (e: SelectChangeEvent) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
     }));
   };
 
@@ -114,85 +141,90 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) 
         <StyledTitle variant="h5">Add New Subscription</StyledTitle>
 
         <form onSubmit={handleSubmit}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <StyledTextField
-                fullWidth
-                label="Subscription Name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12 }}>
+              <Typography variant="h6" gutterBottom>
+                Subscription Details
+              </Typography>
+            </Grid>
+            
+            <Grid size={{ xs: 12 }}>
+              <TextField
                 required
+                fullWidth
+                label="Provider"
+                name="provider"
+                value={formData.provider}
+                onChange={handleChange}
+                error={!!errors.provider}
+                helperText={errors.provider}
+                disabled={isSubmitting}
               />
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                required
                 fullWidth
-                label="Amount"
-                name="amount"
+                label="Type"
+                name="type"
+                value={formData.type}
+                onChange={handleChange}
+                error={!!errors.type}
+                helperText={errors.type}
+                disabled={isSubmitting}
+              />
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                required
+                fullWidth
+                label="Price"
+                name="price"
                 type="number"
-                value={formData.amount}
+                inputProps={{ min: 0, step: 0.01 }}
+                value={formData.price}
                 onChange={handleChange}
-                required
-                InputProps={{
-                  startAdornment: '€',
-                }}
+                error={!!errors.price}
+                helperText={errors.price}
+                disabled={isSubmitting}
               />
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
-                fullWidth
-                select
-                label="Billing Cycle"
-                name="billingCycle"
-                value={formData.billingCycle}
-                onChange={handleChange}
-                required
-              >
-                <MenuItem value="monthly">Monthly</MenuItem>
-                <MenuItem value="yearly">Yearly</MenuItem>
-                <MenuItem value="quarterly">Quarterly</MenuItem>
-                <MenuItem value="weekly">Weekly</MenuItem>
-              </StyledTextField>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth required error={!!errors.frequency} disabled={isSubmitting}>
+                <InputLabel>Frequency</InputLabel>
+                <Select
+                  name="frequency"
+                  value={formData.frequency}
+                  onChange={handleSelectChange}
+                  label="Frequency"
+                >
+                  <MenuItem value="monthly">Monthly</MenuItem>
+                  <MenuItem value="yearly">Yearly</MenuItem>
+                  <MenuItem value="quarterly">Quarterly</MenuItem>
+                  <MenuItem value="weekly">Weekly</MenuItem>
+                </Select>
+                {errors.frequency && <FormHelperText>{errors.frequency}</FormHelperText>}
+              </FormControl>
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
                 fullWidth
-                label="Next Billing Date"
-                name="nextBilling"
+                label="Next Renewal Date"
+                name="next_renewal_date"
                 type="date"
-                value={formData.nextBilling}
+                InputLabelProps={{ shrink: true }}
+                value={formData.next_renewal_date}
                 onChange={handleChange}
-                required
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                disabled={isSubmitting}
               />
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
-                fullWidth
-                select
-                label="Category"
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                required
-              >
-                <MenuItem value="entertainment">Entertainment</MenuItem>
-                <MenuItem value="utilities">Utilities</MenuItem>
-                <MenuItem value="software">Software</MenuItem>
-                <MenuItem value="health">Health</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </StyledTextField>
-            </Grid>
-
-            <Grid item xs={12}>
-              <StyledTextField
+            
+            <Grid size={{ xs: 12 }}>
+              <TextField
                 fullWidth
                 label="Description"
                 name="description"
@@ -200,15 +232,28 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) 
                 rows={3}
                 value={formData.description}
                 onChange={handleChange}
+                disabled={isSubmitting}
               />
             </Grid>
-
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                <Button onClick={onClose}>Cancel</Button>
-                <StyledButton type="submit" variant="contained">
-                  Add Subscription
-                </StyledButton>
+            
+            <Grid size={{ xs: 12 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Adding...' : 'Add Subscription'}
+                </Button>
               </Box>
             </Grid>
           </Grid>

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
 import { apiService } from '../services/api';
+import { SubscriptionData, PriceChange } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -40,15 +41,14 @@ export const AuthContext = createContext<{
   signOut: async () => {},
   signInWithGoogle: async () => {},
   scanEmails: async () => {},
-  login: async () => ({ user: null, session: null }),
+  login: async () => ({ user: {} as User, session: {} as Session }),
   subscriptionState: {
     isLoading: false,
     error: null,
     subscriptions: [],
     priceChanges: null,
     lastScanTime: null
-  },
-  scanEmails: async () => {}
+  }
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -294,20 +294,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Starting email scan...');
       const response = await apiService.scanEmails();
       
-      if (!response.success) {
+      if (!response.success || !response.data) {
         throw new Error(response.error || 'Failed to scan emails');
       }
 
       console.log('Email scan completed:', {
-        subscriptionCount: response.data.subscriptions.length,
-        priceChangesCount: response.data.priceChanges?.length || 0
+        subscriptionCount: response.data?.subscriptions?.length || 0,
+        priceChangesCount: response.data?.priceChanges?.length || 0
       });
 
       setSubscriptionState({
         isLoading: false,
         error: null,
-        subscriptions: response.data.subscriptions,
-        priceChanges: response.data.priceChanges,
+        subscriptions: response.data?.subscriptions || [],
+        priceChanges: response.data?.priceChanges || null,
         lastScanTime: new Date().toISOString()
       });
     } catch (error) {

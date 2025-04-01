@@ -26,46 +26,47 @@ interface UpcomingRenewal {
 }
 
 interface AnalyticsData {
-  subscriptions: number;
-  monthlyTotal: number;
-  yearlyTotal: number;
+  totalSubscriptions: number;
+  totalMonthlyCost: number;
+  averagePriceChange: number;
+  upcomingRenewals: number;
   priceChanges: PriceChange[];
-  upcomingRenewals: UpcomingRenewal[];
-  priceHistory: Record<string, any[]>;
+  upcomingRenewalsList: UpcomingRenewal[];
 }
 
 export const SubscriptionAnalytics: React.FC = () => {
-  const { session, apiUrl } = useAuth();
+  const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const fetchAnalytics = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/api/subscription-analytics`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'x-user-id': session?.user?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch analytics');
-      }
-
-      const data = await response.json();
-      setAnalytics(data.data);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
 
   useEffect(() => {
-    if (session?.access_token) {
-      fetchAnalytics();
-    }
-  }, [session?.access_token]);
+    const fetchAnalytics = async () => {
+      if (!user) return;
+
+      try {
+        const response = await fetch(`${apiUrl}/api/analytics`, {
+          headers: {
+            'Authorization': `Bearer ${user.id}`,
+            'x-user-id': user.id
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch analytics');
+        }
+
+        const data = await response.json();
+        setAnalytics(data.analytics);
+      } catch (error) {
+        console.error('Error fetching analytics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, [user, apiUrl]);
 
   if (loading) {
     return (
@@ -77,51 +78,37 @@ export const SubscriptionAnalytics: React.FC = () => {
 
   if (!analytics) {
     return (
-      <div className="text-center text-gray-500 py-4">
-        No analytics data available
+      <div className="text-center p-4">
+        <p className="text-gray-500">No analytics data available</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <ChartBarIcon className="h-6 w-6 text-blue-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Total Subscriptions</h3>
-          </div>
-          <p className="mt-2 text-2xl font-semibold">{analytics.subscriptions}</p>
+          <h3 className="text-sm font-medium text-gray-500">Total Subscriptions</h3>
+          <p className="mt-2 text-2xl font-semibold">{analytics.totalSubscriptions}</p>
         </div>
-
+        
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <CurrencyDollarIcon className="h-6 w-6 text-green-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Monthly Total</h3>
-          </div>
-          <p className="mt-2 text-2xl font-semibold">${analytics.monthlyTotal.toFixed(2)}</p>
+          <h3 className="text-sm font-medium text-gray-500">Monthly Cost</h3>
+          <p className="mt-2 text-2xl font-semibold">${analytics.totalMonthlyCost.toFixed(2)}</p>
         </div>
-
+        
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <CurrencyDollarIcon className="h-6 w-6 text-purple-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Yearly Total</h3>
-          </div>
-          <p className="mt-2 text-2xl font-semibold">${analytics.yearlyTotal.toFixed(2)}</p>
+          <h3 className="text-sm font-medium text-gray-500">Avg Price Change</h3>
+          <p className="mt-2 text-2xl font-semibold">{analytics.averagePriceChange.toFixed(1)}%</p>
         </div>
-
+        
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <ArrowTrendingUpIcon className="h-6 w-6 text-red-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Price Changes</h3>
-          </div>
-          <p className="mt-2 text-2xl font-semibold">{analytics.priceChanges.length}</p>
+          <h3 className="text-sm font-medium text-gray-500">Upcoming Renewals</h3>
+          <p className="mt-2 text-2xl font-semibold">{analytics.upcomingRenewals}</p>
         </div>
       </div>
 
-      {/* Price Changes */}
-      {analytics.priceChanges.length > 0 && (
+      {analytics.priceChanges && analytics.priceChanges.length > 0 && (
         <div className="bg-white rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Recent Price Changes</h2>
           <div className="space-y-4">
@@ -147,15 +134,11 @@ export const SubscriptionAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Upcoming Renewals */}
-      {analytics.upcomingRenewals.length > 0 && (
+      {analytics.upcomingRenewalsList && analytics.upcomingRenewalsList.length > 0 && (
         <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4 flex items-center">
-            <CalendarIcon className="h-5 w-5 mr-2" />
-            Upcoming Renewals
-          </h2>
+          <h2 className="text-lg font-semibold mb-4">Upcoming Renewals</h2>
           <div className="space-y-4">
-            {analytics.upcomingRenewals.map((renewal, index) => (
+            {analytics.upcomingRenewalsList.map((renewal, index) => (
               <div key={index} className="border-b pb-4 last:border-b-0">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">{renewal.provider}</h3>

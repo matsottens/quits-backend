@@ -72,7 +72,8 @@ const AuthCallback = () => {
       } catch (error) {
         console.error('Auth callback error:', error);
         // Redirect to login page with error
-        navigate('/login?error=' + encodeURIComponent(error.message));
+        const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+        navigate('/login?error=' + encodeURIComponent(errorMessage));
       }
     };
 

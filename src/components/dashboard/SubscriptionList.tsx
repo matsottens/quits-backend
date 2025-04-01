@@ -108,7 +108,7 @@ export const SubscriptionList: React.FC = () => {
       ) : (
         <Grid container spacing={2}>
           {subscriptions.map((subscription) => (
-            <Grid item xs={12} sm={6} md={4} key={subscription.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={subscription.id}>
               <Card>
                 <CardContent>
                   <Typography variant="h6" component="div" gutterBottom>

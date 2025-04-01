@@ -26,6 +26,12 @@ export interface Subscription {
   status: string;
   created_at: string;
   updated_at: string;
+  provider?: string;
+  type?: string;
+  price?: number;
+  frequency?: string;
+  next_renewal_date?: string;
+  notes?: string;
 }
 
 // Database helper functions

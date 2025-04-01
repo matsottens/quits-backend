@@ -10,7 +10,15 @@ interface AuthState {
   error: string | null;
 }
 
-export const useAuth = () => {
+interface AuthReturn extends AuthState {
+  login: (email: string, password: string) => Promise<boolean>;
+  googleLogin: () => void;
+  signup: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<boolean>;
+  apiUrl: string;
+}
+
+export const useAuth = (): AuthReturn => {
   const navigate = useNavigate();
   const [state, setState] = useState<AuthState>({
     user: null,

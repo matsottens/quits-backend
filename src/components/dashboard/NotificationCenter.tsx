@@ -21,17 +21,20 @@ interface Notification {
 }
 
 export const NotificationCenter: React.FC = () => {
-  const { session, apiUrl } = useAuth();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
 
   const fetchNotifications = async () => {
+    if (!user) return;
+
     try {
       const response = await fetch(`${apiUrl}/api/notifications`, {
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'x-user-id': session?.user?.id || ''
+          'Authorization': `Bearer ${user.id}`,
+          'x-user-id': user.id
         }
       });
 
@@ -50,12 +53,14 @@ export const NotificationCenter: React.FC = () => {
   };
 
   const markAsRead = async (notificationId: string) => {
+    if (!user) return;
+
     try {
       const response = await fetch(`${apiUrl}/api/notifications/${notificationId}/read`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'x-user-id': session?.user?.id || ''
+          'Authorization': `Bearer ${user.id}`,
+          'x-user-id': user.id
         }
       });
 
@@ -74,10 +79,10 @@ export const NotificationCenter: React.FC = () => {
   };
 
   useEffect(() => {
-    if (session?.access_token) {
+    if (user) {
       fetchNotifications();
     }
-  }, [session?.access_token]);
+  }, [user]);
 
   if (loading) {
     return (

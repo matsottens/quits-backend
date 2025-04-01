@@ -9,6 +9,7 @@ import {
   MenuItem,
   IconButton,
   Select,
+  SelectChangeEvent,
   FormControl,
   InputLabel,
   FormHelperText,
@@ -90,6 +91,8 @@ interface ManualSubscriptionProps {
 }
 
 const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubmit }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<ManualSubscriptionFormData>({
     name: '',
     amount: '',
@@ -101,11 +104,21 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
     notificationType: 'email', // Default to email notifications
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [name as string]: value,
+      [name]: value
+    }));
+  };
+
+  const handleSelectChange = (e: SelectChangeEvent) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
     }));
   };
 
@@ -165,134 +178,98 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
         <StyledTitle variant="h5" sx={{ color: '#26457A' }}>Add Subscription Manually</StyledTitle>
 
         <form onSubmit={handleSubmit}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <StyledTextField
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12 }}>
+              <Typography variant="h6" gutterBottom>
+                Subscription Details
+              </Typography>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                required
                 fullWidth
-                label="Subscription Name"
+                label="Provider"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                required
+                error={!!errors.name}
+                helperText={errors.name}
               />
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                required
                 fullWidth
-                label="Amount"
+                label="Type"
                 name="amount"
                 type="number"
+                inputProps={{ min: 0, step: 0.01 }}
                 value={formData.amount}
                 onChange={handleChange}
-                required
-                InputProps={{
-                  startAdornment: '€',
-                }}
+                error={!!errors.amount}
+                helperText={errors.amount}
               />
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
-                fullWidth
-                select
-                label="Billing Cycle"
-                name="billingCycle"
-                value={formData.billingCycle}
-                onChange={handleChange}
-                required
-              >
-                <MenuItem value="monthly">Monthly</MenuItem>
-                <MenuItem value="bimonthly">Bi-Monthly (Every 2 Months)</MenuItem>
-                <MenuItem value="quarterly">Quarterly (Every 3 Months)</MenuItem>
-                <MenuItem value="semiannually">Semi-Annually (Every 6 Months)</MenuItem>
-                <MenuItem value="yearly">Yearly</MenuItem>
-                <MenuItem value="biennial">Biennial (Every 2 Years)</MenuItem>
-                <MenuItem value="weekly">Weekly</MenuItem>
-              </StyledTextField>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth required error={!!errors.billingCycle} disabled={isSubmitting}>
+                <InputLabel>Frequency</InputLabel>
+                <Select
+                  name="billingCycle"
+                  value={formData.billingCycle}
+                  onChange={handleSelectChange}
+                  label="Frequency"
+                >
+                  <MenuItem value="monthly">Monthly</MenuItem>
+                  <MenuItem value="yearly">Yearly</MenuItem>
+                  <MenuItem value="quarterly">Quarterly</MenuItem>
+                  <MenuItem value="weekly">Weekly</MenuItem>
+                </Select>
+                {errors.billingCycle && <FormHelperText>{errors.billingCycle}</FormHelperText>}
+              </FormControl>
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                required
                 fullWidth
-                label="Next Billing Date"
+                label="Price"
                 name="nextBilling"
                 type="date"
+                InputLabelProps={{ shrink: true }}
                 value={formData.nextBilling}
                 onChange={handleChange}
-                required
-                InputLabelProps={{
-                  shrink: true,
-                }}
               />
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
-                fullWidth
-                select
-                label="Category"
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                required
-              >
-                <MenuItem value="entertainment">Entertainment</MenuItem>
-                <MenuItem value="utilities">Utilities</MenuItem>
-                <MenuItem value="software">Software</MenuItem>
-                <MenuItem value="health">Health</MenuItem>
-                <MenuItem value="food">Food & Delivery</MenuItem>
-                <MenuItem value="insurance">Insurance</MenuItem>
-                <MenuItem value="shopping">Shopping</MenuItem>
-                <MenuItem value="telecom">Telecom</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </StyledTextField>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="subtitle1" gutterBottom sx={{ color: '#26457A', fontWeight: 500, mt: 2 }}>
-                Notification Preferences
+            
+            <Grid size={{ xs: 12 }}>
+              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                Additional Information
               </Typography>
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
-                fullWidth
-                select
-                label="Notify Me Before"
-                name="notifyBefore"
-                value={formData.notifyBefore}
-                onChange={handleChange}
-                required
-              >
-                <MenuItem value="1">1 day before</MenuItem>
-                <MenuItem value="3">3 days before</MenuItem>
-                <MenuItem value="5">5 days before</MenuItem>
-                <MenuItem value="7">1 week before</MenuItem>
-                <MenuItem value="14">2 weeks before</MenuItem>
-                <MenuItem value="30">1 month before</MenuItem>
-              </StyledTextField>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth>
+                <InputLabel>Category</InputLabel>
+                <Select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleSelectChange}
+                  label="Category"
+                >
+                  <MenuItem value="streaming">Streaming</MenuItem>
+                  <MenuItem value="software">Software</MenuItem>
+                  <MenuItem value="gaming">Gaming</MenuItem>
+                  <MenuItem value="news">News</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <StyledTextField
-                fullWidth
-                select
-                label="Notification Method"
-                name="notificationType"
-                value={formData.notificationType}
-                onChange={handleChange}
-                required
-              >
-                <MenuItem value="email">Email</MenuItem>
-                <MenuItem value="sms">SMS</MenuItem>
-                <MenuItem value="push">Push Notification</MenuItem>
-                <MenuItem value="all">All Methods</MenuItem>
-              </StyledTextField>
-            </Grid>
-
-            <Grid item xs={12}>
-              <StyledTextField
+            
+            <Grid size={{ xs: 12 }}>
+              <TextField
                 fullWidth
                 label="Description"
                 name="description"
@@ -302,13 +279,20 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
                 onChange={handleChange}
               />
             </Grid>
-
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                <Button onClick={onClose} sx={{ color: 'white' }}>Cancel</Button>
-                <StyledButton type="submit" variant="contained">
-                  Add Subscription
-                </StyledButton>
+            
+            <Grid size={{ xs: 12 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, gap: 2 }}>
+                <Button variant="outlined" color="primary" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Saving...' : 'Save Subscription'}
+                </Button>
               </Box>
             </Grid>
           </Grid>

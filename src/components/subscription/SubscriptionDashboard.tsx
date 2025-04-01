@@ -148,9 +148,27 @@ interface ManualSubscriptionFormData {
 }
 
 interface SubscriptionDetailsProps {
-  subscription: Subscription;
+  subscription: {
+    id: string;
+    user_id: string;
+    name: string;
+    amount: string;
+    billing_cycle: string;
+    next_billing: string;
+    category: string;
+    description: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    provider: string;
+    type: string;
+    price: number;
+    frequency: string;
+    next_renewal_date: string;
+    notes: string;
+  };
   onClose: () => void;
-  onEdit: (subscription: Subscription) => void;
+  onEdit: (subscription: any) => void;
   onDelete: (id: string) => void;
 }
 
@@ -396,25 +414,25 @@ const SubscriptionDashboard: React.FC = () => {
             Menu
           </Typography>
           <List>
-            <ListItem button onClick={() => navigate('/dashboard')}>
+            <ListItem onClick={() => navigate('/dashboard')}>
               <ListItemIcon>
                 <TrackChangesIcon />
               </ListItemIcon>
               <ListItemText primary="Dashboard" />
             </ListItem>
-            <ListItem button onClick={() => navigate('/subscription-tracker')}>
+            <ListItem onClick={() => navigate('/subscription-tracker')}>
               <ListItemIcon>
                 <TrackChangesIcon />
               </ListItemIcon>
               <ListItemText primary="Subscription Tracker" />
             </ListItem>
-            <ListItem button onClick={() => navigate('/calendar')}>
+            <ListItem onClick={() => navigate('/calendar')}>
               <ListItemIcon>
                 <CalendarMonthIcon />
               </ListItemIcon>
               <ListItemText primary="Calendar" />
             </ListItem>
-            <ListItem button onClick={() => navigate('/settings')}>
+            <ListItem onClick={() => navigate('/settings')}>
               <ListItemIcon>
                 <SettingsIcon />
               </ListItemIcon>
@@ -483,7 +501,25 @@ const SubscriptionDashboard: React.FC = () => {
 
       {selectedSubscription && (
         <SubscriptionDetails
-          subscription={selectedSubscription}
+          subscription={{
+            id: selectedSubscription.id,
+            user_id: selectedSubscription.user_id,
+            name: selectedSubscription.name || selectedSubscription.provider || '',
+            amount: selectedSubscription.amount || String(selectedSubscription.price) || '',
+            billing_cycle: selectedSubscription.billing_cycle || selectedSubscription.frequency || '',
+            next_billing: selectedSubscription.next_billing || selectedSubscription.next_renewal_date || '',
+            category: selectedSubscription.category || '',
+            description: selectedSubscription.description || '',
+            status: selectedSubscription.status || 'active',
+            created_at: selectedSubscription.created_at || '',
+            updated_at: selectedSubscription.updated_at || '',
+            provider: selectedSubscription.provider || selectedSubscription.name || '',
+            type: selectedSubscription.type || '',
+            price: typeof selectedSubscription.price === 'number' ? selectedSubscription.price : parseFloat(selectedSubscription.amount) || 0,
+            frequency: selectedSubscription.frequency || selectedSubscription.billing_cycle || '',
+            next_renewal_date: selectedSubscription.next_renewal_date || selectedSubscription.next_billing || '',
+            notes: selectedSubscription.notes || ''
+          }}
           onClose={() => setSelectedSubscription(null)}
           onEdit={handleSubscriptionEdit}
           onDelete={handleSubscriptionDelete}

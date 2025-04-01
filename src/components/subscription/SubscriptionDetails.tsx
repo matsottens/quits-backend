@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -56,6 +57,12 @@ interface SubscriptionDetailsProps {
     status: string;
     created_at: string;
     updated_at: string;
+    provider: string;
+    type: string;
+    price: number;
+    frequency: string;
+    next_renewal_date: string;
+    notes: string;
   };
   onClose: () => void;
   onEdit: (subscription: SubscriptionDetailsProps['subscription']) => void;
@@ -68,6 +75,8 @@ const SubscriptionDetails: React.FC<SubscriptionDetailsProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const navigate = useNavigate();
+
   return (
     <Box
       sx={{
@@ -108,61 +117,59 @@ const SubscriptionDetails: React.FC<SubscriptionDetailsProps> = ({
           </Box>
         </Box>
 
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
-            <DetailLabel>Amount</DetailLabel>
-            <DetailValue>€{subscription.amount}</DetailValue>
+        <Grid container spacing={2} sx={{ mt: 3 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Typography variant="subtitle2" color="text.secondary">Provider</Typography>
+            <Typography variant="body1">{subscription.provider}</Typography>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Typography variant="subtitle2" color="text.secondary">Type</Typography>
+            <Typography variant="body1">{subscription.type || 'Unknown'}</Typography>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Typography variant="subtitle2" color="text.secondary">Price</Typography>
+            <Typography variant="body1">${subscription.price.toFixed(2)} / {subscription.frequency}</Typography>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Typography variant="subtitle2" color="text.secondary">Renewal Date</Typography>
+            <Typography variant="body1">
+              {subscription.next_renewal_date 
+                ? new Date(subscription.next_renewal_date).toLocaleDateString() 
+                : 'Not set'}
+            </Typography>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <Typography variant="subtitle2" color="text.secondary">Description</Typography>
+            <Typography variant="body1">{subscription.description || 'No description'}</Typography>
           </Grid>
 
-          <Grid item xs={12} sm={6}>
-            <DetailLabel>Billing Cycle</DetailLabel>
-            <DetailValue>{subscription.billing_cycle.charAt(0).toUpperCase() + subscription.billing_cycle.slice(1)}</DetailValue>
+          {/* Additional Details Section */}
+          <Grid size={{ xs: 12 }}>
+            <Typography variant="h6" sx={{ mt: 2, mb: 2 }}>Additional Details</Typography>
           </Grid>
 
-          <Grid item xs={12} sm={6}>
-            <DetailLabel>Next Billing Date</DetailLabel>
-            <DetailValue>{new Date(subscription.next_billing).toLocaleDateString()}</DetailValue>
+          <Grid size={{ xs: 12 }}>
+            <Typography variant="subtitle2" color="text.secondary">Notes</Typography>
+            <Typography variant="body1">{subscription.notes || 'No notes'}</Typography>
           </Grid>
 
-          <Grid item xs={12} sm={6}>
-            <DetailLabel>Category</DetailLabel>
-            <DetailValue>{subscription.category.charAt(0).toUpperCase() + subscription.category.slice(1)}</DetailValue>
-          </Grid>
-
-          <Grid item xs={12}>
-            <DetailLabel>Status</DetailLabel>
-            <DetailValue>
-              <Typography
-                component="span"
-                sx={{
-                  backgroundColor: subscription.status === 'active' ? '#dcfce7' : '#fee2e2',
-                  color: subscription.status === 'active' ? '#166534' : '#991b1b',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                }}
+          {/* Actions Section */}
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4, gap: 2 }}>
+              <Button 
+                variant="outlined" 
+                color="primary" 
+                onClick={onClose}
               >
-                {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
-              </Typography>
-            </DetailValue>
-          </Grid>
-
-          {subscription.description && (
-            <>
-              <Grid item xs={12}>
-                <Divider sx={{ my: 2 }} />
-              </Grid>
-              <Grid item xs={12}>
-                <DetailLabel>Description</DetailLabel>
-                <DetailValue>{subscription.description}</DetailValue>
-              </Grid>
-            </>
-          )}
-
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button onClick={onClose}>Close</Button>
+                Back
+              </Button>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                onClick={() => onEdit(subscription)}
+              >
+                Edit Subscription
+              </Button>
             </Box>
           </Grid>
         </Grid>

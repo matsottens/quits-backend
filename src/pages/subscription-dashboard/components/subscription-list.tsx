@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { MoreVertical } from 'lucide-react';
-import { LogoComponent } from './logo-component';
 import ManageSubscription, { SubscriptionData } from '../../../components/subscription/ManageSubscription';
 
 interface SubscriptionListProps {
@@ -23,6 +22,12 @@ export default function SubscriptionList({ searchQuery }: SubscriptionListProps)
       notificationType: "email",
       isActive: true,
       description: "Streaming service",
+      provider: "Netflix Inc.",
+      type: "Streaming",
+      price: "15.99",
+      frequency: "monthly",
+      next_renewal_date: "2024-03-15",
+      status: "active"
     },
     {
       id: "2",
@@ -35,6 +40,12 @@ export default function SubscriptionList({ searchQuery }: SubscriptionListProps)
       notificationType: "email",
       isActive: true,
       description: "Music streaming",
+      provider: "Spotify AB",
+      type: "Music",
+      price: "9.99",
+      frequency: "monthly",
+      next_renewal_date: "2024-03-20",
+      status: "active"
     },
   ];
 

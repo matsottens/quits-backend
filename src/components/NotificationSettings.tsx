@@ -9,54 +9,63 @@ interface NotificationSettings {
 }
 
 export const NotificationSettings: React.FC = () => {
-  const { session, apiUrl } = useAuth();
+  const { user } = useAuth();
   const [settings, setSettings] = useState<NotificationSettings>({
     email_notifications: true,
     price_change_threshold: 5,
-    renewal_reminder_days: 7
+    renewal_reminder_days: 30
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
 
-  const fetchSettings = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/api/notification-settings`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'x-user-id': session?.user?.id || ''
+  useEffect(() => {
+    const fetchSettings = async () => {
+      if (!user) return;
+
+      try {
+        const response = await fetch(`${apiUrl}/api/notification-settings`, {
+          headers: {
+            'Authorization': `Bearer ${user.id}`,
+            'x-user-id': user.id
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch notification settings');
         }
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch notification settings');
+        const data = await response.json();
+        setSettings(data.settings);
+      } catch (error) {
+        console.error('Error fetching notification settings:', error);
+        setError('Failed to load notification settings');
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const data = await response.json();
-      setSettings(data.data);
-    } catch (error) {
-      console.error('Error fetching notification settings:', error);
-      setError('Failed to load notification settings');
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchSettings();
+  }, [user]);
 
   const saveSettings = async () => {
-    try {
-      setSaving(true);
-      setError(null);
-      setSuccess(false);
+    if (!user) return;
 
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+
+    try {
       const response = await fetch(`${apiUrl}/api/notification-settings`, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'x-user-id': session?.user?.id || '',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.id}`,
+          'x-user-id': user.id
         },
-        body: JSON.stringify(settings)
+        body: JSON.stringify({ settings })
       });
 
       if (!response.ok) {
@@ -71,12 +80,6 @@ export const NotificationSettings: React.FC = () => {
       setSaving(false);
     }
   };
-
-  useEffect(() => {
-    if (session?.access_token) {
-      fetchSettings();
-    }
-  }, [session?.access_token]);
 
   if (loading) {
     return (
@@ -112,10 +115,7 @@ export const NotificationSettings: React.FC = () => {
             <input
               type="checkbox"
               checked={settings.email_notifications}
-              onChange={(e) => setSettings(prev => ({
-                ...prev,
-                email_notifications: e.target.checked
-              }))}
+              onChange={(e) => setSettings({ ...settings, email_notifications: e.target.checked })}
               className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
             />
             <span className="text-gray-700">Enable email notifications</span>
@@ -136,10 +136,7 @@ export const NotificationSettings: React.FC = () => {
               min="1"
               max="100"
               value={settings.price_change_threshold}
-              onChange={(e) => setSettings(prev => ({
-                ...prev,
-                price_change_threshold: Math.max(1, Math.min(100, parseInt(e.target.value) || 1))
-              }))}
+              onChange={(e) => setSettings({ ...settings, price_change_threshold: Math.max(1, Math.min(100, parseInt(e.target.value) || 1)) })}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>
@@ -159,10 +156,7 @@ export const NotificationSettings: React.FC = () => {
               min="1"
               max="30"
               value={settings.renewal_reminder_days}
-              onChange={(e) => setSettings(prev => ({
-                ...prev,
-                renewal_reminder_days: Math.max(1, Math.min(30, parseInt(e.target.value) || 1))
-              }))}
+              onChange={(e) => setSettings({ ...settings, renewal_reminder_days: Math.max(1, Math.min(30, parseInt(e.target.value) || 1)) })}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>

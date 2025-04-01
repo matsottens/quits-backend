@@ -260,13 +260,14 @@ const ChartLegendContent = React.forwardRef<
           className
         )}
       >
-        {payload.map((item: ChartPayloadItem) => {
-          const key = `${nameKey || item.dataKey || "value"}`
-          const itemConfig = getPayloadConfigFromPayload(config, item, key)
+        {payload.map((item) => {
+          const chartItem = item as unknown as ChartPayloadItem;
+          const key = `${nameKey || chartItem.dataKey || "value"}`
+          const itemConfig = getPayloadConfigFromPayload(config, chartItem, key)
 
           return (
             <div
-              key={item.value}
+              key={chartItem.value as React.Key}
               className={cn(
                 "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground"
               )}
@@ -277,7 +278,7 @@ const ChartLegendContent = React.forwardRef<
                 <div
                   className="h-2 w-2 shrink-0 rounded-[2px]"
                   style={{
-                    backgroundColor: item.color,
+                    backgroundColor: chartItem.color,
                   }}
                 />
               )}

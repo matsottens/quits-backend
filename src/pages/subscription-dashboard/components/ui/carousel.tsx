@@ -3,30 +3,29 @@
 import * as React from "react"
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
-  type EmblaOptionsType,
-  type EmblaPluginType,
 } from "embla-carousel-react"
+import type { EmblaOptionsType, EmblaPluginType } from "embla-carousel"
 import { Button } from "./button"
 import { cn } from "@/lib/utils"
 
 type CarouselApi = UseEmblaCarouselType[1]
-type UseCarouselParameters = Parameters<typeof useEmblaCarousel>[0]
+type UseCarouselParameters = Parameters<typeof useEmblaCarousel>
 
 interface CarouselProps {
-  opts?: UseCarouselParameters[0]
-  plugins?: UseCarouselParameters[1]
+  opts?: EmblaOptionsType
+  plugins?: EmblaPluginType[]
   orientation?: "horizontal" | "vertical"
   setApi?: (api: CarouselApi) => void
 }
 
-interface CarouselContextValue {
+interface CarouselContextValue extends CarouselProps {
   carouselRef: ReturnType<typeof useEmblaCarousel>[0]
   api: ReturnType<typeof useEmblaCarousel>[1]
   scrollPrev: () => void
   scrollNext: () => void
   canScrollPrev: boolean
   canScrollNext: boolean
-} & CarouselProps
+}
 
 const CarouselContext = React.createContext<CarouselContextValue | null>(null)
 
@@ -55,7 +54,7 @@ const Carousel = React.forwardRef<
   const [carouselRef, api] = useEmblaCarousel({
     ...opts,
     axis: orientation === "horizontal" ? "x" : "y",
-  }, plugins ? [plugins] : undefined)
+  }, plugins)
   const [canScrollPrev, setCanScrollPrev] = React.useState(false)
   const [canScrollNext, setCanScrollNext] = React.useState(false)
 
