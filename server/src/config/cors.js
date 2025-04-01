@@ -42,8 +42,23 @@ const corsConfig = {
   isAllowedOrigin: (origin) => {
     if (!origin) return true; // Allow requests with no origin (e.g., mobile apps)
     
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Development mode: allowing all origins');
+      return true;
+    }
+    
     // Normalize the origin by removing trailing slashes and converting to lowercase
     const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
+    
+    // Log the origin check
+    console.log('Checking origin:', {
+      original: origin,
+      normalized: normalizedOrigin,
+      allowed: corsConfig.allowedOrigins.some(allowedOrigin => 
+        allowedOrigin.toLowerCase().replace(/\/$/, '') === normalizedOrigin
+      )
+    });
     
     // Check if the origin is in the allowed list
     return corsConfig.allowedOrigins.some(allowedOrigin => 
@@ -54,10 +69,11 @@ const corsConfig = {
   // Function to get CORS headers for a specific origin
   getCorsHeaders: (origin) => {
     if (!corsConfig.isAllowedOrigin(origin)) {
+      console.log('Origin not allowed:', origin);
       return null;
     }
 
-    return {
+    const headers = {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': corsConfig.allowedMethods.join(', '),
       'Access-Control-Allow-Headers': corsConfig.allowedHeaders.join(', '),
@@ -66,6 +82,9 @@ const corsConfig = {
       'Access-Control-Max-Age': corsConfig.maxAge.toString(),
       'Vary': 'Origin'
     };
+
+    console.log('Generated CORS headers:', headers);
+    return headers;
   }
 };
 

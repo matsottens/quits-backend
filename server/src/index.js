@@ -55,6 +55,87 @@ app.get('/api/test-cors', (req, res) => {
   });
 });
 
+// Comprehensive CORS test endpoint
+app.get('/api/test-cors', (req, res) => {
+  const requestId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+  
+  // Log all request details
+  console.log(`[CORS TEST ${requestId}]`, {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    nodeVersion: process.version,
+    request: {
+      method: req.method,
+      path: req.path,
+      url: req.url,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl,
+      protocol: req.protocol,
+      secure: req.secure,
+      host: req.hostname,
+      ip: req.ip,
+      ips: req.ips,
+      headers: {
+        ...req.headers,
+        authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+        cookie: req.headers.cookie ? '[REDACTED]' : undefined
+      },
+      query: req.query,
+      body: req.body,
+      cookies: req.cookies,
+      signedCookies: req.signedCookies
+    },
+    cors: {
+      origin: req.headers.origin,
+      referer: req.headers.referer,
+      userAgent: req.headers['user-agent'],
+      contentType: req.headers['content-type'],
+      accept: req.headers.accept
+    },
+    response: {
+      statusCode: res.statusCode,
+      headers: res.getHeaders()
+    }
+  });
+
+  // Send detailed response
+  res.json({
+    success: true,
+    requestId,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    nodeVersion: process.version,
+    cors: {
+      origin: req.headers.origin,
+      referer: req.headers.referer,
+      allowedOrigins: corsConfig.allowedOrigins,
+      isAllowed: corsConfig.isAllowedOrigin(req.headers.origin),
+      headers: corsConfig.getCorsHeaders(req.headers.origin)
+    },
+    request: {
+      method: req.method,
+      path: req.path,
+      url: req.url,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl,
+      protocol: req.protocol,
+      secure: req.secure,
+      host: req.hostname,
+      ip: req.ip,
+      ips: req.ips
+    },
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+      cookie: req.headers.cookie ? '[REDACTED]' : undefined
+    },
+    response: {
+      statusCode: res.statusCode,
+      headers: res.getHeaders()
+    }
+  });
+});
+
 // Add routes
 app.use('/api', testRouter);
 app.use('/api', emailsRouter);
