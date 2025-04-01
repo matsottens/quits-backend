@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-}
+import { supabase } from '../supabase';
+import { User, Session } from '@supabase/supabase-js';
 
 interface AuthState {
   user: User | null;
+  session: Session | null;
   loading: boolean;
   error: string | null;
 }
@@ -17,6 +14,7 @@ export const useAuth = () => {
   const navigate = useNavigate();
   const [state, setState] = useState<AuthState>({
     user: null,
+    session: null,
     loading: true,
     error: null
   });
@@ -25,36 +23,37 @@ export const useAuth = () => {
     // Check authentication status on load
     const checkAuthStatus = async () => {
       try {
-        const response = await fetch('http://localhost:5000/auth/user', {
-          credentials: 'include',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
-        const data = await response.json();
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (data.authenticated && data.user) {
-          setState({
-            user: {
-              id: data.user.id,
-              email: data.user.email,
-              name: data.user.name
-            },
-            loading: false,
-            error: null
-          });
-        } else {
-          setState({
-            user: null,
-            loading: false,
-            error: null
-          });
+        if (error) {
+          throw error;
         }
+
+        setState({
+          user: session?.user ?? null,
+          session: session,
+          loading: false,
+          error: null
+        });
+
+        // Set up auth state change listener
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          setState({
+            user: session?.user ?? null,
+            session: session,
+            loading: false,
+            error: null
+          });
+        });
+
+        return () => {
+          subscription.unsubscribe();
+        };
       } catch (error) {
         console.error('Error checking auth status:', error);
         setState({
           user: null,
+          session: null,
           loading: false,
           error: 'Failed to check authentication status'
         });
@@ -67,10 +66,12 @@ export const useAuth = () => {
   const login = async (email: string, password: string) => {
     try {
       setState({ ...state, loading: true, error: null });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       
-      // In a real implementation, this would make a POST request to the server
-      // For now, we're using the Google OAuth flow, so this is just a placeholder
-      window.location.href = 'http://localhost:5000/auth/google';
+      if (error) throw error;
       return true;
     } catch (error) {
       setState({ ...state, loading: false, error: 'Login failed' });
@@ -79,15 +80,26 @@ export const useAuth = () => {
   };
 
   const googleLogin = () => {
-    window.location.href = 'http://localhost:5000/auth/google';
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    });
   };
 
-  const signup = async (name: string, email: string, password: string) => {
+  const signup = async (email: string, password: string) => {
     try {
       setState({ ...state, loading: true, error: null });
-      // In a real implementation, this would register the user
-      // For now, we're using the Google OAuth flow
-      window.location.href = 'http://localhost:5000/auth/google';
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) throw error;
       return true;
     } catch (error) {
       setState({ ...state, loading: false, error: 'Signup failed' });
@@ -98,33 +110,23 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       setState({ ...state, loading: true, error: null });
+      const { error } = await supabase.auth.signOut();
       
-      await fetch('http://localhost:5000/auth/logout', {
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      setState({ user: null, loading: false, error: null });
-      
-      // After logout, redirect to login page using React Router
+      if (error) throw error;
       navigate('/login');
+      return true;
     } catch (error) {
-      console.error('Error during logout:', error);
       setState({ ...state, loading: false, error: 'Logout failed' });
+      return false;
     }
   };
 
   return {
-    user: state.user,
-    loading: state.loading,
-    error: state.error,
+    ...state,
     login,
     googleLogin,
     signup,
     logout,
-    isAuthenticated: !!state.user
+    apiUrl: process.env.REACT_APP_API_URL || 'https://api.quits.cc'
   };
 }; 
