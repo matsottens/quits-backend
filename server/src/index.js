@@ -13,6 +13,14 @@ const RedisStore = require('connect-redis').default;
 const redis = require('./config/redis');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 
+// CORS configuration
+const corsOptions = {
+  origin: ['https://www.quits.cc', 'https://quits.cc', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-User-ID', 'X-Gmail-Token']
+};
+
 const { customCorsMiddleware, authenticateRequest, cspMiddleware, supabase } = require('./middleware/auth');
 
 const app = express();
@@ -98,27 +106,21 @@ app.use('/api', testRouter); // Add test routes first
 app.use('/api/notifications', authenticateRequest, notificationsRouter);
 app.use('/api/analytics', authenticateRequest, analyticsRouter);
 
-// Session configuration with Redis store
-const sessionConfig = {
-  store: new RedisStore({ 
-    client: redis.getClient(),
-    prefix: 'session:',
-    ttl: 24 * 60 * 60 // 24 hours
+// Session configuration
+app.use(session({
+  store: new FileStore({
+    path: './sessions',
+    ttl: 86400 // 1 day
   }),
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'your-secret-key-here',
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  },
-  name: 'sessionId'
-};
-
-// Apply middleware
-app.use(session(sessionConfig));
+  }
+}));
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -356,19 +358,6 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 console.log('Initializing Supabase with URL:', supabaseUrl);
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  },
-  global: {
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    fetch: fetch
-  }
-});
 
 // Test Supabase connection on startup
 async function testSupabaseConnection() {
