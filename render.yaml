@@ -39,7 +39,7 @@ services:
     healthCheckPath: /api/test-cors
     autoDeploy: true
     github:
-      repo: your-github-username/quits-api
+      repo: matsottens/quits-backend
       branch: main
     headers:
       - path: /*
