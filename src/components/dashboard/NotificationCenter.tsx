@@ -79,10 +79,8 @@ export const NotificationCenter: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchNotifications();
-    }
-  }, [user]);
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   if (loading) {
     return (

@@ -68,7 +68,7 @@ export const OAuthRedirect: React.FC = () => {
     };
 
     handleCallback();
-  }, [location.search]); // Only re-run when the search params change
+  }, [location.pathname, login, navigate]);
 
   if (error) {
     return (

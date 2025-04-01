@@ -3,17 +3,6 @@ import { Box, Typography, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-interface Subscription {
-  id?: string;
-  name: string;
-  amount: number;
-  currency: string;
-  billingCycle: string;
-  lastBilled: string;
-  category: string;
-  isActive: boolean;
-}
-
 export const ScanningScreen: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('Initializing...');
