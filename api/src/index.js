@@ -15,13 +15,51 @@ if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing Supabase configuration');
 }
 
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  },
+  global: {
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    fetch: fetch
+  }
+});
+
 // Configure CORS
 const corsOrigins = process.env.CORS_ORIGIN ? 
-  process.env.CORS_ORIGIN.split(',') : 
+  process.env.CORS_ORIGIN.split(',').map(origin => origin.trim()) : 
   ['https://quits.cc', 'https://www.quits.cc'];
 
-console.log('Allowed CORS origins:', corsOrigins);
+console.log('Server starting with CORS origins:', corsOrigins);
 
+// CORS pre-flight middleware
+app.options('*', cors({
+  origin: function(origin, callback) {
+    console.log('Pre-flight request from origin:', origin);
+    if (!origin || corsOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS (pre-flight):', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'X-Gmail-Token',
+    'X-User-ID',
+    'Origin',
+    'Accept'
+  ]
+}));
+
+// Main CORS middleware
 app.use(cors({
   origin: function(origin, callback) {
     console.log('Incoming request from origin:', origin);
@@ -48,14 +86,20 @@ app.use(cors({
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  console.log('Headers:', req.headers);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
   next();
 });
 
 app.use(bodyParser.json());
 
+// Basic root endpoint
+app.get('/', (req, res) => {
+  res.json({ message: 'Quits API is running' });
+});
+
 // Health check endpoint (no auth required)
 app.get('/api/health', (req, res) => {
+  console.log('Health check endpoint called');
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
@@ -138,14 +182,30 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
   }
 });
 
+// Print registered routes
+app._router.stack.forEach((r) => {
+  if (r.route && r.route.path) {
+    console.log(`Registered route: ${Object.keys(r.route.methods)} ${r.route.path}`);
+  }
+});
+
 // Handle all other routes
 app.all('*', (req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  console.log(`404 - Not found: ${req.method} ${req.path}`);
+  res.status(404).json({ 
+    error: 'Not found',
+    path: req.path,
+    method: req.method
+  });
 });
 
 // Start the server
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running on port ${port}`);
+  console.log('Available endpoints:');
+  console.log('- GET /');
+  console.log('- GET /api/health');
+  console.log('- GET /api/scan-emails (protected)');
 });
 
 // Export the Express app
