@@ -21,7 +21,7 @@ interface Notification {
 }
 
 export const NotificationCenter: React.FC = () => {
-  const { user, apiUrl } = useAuth();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ export const NotificationCenter: React.FC = () => {
     if (!user) return;
 
     try {
-      const response = await fetch(`${apiUrl}/api/notifications`, {
+      const response = await fetch('/api/notifications', {
         headers: {
           Authorization: `Bearer ${user.id}`,
         },
@@ -48,13 +48,13 @@ export const NotificationCenter: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, apiUrl]);
+  }, [user]);
 
   const markAsRead = async (notificationId: string) => {
     if (!user) return;
 
     try {
-      const response = await fetch(`${apiUrl}/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user.id}`,

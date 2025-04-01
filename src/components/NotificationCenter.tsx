@@ -25,13 +25,12 @@ export const NotificationCenter: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
 
   const fetchNotifications = async () => {
     if (!user) return;
 
     try {
-      const response = await fetch(`${apiUrl}/api/notifications`, {
+      const response = await fetch('/api/notifications', {
         headers: {
           'Authorization': `Bearer ${user.id}`,
           'x-user-id': user.id
@@ -56,7 +55,7 @@ export const NotificationCenter: React.FC = () => {
     if (!user) return;
 
     try {
-      const response = await fetch(`${apiUrl}/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user.id}`,

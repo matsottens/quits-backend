@@ -9,7 +9,7 @@ interface NotificationSettingsData {
 }
 
 export const NotificationSettings: React.FC = () => {
-  const { user, apiUrl } = useAuth();
+  const { user } = useAuth();
   const [settings, setSettings] = useState<NotificationSettingsData>({
     email_notifications: true,
     price_change_threshold: 5,
@@ -23,7 +23,7 @@ export const NotificationSettings: React.FC = () => {
   const fetchSettings = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(`${apiUrl}/api/notification-settings`, {
+      const response = await fetch('/api/notification-settings', {
         headers: {
           Authorization: `Bearer ${user.id}`,
         },
@@ -37,7 +37,7 @@ export const NotificationSettings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, apiUrl]);
+  }, [user]);
 
   useEffect(() => {
     fetchSettings();
@@ -51,7 +51,7 @@ export const NotificationSettings: React.FC = () => {
     setSuccess(false);
 
     try {
-      const response = await fetch(`${apiUrl}/api/notification-settings`, {
+      const response = await fetch('/api/notification-settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
