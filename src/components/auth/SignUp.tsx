@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase';
 
+interface SignUpData {
+  user: {
+    email: string;
+    confirmed_at: string | null;
+    identities?: Array<any>;  // Define proper type if available
+  };
+}
+
 export const SignUp: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,89 +39,45 @@ export const SignUp: React.FC = () => {
     try {
       setLoading(true);
 
-      // Sign up with Supabase
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      const signUpData = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: 'https://www.quits.cc/auth/callback'
-        }
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
-      if (signUpError) {
-        throw signUpError;
+      if (signUpData.error) {
+        throw signUpData.error;
       }
 
-      if (signUpData.user) {
-        console.log('Sign up response:', {
-          email: signUpData.user.email,
-          confirmed: signUpData.user.confirmed_at,
-          hasIdentities: signUpData.user.identities?.length > 0
-        });
-        
-        // If user exists but is not confirmed
-        if (signUpData.user.identities?.length === 0) {
-          console.log('Attempting to resend confirmation email');
-          
-          // First try resending with signup type
-          let { data: resendData, error: resendError } = await supabase.auth.resend({
-            type: 'signup',
-            email,
-            options: {
-              emailRedirectTo: 'https://www.quits.cc/auth/callback'
-            }
-          });
-
-          // If that fails, try with recovery type
-          if (resendError) {
-            console.log('Signup resend failed, trying recovery:', resendError);
-            const result = await supabase.auth.resetPasswordForEmail(email, {
-              redirectTo: 'https://www.quits.cc/auth/callback'
-            });
-            resendError = result.error;
-            resendData = result.data;
-          }
-
-          if (resendError) {
-            console.error('Failed to resend confirmation:', resendError);
-            throw resendError;
-          }
-
-          console.log('Confirmation email resent successfully');
-          setSuccess('A new confirmation email has been sent. Please check your inbox.');
-          setTimeout(() => {
-            navigate('/login');
-          }, 5000);
-          return;
-        }
-
-        if (signUpData.user.confirmed_at) {
-          // User is already confirmed, proceed with login
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-          if (signInError) {
-            throw signInError;
-          }
-
-          navigate('/scanning');
-        } else {
-          // New signup, user needs to confirm email
-          setSuccess('Please check your email for a confirmation link to complete your registration.');
-          setTimeout(() => {
-            navigate('/login');
-          }, 5000);
-        }
+      // Check if user exists and has data
+      if (!signUpData.user) {
+        throw new Error('No user data received');
       }
-    } catch (error) {
-      console.error('Error during signup:', error);
-      if (error instanceof Error && error.message.includes('rate limit')) {
-        setError('Too many signup attempts. Please try again later.');
+
+      // Safely check identities
+      const hasIdentities = signUpData.user.identities && signUpData.user.identities.length > 0;
+
+      // Log signup data (excluding sensitive information)
+      console.log('Signup successful:', {
+        email: signUpData.user.email,
+        confirmed: signUpData.user.confirmed_at,
+        hasIdentities
+      });
+      
+      // If user exists but is not confirmed
+      if (!hasIdentities) {
+        setSuccess('Please check your email for the confirmation link.');
       } else {
-        setError(error instanceof Error ? error.message : 'An error occurred during signup');
+        setSuccess('Sign up successful! Redirecting to dashboard...');
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
       }
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      setError(error.message || 'An error occurred during sign up');
     } finally {
       setLoading(false);
     }
