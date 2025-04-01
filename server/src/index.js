@@ -27,6 +27,7 @@ console.log('Server configuration:', {
 
 const notificationsRouter = require('./routes/notifications');
 const analyticsRouter = require('./routes/analytics');
+const testRouter = require('./routes/test');
 
 // Request tracking middleware
 const requestTracker = (req, res, next) => {
@@ -92,9 +93,10 @@ app.get('/api/test-cors', (req, res) => {
   res.json(responseData);
 });
 
-// Add routes that require authentication
+// Add routes
+app.use('/api', testRouter); // Add test routes first
 app.use('/api/notifications', authenticateRequest, notificationsRouter);
-app.use('/api', authenticateRequest, analyticsRouter);
+app.use('/api/analytics', authenticateRequest, analyticsRouter);
 
 // Session configuration with Redis store
 const sessionConfig = {
@@ -1389,6 +1391,49 @@ app.get('/api/subscription-analytics', cacheMiddleware, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// Catch-all error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Catch-all route handler for unmatched routes
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Not found',
+    path: req.path
+  });
+});
+
+// Start the server
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  console.error('Server error:', error);
+  process.exit(1);
+});
+
+// Handle process termination
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 }); 

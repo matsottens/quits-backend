@@ -88,6 +88,7 @@ const customCorsMiddleware = (req, res, next) => {
   // List of allowed domains
   const allowedDomains = [
     'https://www.quits.cc',
+    'https://quits.cc',
     'https://api.quits.cc',
     'http://localhost:3000',
     'http://localhost:5000'
@@ -97,7 +98,7 @@ const customCorsMiddleware = (req, res, next) => {
   const isAllowed = allowedDomains.includes(origin);
 
   // Set the Access-Control-Allow-Origin header
-  res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : 'https://www.quits.cc');
+  res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : null);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -113,6 +114,16 @@ const customCorsMiddleware = (req, res, next) => {
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(204).end();
+    return;
+  }
+
+  // If origin is not allowed, return 403
+  if (!isAllowed) {
+    res.status(403).json({
+      error: 'CORS error',
+      message: 'Origin not allowed',
+      origin: origin
+    });
     return;
   }
 
