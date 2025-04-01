@@ -68,7 +68,7 @@ export const OAuthRedirect: React.FC = () => {
     };
 
     handleCallback();
-  }, [location.pathname, login, navigate]);
+  }, [location.pathname, login, navigate, location.search]);
 
   if (error) {
     return (

@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { BellIcon } from '@heroicons/react/24/outline';
 
-interface NotificationSettings {
+interface NotificationSettingsData {
   email_notifications: boolean;
   price_change_threshold: number;
   renewal_reminder_days: number;
 }
 
 export const NotificationSettings: React.FC = () => {
-  const { user } = useAuth();
-  const [settings, setSettings] = useState<NotificationSettings>({
+  const { user, apiUrl } = useAuth();
+  const [settings, setSettings] = useState<NotificationSettingsData>({
     email_notifications: true,
     price_change_threshold: 5,
     renewal_reminder_days: 30
@@ -19,36 +19,29 @@ export const NotificationSettings: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
+
+  const fetchSettings = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await fetch(`${apiUrl}/api/notification-settings`, {
+        headers: {
+          Authorization: `Bearer ${user.id}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSettings(data);
+      }
+    } catch (error) {
+      console.error('Error fetching notification settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, apiUrl]);
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      if (!user) return;
-
-      try {
-        const response = await fetch(`${apiUrl}/api/notification-settings`, {
-          headers: {
-            'Authorization': `Bearer ${user.id}`,
-            'x-user-id': user.id
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch notification settings');
-        }
-
-        const data = await response.json();
-        setSettings(data.settings);
-      } catch (error) {
-        console.error('Error fetching notification settings:', error);
-        setError('Failed to load notification settings');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchSettings();
-  }, [user]);
+  }, [fetchSettings]);
 
   const saveSettings = async () => {
     if (!user) return;

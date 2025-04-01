@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { BellIcon, CheckIcon } from '@heroicons/react/24/outline';
 
@@ -21,21 +21,19 @@ interface Notification {
 }
 
 export const NotificationCenter: React.FC = () => {
-  const { user } = useAuth();
+  const { user, apiUrl } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!user) return;
 
     try {
       const response = await fetch(`${apiUrl}/api/notifications`, {
         headers: {
-          'Authorization': `Bearer ${user.id}`,
-          'x-user-id': user.id
-        }
+          Authorization: `Bearer ${user.id}`,
+        },
       });
 
       if (!response.ok) {
@@ -50,7 +48,7 @@ export const NotificationCenter: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, apiUrl]);
 
   const markAsRead = async (notificationId: string) => {
     if (!user) return;

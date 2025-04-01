@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
 import { apiService } from '../services/api';
@@ -13,6 +13,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   scanEmails: () => Promise<void>;
   login: (tokens: any) => Promise<{ user: User; session: Session }>;
+  apiUrl: string;
 }
 
 interface SubscriptionState {
@@ -23,38 +24,11 @@ interface SubscriptionState {
   lastScanTime: string | null;
 }
 
-export const AuthContext = createContext<{
-  user: User | null;
-  loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
-  scanEmails: () => Promise<void>;
-  login: (tokens: any) => Promise<{ user: User; session: Session }>;
-  subscriptionState: SubscriptionState;
-}>({
-  user: null,
-  loading: true,
-  signIn: async () => {},
-  signUp: async () => ({ error: null }),
-  signOut: async () => {},
-  signInWithGoogle: async () => {},
-  scanEmails: async () => {},
-  login: async () => ({ user: {} as User, session: {} as Session }),
-  subscriptionState: {
-    isLoading: false,
-    error: null,
-    subscriptions: [],
-    priceChanges: null,
-    lastScanTime: null
-  }
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [subscriptionState, setSubscriptionState] = useState<SubscriptionState>({
     isLoading: false,
     error: null,
@@ -62,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     priceChanges: null,
     lastScanTime: null
   });
+  const [apiUrl] = useState(process.env.REACT_APP_API_URL || 'http://localhost:3001');
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -229,7 +204,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.location.href = data.url;
     } catch (error) {
       console.error('Error initiating Google sign-in:', error);
-      setError(error instanceof Error ? error : new Error('Failed to start Google sign-in'));
       // Redirect to login page on error
       window.location.href = '/login';
     } finally {
@@ -282,7 +256,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(error instanceof Error ? error : new Error('Failed to login'));
+      // Redirect to login page on error
+      window.location.href = '/login';
       throw error;
     }
   };
@@ -338,7 +313,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithGoogle,
     scanEmails,
     login,
-    subscriptionState
+    subscriptionState,
+    apiUrl
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

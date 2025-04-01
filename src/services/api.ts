@@ -1,13 +1,9 @@
 import { supabase } from '../supabase';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 const API_URL_WITH_PROTOCOL = API_URL.startsWith('http') 
   ? API_URL 
   : `https://${API_URL.replace(/^\/+/, '')}`;
-
-// Handle both www and non-www domains
-const FRONTEND_URL = window.location.origin;
-const FRONTEND_URL_WITHOUT_WWW = FRONTEND_URL.replace(/^www\./, '');
 
 interface ApiResponse<T> {
   success: boolean;

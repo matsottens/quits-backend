@@ -83,15 +83,14 @@ export const EmailOAuthConsent: React.FC = () => {
             This content is not created or endorsed by Google.
             <br />
             Learn about how Quits handles your data in our{' '}
-            <a
-              href="#"
+            <button
               onClick={(e) => {
                 e.preventDefault();
               }}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-blue-600 hover:text-blue-800 underline cursor-pointer bg-transparent border-none p-0"
             >
               privacy policy
-            </a>.
+            </button>.
           </p>
         </div>
       </div>

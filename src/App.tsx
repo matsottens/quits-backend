@@ -14,7 +14,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { Box, CircularProgress } from '@mui/material';
 import { AuthCallback } from './components/auth/AuthCallback';
-import { PrivateRoute } from './components/PrivateRoute';
 
 // Protected Route component with Layout
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {

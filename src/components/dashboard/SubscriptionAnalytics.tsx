@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   ChartBarIcon, 
@@ -40,33 +40,33 @@ export const SubscriptionAnalytics: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      if (!user) return;
+  const fetchAnalytics = useCallback(async () => {
+    if (!user) return;
 
-      try {
-        const response = await fetch(`${apiUrl}/api/analytics`, {
-          headers: {
-            'Authorization': `Bearer ${user.id}`,
-            'x-user-id': user.id
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch analytics');
+    try {
+      const response = await fetch(`${apiUrl}/api/analytics`, {
+        headers: {
+          'Authorization': `Bearer ${user.id}`,
+          'x-user-id': user.id
         }
+      });
 
-        const data = await response.json();
-        setAnalytics(data.analytics);
-      } catch (error) {
-        console.error('Error fetching analytics:', error);
-      } finally {
-        setLoading(false);
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics');
       }
-    };
 
+      const data = await response.json();
+      setAnalytics(data.analytics);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, apiUrl]);
+
+  useEffect(() => {
     fetchAnalytics();
-  }, [user]);
+  }, [fetchAnalytics]);
 
   if (loading) {
     return (
