@@ -1,9 +1,15 @@
 import { supabase } from '../supabase';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-const API_URL_WITH_PROTOCOL = API_URL.startsWith('http') 
-  ? API_URL 
-  : `https://${API_URL.replace(/^\/+/, '')}`;
+
+// Helper function to normalize domain
+const normalizeDomain = (url: string) => {
+  const withoutWww = url.replace(/^www\./, '');
+  return withoutWww.startsWith('http') ? withoutWww : `https://${withoutWww.replace(/^\/+/, '')}`;
+};
+
+// API URL with protocol
+const API_URL_WITH_PROTOCOL = normalizeDomain(API_URL);
 
 interface ApiResponse<T> {
   success: boolean;
@@ -44,6 +50,9 @@ export interface PriceChange {
 
 class ApiService {
   private static instance: ApiService;
+  private retryCount: number = 0;
+  private readonly MAX_RETRIES = 2;
+  
   private constructor() {}
 
   public static getInstance(): ApiService {
@@ -107,27 +116,28 @@ class ApiService {
   ): Promise<ApiResponse<T>> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      // Get authentication headers
       const headers = await this.getAuthHeaders();
       const currentOrigin = window.location.origin;
       
-      // Always use the non-www version for CORS
-      const corsOrigin = currentOrigin.replace(/^www\./, '');
+      // Try both www and non-www versions if needed
+      const origins = this.retryCount === 0 
+        ? [normalizeDomain(currentOrigin)]
+        : [currentOrigin, normalizeDomain(currentOrigin)];
       
-      // Log request details (excluding sensitive data)
+      const origin = origins[Math.min(this.retryCount, origins.length - 1)];
+
       console.log('Making API request:', {
         url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
         method: options.method || 'GET',
-        origin: currentOrigin,
-        corsOrigin,
+        origin,
+        retryCount: this.retryCount,
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
         hasUserId: !!headers['X-User-ID']
       });
 
-      // Ensure we have all required headers
       if (!headers['Authorization']) {
         throw new Error('No authentication token available. Please sign in again.');
       }
@@ -145,7 +155,7 @@ class ApiService {
         headers: {
           ...headers,
           ...options.headers,
-          'Origin': corsOrigin // Always use non-www version for CORS
+          'Origin': origin
         },
         signal: controller.signal,
         mode: 'cors',
@@ -153,38 +163,17 @@ class ApiService {
         referrerPolicy: 'strict-origin-when-cross-origin'
       });
 
-      // Log CORS headers for debugging
-      const corsHeaders = {
-        'Access-Control-Allow-Origin': response.headers.get('access-control-allow-origin'),
-        'Access-Control-Allow-Methods': response.headers.get('access-control-allow-methods'),
-        'Access-Control-Allow-Headers': response.headers.get('access-control-allow-headers'),
-        'Access-Control-Allow-Credentials': response.headers.get('access-control-allow-credentials'),
-        'Origin': response.headers.get('origin')
-      };
-
-      console.log('CORS Headers:', corsHeaders);
-
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         
-        console.error('API error response:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: response.url,
-          error: errorData,
-          cors: corsHeaders
-        });
-
         if (response.status === 401) {
           if (errorData?.error === 'Gmail token expired or invalid') {
-            console.log('Gmail token expired, redirecting to auth...');
             sessionStorage.removeItem('gmail_access_token');
             window.location.href = '/auth/google';
             return { success: false, error: 'Gmail token expired. Redirecting to Google auth...' };
           } else {
-            console.log('Session expired, redirecting to login...');
             await supabase.auth.signOut();
             window.location.href = '/login';
             return { success: false, error: 'Session expired. Please sign in again.' };
@@ -194,25 +183,35 @@ class ApiService {
         throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
       }
 
+      // Reset retry count on successful request
+      this.retryCount = 0;
+      
       const data = await response.json();
       return { success: true, data };
     } catch (error: any) {
-      // Check if it's an AbortError
       if (error.name === 'AbortError') {
-        console.error('Request timed out after 30 seconds');
         return { success: false, error: 'Request timed out. Please try again.' };
       }
 
-      // Check if it's a CORS error
+      // Handle CORS errors with retry logic
+      if ((error.message.includes('CORS') || error.message.includes('Failed to fetch')) && this.retryCount < this.MAX_RETRIES) {
+        console.log(`CORS error, retrying with different origin (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})`);
+        this.retryCount++;
+        return this.makeRequest(endpoint, options);
+      }
+
+      // Reset retry count after max retries or other errors
+      this.retryCount = 0;
+
       if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-        console.error('CORS error:', {
+        console.error('CORS error after all retries:', {
           message: error.message,
           origin: window.location.origin,
           url: `${API_URL_WITH_PROTOCOL}${endpoint}`
         });
         return { 
           success: false, 
-          error: 'CORS error: Unable to access the API. Please try again later.',
+          error: 'Unable to access the API. Please try again later.',
           details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         };
       }
