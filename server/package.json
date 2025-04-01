@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "test": "jest",
+    "test:cors": "node src/test-cors.js",
     "build": "echo 'No build step required'"
   },
   "dependencies": {

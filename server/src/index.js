@@ -12,6 +12,7 @@ const redis = require('./config/redis');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const corsMiddleware = require('./middleware/cors');
 const corsConfig = require('./config/cors');
+const cors = require('cors');
 
 const { customCorsMiddleware, authenticateRequest, cspMiddleware, supabase } = require('./middleware/auth');
 
@@ -30,8 +31,37 @@ const analyticsRouter = require('./routes/analytics');
 const testRouter = require('./routes/test');
 const emailsRouter = require('./routes/emails');
 
-// Apply CORS middleware first
-app.use(corsMiddleware);
+// CORS configuration
+const corsOptions = {
+  origin: function(origin, callback) {
+    const allowedOrigins = ['https://www.quits.cc', 'https://quits.cc', 'http://localhost:3000'];
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS: Origin not allowed:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'X-User-ID',
+    'X-Gmail-Token',
+    'Origin'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Add preflight handler for scan-emails endpoint
+app.options('/api/scan-emails', cors(corsOptions));
 
 // Then apply other middleware
 app.use(cspMiddleware);

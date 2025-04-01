@@ -21,7 +21,7 @@ services:
       - key: GOOGLE_CALLBACK_URL
         sync: false
       - key: CLIENT_URL
-        sync: false
+        value: https://www.quits.cc
       - key: SESSION_SECRET
         sync: false
       - key: NODE_ENV
@@ -36,6 +36,11 @@ services:
         - server/package.json
         - server/package-lock.json
         - server/.env
+    healthCheckPath: /api/test-cors
+    autoDeploy: true
+    github:
+      repo: your-github-username/quits-api
+      branch: main
     headers:
       - path: /*
         name: Strict-Transport-Security
@@ -45,4 +50,22 @@ services:
         value: DENY
       - path: /*
         name: X-Content-Type-Options
-        value: nosniff 
+        value: nosniff
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: https://www.quits.cc
+      - path: /*
+        name: Access-Control-Allow-Methods
+        value: GET, POST, PUT, DELETE, OPTIONS, PATCH
+      - path: /*
+        name: Access-Control-Allow-Headers
+        value: Content-Type, Authorization, X-Gmail-Token, X-User-ID
+      - path: /*
+        name: Access-Control-Allow-Credentials
+        value: "true"
+      - path: /*
+        name: Access-Control-Max-Age
+        value: "86400"
+      - path: /*
+        name: Vary
+        value: Origin 
