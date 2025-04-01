@@ -25,8 +25,66 @@ router.get('/scan-emails', async (req, res) => {
       body: 'This is a test subscription email'
     };
 
-    // Store subscription in Supabase
-    const { data, error } = await supabase
+    // First, check if a subscription with this email_id already exists
+    console.log('Checking for existing subscription...');
+    const { data: existingSubscription, error: checkError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('email_id', mockEmail.id)
+      .single();
+
+    if (checkError) {
+      console.error('Error checking existing subscription:', {
+        code: checkError.code,
+        message: checkError.message,
+        details: checkError.details,
+        hint: checkError.hint
+      });
+      if (checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        return res.status(500).json({ 
+          error: 'Failed to check existing subscription',
+          details: checkError.message
+        });
+      }
+    }
+
+    if (existingSubscription) {
+      console.log('Found existing subscription, updating...');
+      // Update existing subscription
+      const { data: updatedSubscription, error: updateError } = await supabase
+        .from('subscriptions')
+        .update({
+          last_detected_date: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingSubscription.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating subscription:', {
+          code: updateError.code,
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint
+        });
+        return res.status(500).json({ 
+          error: 'Failed to update subscription data',
+          details: updateError.message
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Subscription updated',
+        email: mockEmail,
+        subscription: updatedSubscription
+      });
+    }
+
+    console.log('No existing subscription found, creating new one...');
+    // Insert new subscription
+    const { data: newSubscription, error: insertError } = await supabase
       .from('subscriptions')
       .insert([
         {
@@ -36,25 +94,43 @@ router.get('/scan-emails', async (req, res) => {
           price: 9.99,
           frequency: 'monthly',
           email_id: mockEmail.id,
-          last_detected_date: new Date().toISOString()
+          last_detected_date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }
       ])
-      .select();
+      .select()
+      .single();
 
-    if (error) {
-      console.error('Error storing subscription:', error);
-      return res.status(500).json({ error: 'Failed to store subscription data' });
+    if (insertError) {
+      console.error('Error inserting subscription:', {
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint
+      });
+      return res.status(500).json({ 
+        error: 'Failed to store subscription data',
+        details: insertError.message
+      });
     }
 
     res.json({
       success: true,
       message: 'Email scan initiated',
       email: mockEmail,
-      subscription: data[0]
+      subscription: newSubscription
     });
   } catch (error) {
-    console.error('Error scanning emails:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error scanning emails:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message
+    });
   }
 });
 

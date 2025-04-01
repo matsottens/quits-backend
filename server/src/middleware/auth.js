@@ -100,7 +100,7 @@ const customCorsMiddleware = (req, res, next) => {
 
   // Set CORS headers
   if (isAllowed) {
-    // Always set the exact origin that was requested
+    // For credentials, we must set the exact origin
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
