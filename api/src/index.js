@@ -23,7 +23,8 @@ app.use(cors({
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
-    return callback(null, true);
+    // Always return www.quits.cc as the allowed origin
+    return callback(null, 'https://www.quits.cc');
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
