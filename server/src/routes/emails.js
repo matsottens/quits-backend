@@ -3,7 +3,7 @@ const router = express.Router();
 const { supabase } = require('../middleware/auth');
 
 // Email scanning endpoint (protected)
-router.get('/scan-emails', async (req, res) => {
+router.post('/scan-emails', async (req, res) => {
   try {
     const gmailToken = req.headers['x-gmail-token'];
     const userId = req.headers['x-user-id'];

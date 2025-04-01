@@ -76,6 +76,7 @@ class ApiService {
   public static getInstance(): ApiService {
     if (!ApiService.instance) {
       ApiService.instance = new ApiService();
+      console.log('Created new ApiService instance');
     }
     return ApiService.instance;
   }
@@ -112,7 +113,8 @@ class ApiService {
         hasAccessToken: true,
         hasGmailToken: true,
         hasUserId: true,
-        userId: session.user.id
+        userId: session.user.id,
+        email: session.user.email
       });
 
       return {
@@ -124,6 +126,8 @@ class ApiService {
       };
     } catch (error) {
       console.error('Error getting auth headers:', error);
+      // Clear any invalid tokens
+      sessionStorage.removeItem('gmail_access_token');
       throw error;
     }
   }
@@ -141,19 +145,23 @@ class ApiService {
       // Initialize origin variations if not already set
       if (this.originVariations.length === 0) {
         this.originVariations = getOriginVariations(window.location.origin);
+        console.log('Initialized origin variations:', this.originVariations);
       }
 
       // Get current origin to try
       const currentOrigin = this.originVariations[this.retryCount % this.originVariations.length];
 
+      const requestUrl = `${API_URL}${endpoint}`;
       console.log('Making API request:', {
-        url: `${API_URL}${endpoint}`,
+        url: requestUrl,
         method: options.method || 'GET',
         origin: currentOrigin,
         retryCount: this.retryCount,
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
-        hasUserId: !!headers['X-User-ID']
+        hasUserId: !!headers['X-User-ID'],
+        environment: process.env.NODE_ENV,
+        headers: Object.keys(headers)
       });
 
       if (!headers['Authorization']) {
@@ -168,12 +176,13 @@ class ApiService {
         throw new Error('No user ID available. Please sign in again.');
       }
 
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(requestUrl, {
         ...options,
         headers: {
           ...headers,
           ...options.headers,
-          'Origin': currentOrigin
+          'Origin': currentOrigin,
+          'Content-Type': 'application/json'
         },
         signal: controller.signal,
         mode: 'cors',
@@ -188,7 +197,9 @@ class ApiService {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
-        url: response.url
+        url: response.url,
+        type: response.type,
+        ok: response.ok
       });
 
       // Try to get the response text first
@@ -253,7 +264,8 @@ class ApiService {
           message: error.message,
           origin: window.location.origin,
           url: endpoint,
-          triedOrigins: this.originVariations
+          triedOrigins: this.originVariations,
+          environment: process.env.NODE_ENV
         });
         return { 
           success: false, 
@@ -266,7 +278,8 @@ class ApiService {
         message: error.message,
         type: error.name,
         stack: error.stack,
-        url: endpoint
+        url: endpoint,
+        environment: process.env.NODE_ENV
       });
 
       return { 

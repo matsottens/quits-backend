@@ -11,7 +11,8 @@ const port = process.env.PORT || 10000;
 const allowedOrigins = [
   'http://localhost:3000',
   'https://quits.cc',
-  'https://www.quits.cc'
+  'https://www.quits.cc',
+  'https://quits-frontend.vercel.app' // Add Vercel deployment URL
 ];
 
 // Add OPTIONS handler for preflight requests
@@ -26,12 +27,20 @@ app.use(cors({
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
-    // Always return www.quits.cc as the allowed origin
-    return callback(null, 'https://www.quits.cc');
+    // Return the requesting origin instead of hardcoding
+    return callback(null, origin);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gmail-Token', 'X-User-ID', 'Origin', 'X-Requested-With', 'Accept'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Gmail-Token',
+    'X-User-ID',
+    'Origin',
+    'X-Requested-With',
+    'Accept'
+  ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   maxAge: 86400 // 24 hours
 }));
