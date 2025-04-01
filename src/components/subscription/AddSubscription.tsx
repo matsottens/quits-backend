@@ -152,6 +152,7 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) 
               <TextField
                 required
                 fullWidth
+                id="provider"
                 label="Provider"
                 name="provider"
                 value={formData.provider}
@@ -166,6 +167,7 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) 
               <TextField
                 required
                 fullWidth
+                id="type"
                 label="Type"
                 name="type"
                 value={formData.type}
@@ -180,6 +182,7 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) 
               <TextField
                 required
                 fullWidth
+                id="price"
                 label="Price"
                 name="price"
                 type="number"
@@ -213,6 +216,7 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) 
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
+                id="next_renewal_date"
                 label="Next Renewal Date"
                 name="next_renewal_date"
                 type="date"
@@ -226,6 +230,7 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) 
             <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
+                id="description"
                 label="Description"
                 name="description"
                 multiline

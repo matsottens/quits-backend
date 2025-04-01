@@ -219,6 +219,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
               <TextField
                 required
                 fullWidth
+                id="provider"
                 label="Provider"
                 name="provider"
                 value={formData.provider}
@@ -233,6 +234,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
               <TextField
                 required
                 fullWidth
+                id="type"
                 label="Type"
                 name="type"
                 value={formData.type}
@@ -247,6 +249,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
               <TextField
                 required
                 fullWidth
+                id="price"
                 label="Price"
                 name="price"
                 type="number"
@@ -280,6 +283,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
+                id="next_renewal_date"
                 label="Next Renewal Date"
                 name="next_renewal_date"
                 type="date"
@@ -293,6 +297,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
             <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
+                id="description"
                 label="Description"
                 name="description"
                 multiline

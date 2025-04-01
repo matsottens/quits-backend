@@ -7,6 +7,29 @@ const fetch = require('cross-fetch');
 const app = express();
 const port = process.env.PORT || 10000;
 
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://quits.cc',
+  'https://www.quits.cc'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gmail-Token', 'X-User-ID']
+}));
+
 // Initialize environment variables validation
 const requiredEnvVars = {
   'SUPABASE_URL': process.env.SUPABASE_URL,
@@ -85,32 +108,6 @@ const supabase = createClient(cleanSupabaseUrl, supabaseServiceKey, {
   }
 })();
 
-// Configure CORS
-const allowedOrigin = 'https://www.quits.cc';
-
-// Handle CORS preflight and main requests
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  // Only allow the specific origin
-  if (origin === allowedOrigin) {
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Authorization, X-Gmail-Token, X-User-ID, Content-Type, Accept, Origin');
-    res.setHeader('Vary', 'Origin');
-
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-      res.status(204).end();
-      return;
-    }
-  }
-
-  next();
-});
-
 app.use(bodyParser.json());
 
 // Basic root endpoint
@@ -147,6 +144,13 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
   try {
     const gmailToken = req.headers['x-gmail-token'];
     const userId = req.headers['x-user-id'];
+    const authToken = req.headers.authorization?.split(' ')[1];
+
+    console.log('Scan emails request received:', {
+      hasGmailToken: !!gmailToken,
+      hasUserId: !!userId,
+      hasAuthToken: !!authToken
+    });
 
     if (!gmailToken) {
       return res.status(401).json({ error: 'No Gmail token provided' });
@@ -156,7 +160,20 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'No user ID provided' });
     }
 
-    // For now, return mock data
+    // Verify the user exists in Supabase
+    const { data: userData, error: userError } = await supabase.auth.getUser(authToken);
+    
+    if (userError || !userData.user) {
+      console.error('User verification failed:', userError);
+      return res.status(401).json({ error: 'Invalid authentication token' });
+    }
+
+    console.log('User verified:', {
+      userId: userData.user.id,
+      email: userData.user.email
+    });
+
+    // For testing - return mock data first to verify the endpoint works
     const mockEmail = {
       id: 'mock-email-1',
       subject: 'Test Subscription',
@@ -165,7 +182,31 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
       body: 'This is a test subscription email'
     };
 
-    // Store subscription in Supabase
+    // Test Supabase connection and permissions
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .limit(1);
+
+      if (testError) {
+        console.error('Database test failed:', testError);
+        return res.status(500).json({ 
+          error: 'Database connection error',
+          details: testError.message
+        });
+      }
+
+      console.log('Database connection test successful');
+    } catch (dbError) {
+      console.error('Database test error:', dbError);
+      return res.status(500).json({ 
+        error: 'Database error',
+        details: dbError.message
+      });
+    }
+
+    // Try to insert test data
     const { data, error } = await supabase
       .from('subscriptions')
       .insert([
@@ -182,8 +223,14 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
       .select();
 
     if (error) {
-      return res.status(500).json({ error: 'Failed to store subscription data' });
+      console.error('Error storing subscription:', error);
+      return res.status(500).json({ 
+        error: 'Failed to store subscription data',
+        details: error.message
+      });
     }
+
+    console.log('Subscription stored successfully:', data[0]);
 
     res.json({
       success: true,
@@ -192,7 +239,11 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
       subscription: data[0]
     });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Unexpected error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message
+    });
   }
 });
 

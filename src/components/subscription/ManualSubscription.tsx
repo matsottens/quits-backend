@@ -189,6 +189,7 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
               <TextField
                 required
                 fullWidth
+                id="provider"
                 label="Provider"
                 name="name"
                 value={formData.name}
@@ -202,6 +203,7 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
               <TextField
                 required
                 fullWidth
+                id="amount"
                 label="Type"
                 name="amount"
                 type="number"
@@ -235,6 +237,7 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
               <TextField
                 required
                 fullWidth
+                id="nextBilling"
                 label="Price"
                 name="nextBilling"
                 type="date"
@@ -271,6 +274,7 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
             <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
+                id="description"
                 label="Description"
                 name="description"
                 multiline
