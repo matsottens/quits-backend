@@ -2,24 +2,14 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
-const cors = require('cors');
 const bodyParser = require('body-parser');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { google } = require('googleapis');
 const { createClient } = require('@supabase/supabase-js');
 const fetch = require('cross-fetch');
 const FileStore = require('session-file-store')(session);
-const RedisStore = require('connect-redis').default;
 const redis = require('./config/redis');
 const rateLimitMiddleware = require('./middleware/rateLimit');
-
-// CORS configuration
-const corsOptions = {
-  origin: ['https://www.quits.cc', 'https://quits.cc', 'http://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-User-ID', 'X-Gmail-Token']
-};
 
 const { customCorsMiddleware, authenticateRequest, cspMiddleware, supabase } = require('./middleware/auth');
 
@@ -36,6 +26,7 @@ console.log('Server configuration:', {
 const notificationsRouter = require('./routes/notifications');
 const analyticsRouter = require('./routes/analytics');
 const testRouter = require('./routes/test');
+const emailsRouter = require('./routes/emails');
 
 // Request tracking middleware
 const requestTracker = (req, res, next) => {
@@ -102,7 +93,8 @@ app.get('/api/test-cors', (req, res) => {
 });
 
 // Add routes
-app.use('/api', testRouter); // Add test routes first
+app.use('/api', testRouter);
+app.use('/api', emailsRouter);
 app.use('/api/notifications', authenticateRequest, notificationsRouter);
 app.use('/api/analytics', authenticateRequest, analyticsRouter);
 
@@ -1192,7 +1184,7 @@ app.post('/auth/google/token', async (req, res) => {
 });
 
 // Add a session check endpoint
-app.get('/auth/check', cors(corsOptions), async (req, res) => {
+app.get('/auth/check', customCorsMiddleware, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
