@@ -5,8 +5,9 @@ const API_URL_WITH_PROTOCOL = API_URL.startsWith('http')
   ? API_URL 
   : `https://${API_URL.replace(/^\/+/, '')}`;
 
-// Ensure we're using www.quits.cc for the frontend URL
-const FRONTEND_URL = 'https://www.quits.cc';
+// Handle both www and non-www domains
+const FRONTEND_URL = window.location.origin;
+const FRONTEND_URL_WITHOUT_WWW = FRONTEND_URL.replace(/^www\./, '');
 
 interface ApiResponse<T> {
   success: boolean;
@@ -89,9 +90,12 @@ class ApiService {
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
       const headers = await this.getAuthHeaders();
+      const currentOrigin = window.location.origin;
+      
       console.log('Making API request:', {
         url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
         method: options.method || 'GET',
+        origin: currentOrigin,
         headers: {
           ...headers,
           // Don't log sensitive data
@@ -104,13 +108,31 @@ class ApiService {
         ...options,
         headers: {
           ...headers,
-          ...options.headers
+          ...options.headers,
+          'Origin': currentOrigin
         },
         signal: controller.signal,
         mode: 'cors',
         credentials: 'include',
         referrerPolicy: 'strict-origin-when-cross-origin'
       });
+
+      // Log CORS headers for debugging
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': response.headers.get('access-control-allow-origin'),
+        'Access-Control-Allow-Methods': response.headers.get('access-control-allow-methods'),
+        'Access-Control-Allow-Headers': response.headers.get('access-control-allow-headers'),
+        'Access-Control-Allow-Credentials': response.headers.get('access-control-allow-credentials'),
+        'Origin': response.headers.get('origin')
+      };
+
+      console.log('CORS Headers:', corsHeaders);
+
+      // Check if CORS headers are present and valid
+      if (!corsHeaders['Access-Control-Allow-Origin']) {
+        console.error('Missing CORS headers in response');
+        throw new Error('Server response missing CORS headers');
+      }
 
       clearTimeout(timeoutId);
 

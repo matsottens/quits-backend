@@ -86,7 +86,7 @@ const customCorsMiddleware = (req, res, next) => {
     return next();
   }
 
-  // List of allowed domains
+  // List of allowed domains (including both www and non-www versions)
   const allowedDomains = [
     'https://www.quits.cc',
     'https://quits.cc',
@@ -95,8 +95,12 @@ const customCorsMiddleware = (req, res, next) => {
     'http://localhost:5000'
   ];
 
-  // Check if the origin is allowed
-  const isAllowed = allowedDomains.includes(origin);
+  // Check if the origin is allowed (including both www and non-www versions)
+  const isAllowed = allowedDomains.some(domain => {
+    const domainWithoutWww = domain.replace(/^www\./, '');
+    const originWithoutWww = origin.replace(/^www\./, '');
+    return domain === origin || domainWithoutWww === originWithoutWww;
+  });
 
   // Set CORS headers
   if (isAllowed) {

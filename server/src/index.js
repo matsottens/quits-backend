@@ -84,7 +84,8 @@ app.get('/api/test-cors', (req, res) => {
       'access-control-allow-origin': res.getHeader('Access-Control-Allow-Origin'),
       'access-control-allow-credentials': res.getHeader('Access-Control-Allow-Credentials'),
       'access-control-allow-methods': res.getHeader('Access-Control-Allow-Methods'),
-      'access-control-allow-headers': res.getHeader('Access-Control-Allow-Headers')
+      'access-control-allow-headers': res.getHeader('Access-Control-Allow-Headers'),
+      'vary': res.getHeader('Vary')
     }
   };
 
