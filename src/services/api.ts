@@ -57,28 +57,51 @@ class ApiService {
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const { data: { session } } = await supabase.auth.getSession();
-    const gmailToken = sessionStorage.getItem('gmail_access_token');
+    try {
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+        throw new Error('Failed to get authentication session');
+      }
 
-    if (!session?.access_token) {
-      throw new Error('Not authenticated. Please sign in again.');
+      if (!session?.access_token) {
+        console.error('No access token in session');
+        throw new Error('Not authenticated. Please sign in again.');
+      }
+
+      // Get Gmail token from session storage
+      const gmailToken = sessionStorage.getItem('gmail_access_token');
+      if (!gmailToken) {
+        console.error('No Gmail token found in session storage');
+        throw new Error('No Gmail access token available. Please sign in with Google again.');
+      }
+
+      if (!session.user?.id) {
+        console.error('No user ID in session');
+        throw new Error('No user ID available. Please sign in again.');
+      }
+
+      // Log successful header creation (excluding sensitive data)
+      console.log('Created auth headers:', {
+        hasAccessToken: true,
+        hasGmailToken: true,
+        hasUserId: true,
+        userId: session.user.id
+      });
+
+      return {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'X-Gmail-Token': gmailToken,
+        'X-User-ID': session.user.id
+      };
+    } catch (error) {
+      console.error('Error getting auth headers:', error);
+      throw error;
     }
-
-    if (!gmailToken) {
-      throw new Error('No Gmail access token available. Please sign in with Google again.');
-    }
-
-    if (!session.user?.id) {
-      throw new Error('No user ID available. Please sign in again.');
-    }
-
-    return {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-      'X-Gmail-Token': gmailToken,
-      'X-User-ID': session.user.id
-    };
   }
 
   private async makeRequest<T>(
@@ -89,20 +112,32 @@ class ApiService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
+      // Get authentication headers
       const headers = await this.getAuthHeaders();
       const currentOrigin = window.location.origin;
       
+      // Log request details (excluding sensitive data)
       console.log('Making API request:', {
         url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
         method: options.method || 'GET',
         origin: currentOrigin,
-        headers: {
-          ...headers,
-          // Don't log sensitive data
-          Authorization: headers.Authorization ? '[REDACTED]' : undefined,
-          'X-Gmail-Token': headers['X-Gmail-Token'] ? '[REDACTED]' : undefined
-        }
+        hasAuthToken: !!headers.Authorization,
+        hasGmailToken: !!headers['X-Gmail-Token'],
+        hasUserId: !!headers['X-User-ID']
       });
+
+      // Ensure we have all required headers
+      if (!headers.Authorization) {
+        throw new Error('No authentication token available. Please sign in again.');
+      }
+
+      if (!headers['X-Gmail-Token']) {
+        throw new Error('No Gmail token available. Please sign in with Google again.');
+      }
+
+      if (!headers['X-User-ID']) {
+        throw new Error('No user ID available. Please sign in again.');
+      }
 
       const response = await fetch(`${API_URL_WITH_PROTOCOL}${endpoint}`, {
         ...options,
@@ -128,34 +163,17 @@ class ApiService {
 
       console.log('CORS Headers:', corsHeaders);
 
-      // Check if CORS headers are present and valid
-      if (!corsHeaders['Access-Control-Allow-Origin']) {
-        console.error('Missing CORS headers in response');
-        throw new Error('Server response missing CORS headers');
-      }
-
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        const responseHeaders = Object.fromEntries(response.headers.entries());
         
         console.error('API error response:', {
           status: response.status,
           statusText: response.statusText,
           url: response.url,
           error: errorData,
-          headers: {
-            ...responseHeaders,
-            // Don't log sensitive data
-            authorization: responseHeaders.authorization ? '[REDACTED]' : undefined
-          },
-          cors: {
-            origin: response.headers.get('access-control-allow-origin'),
-            methods: response.headers.get('access-control-allow-methods'),
-            headers: response.headers.get('access-control-allow-headers'),
-            credentials: response.headers.get('access-control-allow-credentials')
-          }
+          cors: corsHeaders
         });
 
         if (response.status === 401) {
