@@ -63,7 +63,18 @@ const requestTracker = (req, res, next) => {
   next();
 };
 
-// Test endpoint for CORS - must be the first route
+// First, apply CORS middleware
+app.use(customCorsMiddleware);
+
+// Then apply other middleware
+app.use(cspMiddleware);
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// Apply request tracking after CORS
+app.use(requestTracker);
+
+// Test endpoint for CORS
 app.get('/api/test-cors', (req, res) => {
   const responseData = {
     success: true,
@@ -80,17 +91,6 @@ app.get('/api/test-cors', (req, res) => {
   console.log('Test CORS response:', responseData);
   res.json(responseData);
 });
-
-// First, apply CORS middleware
-app.use(customCorsMiddleware);
-
-// Then apply other middleware
-app.use(cspMiddleware);
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
-
-// Apply request tracking after CORS
-app.use(requestTracker);
 
 // Add routes that require authentication
 app.use('/api/notifications', authenticateRequest, notificationsRouter);
@@ -1103,9 +1103,9 @@ const processEmailBatch = async (gmail, messages, userId) => {
     const batchPromises = batch.map(message => 
       gmailApiCall(() => 
         gmail.users.messages.get({
-          userId: 'me',
-          id: message.id,
-          format: 'full'
+        userId: 'me',
+        id: message.id,
+        format: 'full'
         })
       )
     );
@@ -1337,7 +1337,7 @@ app.get('/api/subscription-analytics', async (req, res) => {
       .slice(0, 5); // Get next 5 renewals
 
     res.json({
-      success: true,
+      success: true, 
       data: {
         subscriptions: subscriptions.length,
         monthlyTotal,
