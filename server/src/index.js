@@ -10,6 +10,8 @@ const fetch = require('cross-fetch');
 const FileStore = require('session-file-store')(session);
 const redis = require('./config/redis');
 const rateLimitMiddleware = require('./middleware/rateLimit');
+const corsMiddleware = require('./middleware/cors');
+const corsConfig = require('./config/cors');
 
 const { customCorsMiddleware, authenticateRequest, cspMiddleware, supabase } = require('./middleware/auth');
 
@@ -28,43 +30,8 @@ const analyticsRouter = require('./routes/analytics');
 const testRouter = require('./routes/test');
 const emailsRouter = require('./routes/emails');
 
-// Request tracking middleware
-const requestTracker = (req, res, next) => {
-  // Generate a unique request ID
-  req.requestId = Math.random().toString(36).substring(7);
-  req._startTime = Date.now();
-
-  // Log request start
-  console.log(`[${req.requestId}] Request started:`, {
-    timestamp: new Date().toISOString(),
-    method: req.method,
-    path: req.path,
-    origin: req.headers.origin,
-    headers: {
-      ...req.headers,
-      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
-      'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined
-    }
-  });
-
-  // Track response
-  res.on('finish', () => {
-    const duration = Date.now() - req._startTime;
-    console.log(`[${req.requestId}] Request completed:`, {
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      path: req.path,
-      statusCode: res.statusCode,
-      duration: `${duration}ms`,
-      headers: res.getHeaders()
-    });
-  });
-
-  next();
-};
-
-// First, apply CORS middleware
-app.use(customCorsMiddleware);
+// Apply CORS middleware first
+app.use(corsMiddleware);
 
 // Then apply other middleware
 app.use(cspMiddleware);
@@ -76,21 +43,16 @@ app.use(requestTracker);
 
 // Test endpoint for CORS
 app.get('/api/test-cors', (req, res) => {
-  const responseData = {
-    success: true,
+  res.json({
     message: 'CORS test successful',
-    origin: req.headers.origin,
-    headers: {
-      'access-control-allow-origin': res.getHeader('Access-Control-Allow-Origin'),
-      'access-control-allow-credentials': res.getHeader('Access-Control-Allow-Credentials'),
-      'access-control-allow-methods': res.getHeader('Access-Control-Allow-Methods'),
-      'access-control-allow-headers': res.getHeader('Access-Control-Allow-Headers'),
-      'vary': res.getHeader('Vary')
+    corsConfig: {
+      allowedOrigins: corsConfig.allowedOrigins,
+      allowedMethods: corsConfig.allowedMethods,
+      allowedHeaders: corsConfig.allowedHeaders,
+      exposedHeaders: corsConfig.exposedHeaders,
+      allowCredentials: corsConfig.allowCredentials
     }
-  };
-
-  console.log('Test CORS response:', responseData);
-  res.json(responseData);
+  });
 });
 
 // Add routes
