@@ -86,22 +86,25 @@ const supabase = createClient(cleanSupabaseUrl, supabaseServiceKey, {
 })();
 
 // Configure CORS
-const corsOrigins = ['https://www.quits.cc'];
+const allowedOrigin = 'https://www.quits.cc';
 
-// Simple CORS middleware
+// Handle CORS preflight and main requests
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Handle CORS
-  if (!origin || origin === 'https://www.quits.cc') {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Gmail-Token, X-User-ID, Origin, Accept');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
+  // Only allow the specific origin
+  if (origin === allowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, X-Gmail-Token, X-User-ID, Content-Type, Accept, Origin');
+    res.setHeader('Vary', 'Origin');
+
     // Handle preflight
     if (req.method === 'OPTIONS') {
-      return res.status(200).end();
+      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+      res.status(204).end();
+      return;
     }
   }
 
@@ -142,18 +145,14 @@ const requireAuth = (req, res, next) => {
 // Email scanning endpoint (protected)
 app.get('/api/scan-emails', requireAuth, async (req, res) => {
   try {
-    console.log('Scanning emails - Request headers:', req.headers);
-    
     const gmailToken = req.headers['x-gmail-token'];
     const userId = req.headers['x-user-id'];
 
     if (!gmailToken) {
-      console.log('Missing Gmail token');
       return res.status(401).json({ error: 'No Gmail token provided' });
     }
 
     if (!userId) {
-      console.log('Missing user ID');
       return res.status(401).json({ error: 'No user ID provided' });
     }
 
@@ -183,11 +182,8 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
       .select();
 
     if (error) {
-      console.error('Error storing subscription:', error);
       return res.status(500).json({ error: 'Failed to store subscription data' });
     }
-
-    console.log('Successfully processed email scan for user:', userId);
 
     res.json({
       success: true,
@@ -196,7 +192,6 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
       subscription: data[0]
     });
   } catch (error) {
-    console.error('Error scanning emails:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
