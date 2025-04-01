@@ -295,13 +295,23 @@ class ApiService {
         };
       }
 
+      // Transform the data using our transform functions
+      const transformedData: ScanEmailsResponse = {
+        ...response.data,
+        subscriptions: response.data.subscriptions.map(transformSubscriptionData),
+        priceChanges: response.data.priceChanges?.map(transformPriceChange) || null
+      };
+
       console.log('scanEmails successful:', {
-        count: response.data.count,
-        subscriptionsCount: response.data.subscriptions?.length,
-        priceChangesCount: response.data.priceChanges?.length
+        count: transformedData.count,
+        subscriptionsCount: transformedData.subscriptions?.length,
+        priceChangesCount: transformedData.priceChanges?.length
       });
 
-      return response;
+      return {
+        success: true,
+        data: transformedData
+      };
     } catch (error) {
       console.error('Error in scanEmails:', error);
       return {
