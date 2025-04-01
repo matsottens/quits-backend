@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
+// Remove the API_URL constant since we'll use relative URLs
+// const API_URL = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
 
 // Helper function to normalize domain
 const normalizeDomain = (url: string) => {
@@ -22,8 +23,8 @@ const getOriginVariations = (origin: string): string[] => {
   ];
 };
 
-// API URL with protocol
-const API_URL_WITH_PROTOCOL = normalizeDomain(API_URL);
+// Remove API_URL_WITH_PROTOCOL since we'll use relative URLs
+// const API_URL_WITH_PROTOCOL = normalizeDomain(API_URL);
 
 interface ApiResponse<T> {
   success: boolean;
@@ -144,7 +145,7 @@ class ApiService {
       const currentOrigin = this.originVariations[this.retryCount % this.originVariations.length];
 
       console.log('Making API request:', {
-        url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
+        url: endpoint,
         method: options.method || 'GET',
         origin: currentOrigin,
         retryCount: this.retryCount,
@@ -165,7 +166,7 @@ class ApiService {
         throw new Error('No user ID available. Please sign in again.');
       }
 
-      const response = await fetch(`${API_URL_WITH_PROTOCOL}${endpoint}`, {
+      const response = await fetch(endpoint, {
         ...options,
         headers: {
           ...headers,
@@ -224,7 +225,7 @@ class ApiService {
         console.error('CORS error after all retries:', {
           message: error.message,
           origin: window.location.origin,
-          url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
+          url: endpoint,
           triedOrigins: this.originVariations
         });
         return { 
@@ -238,7 +239,7 @@ class ApiService {
         message: error.message,
         type: error.name,
         stack: error.stack,
-        url: `${API_URL_WITH_PROTOCOL}${endpoint}`
+        url: endpoint
       });
 
       return { 

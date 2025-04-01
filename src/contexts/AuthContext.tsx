@@ -13,7 +13,6 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   scanEmails: () => Promise<void>;
   login: (tokens: any) => Promise<{ user: User; session: Session }>;
-  apiUrl: string;
 }
 
 interface SubscriptionState {
@@ -36,7 +35,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     priceChanges: null,
     lastScanTime: null
   });
-  const [apiUrl] = useState(process.env.REACT_APP_API_URL || 'https://api.quits.cc');
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -318,8 +316,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signInWithGoogle,
     scanEmails,
     login,
-    subscriptionState,
-    apiUrl
+    subscriptionState
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
