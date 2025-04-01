@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { BellIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { Session } from '@supabase/supabase-js';
 
 interface Notification {
   id: string;
@@ -27,11 +28,13 @@ export const NotificationCenter: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchNotifications = async () => {
+    if (!session?.access_token) return;
+
     try {
       const response = await fetch(`${apiUrl}/api/notifications`, {
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'x-user-id': session?.user?.id || ''
+          'Authorization': `Bearer ${session.access_token}`,
+          'x-user-id': session.user?.id || ''
         }
       });
 
@@ -50,12 +53,14 @@ export const NotificationCenter: React.FC = () => {
   };
 
   const markAsRead = async (notificationId: string) => {
+    if (!session?.access_token) return;
+
     try {
       const response = await fetch(`${apiUrl}/api/notifications/${notificationId}/read`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'x-user-id': session?.user?.id || ''
+          'Authorization': `Bearer ${session.access_token}`,
+          'x-user-id': session.user?.id || ''
         }
       });
 
