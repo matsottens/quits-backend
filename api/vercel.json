@@ -10,6 +10,7 @@
     {
       "src": "/(.*)",
       "dest": "index.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "https://www.quits.cc",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -22,7 +23,7 @@
     {
       "src": "/api/(.*)",
       "dest": "index.js",
-      "methods": ["OPTIONS"],
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "https://www.quits.cc",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",

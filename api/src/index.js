@@ -14,6 +14,9 @@ const allowedOrigins = [
   'https://www.quits.cc'
 ];
 
+// Add OPTIONS handler for preflight requests
+app.options('*', cors());
+
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -28,7 +31,9 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gmail-Token', 'X-User-ID']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gmail-Token', 'X-User-ID', 'Origin', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400 // 24 hours
 }));
 
 // Initialize environment variables validation
