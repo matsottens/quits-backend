@@ -5,7 +5,7 @@ import { Layout } from './components/layout/Layout';
 import { Login } from './components/auth/Login';
 import { SignUp } from './components/auth/SignUp';
 import { Dashboard } from './components/dashboard/Dashboard';
-import { Settings } from './components/settings/Settings';
+import Settings from './components/settings/Settings';
 import { OAuthRedirect } from './components/auth/OAuthRedirect';
 import { ScanningScreen } from './components/auth/ScanningScreen';
 import { SubscriptionSelection } from './components/auth/SubscriptionSelection';
