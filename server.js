@@ -7,28 +7,42 @@ const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const FRONTEND_URL = 'http://localhost:3000';
 
-// Middleware
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://quits.cc',
+  'https://www.quits.cc'
+];
+
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gmail-Token', 'X-User-ID']
 }));
 
 // Session configuration MUST come before passport middleware
 app.use(session({
-  secret: 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: true,
   saveUninitialized: true,
   cookie: {
-    secure: false, // set to true if using https
+    secure: process.env.NODE_ENV === 'production', // set to true in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: 'lax',
     path: '/',
-    domain: 'localhost'
+    domain: process.env.NODE_ENV === 'production' ? '.quits.cc' : 'localhost'
   }
 }));
 

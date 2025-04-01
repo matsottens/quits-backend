@@ -113,11 +113,15 @@ class ApiService {
       const headers = await this.getAuthHeaders();
       const currentOrigin = window.location.origin;
       
+      // Always use the non-www version for CORS
+      const corsOrigin = currentOrigin.replace(/^www\./, '');
+      
       // Log request details (excluding sensitive data)
       console.log('Making API request:', {
         url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
         method: options.method || 'GET',
         origin: currentOrigin,
+        corsOrigin,
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
         hasUserId: !!headers['X-User-ID']
@@ -141,7 +145,7 @@ class ApiService {
         headers: {
           ...headers,
           ...options.headers,
-          'Origin': currentOrigin
+          'Origin': corsOrigin // Always use non-www version for CORS
         },
         signal: controller.signal,
         mode: 'cors',
@@ -197,6 +201,20 @@ class ApiService {
       if (error.name === 'AbortError') {
         console.error('Request timed out after 30 seconds');
         return { success: false, error: 'Request timed out. Please try again.' };
+      }
+
+      // Check if it's a CORS error
+      if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+        console.error('CORS error:', {
+          message: error.message,
+          origin: window.location.origin,
+          url: `${API_URL_WITH_PROTOCOL}${endpoint}`
+        });
+        return { 
+          success: false, 
+          error: 'CORS error: Unable to access the API. Please try again later.',
+          details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        };
       }
 
       console.error('API request error:', {

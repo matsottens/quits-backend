@@ -265,42 +265,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const scanEmails = async () => {
     try {
       setSubscriptionState(prev => ({ ...prev, isLoading: true, error: null }));
-      
-      console.log('Starting email scan...');
       const response = await apiService.scanEmails();
       
-      if (!response.success || !response.data) {
+      if (!response.success) {
+        // Check if it's a CORS error
+        if (response.error?.includes('CORS error')) {
+          console.error('CORS error during email scan:', response.error);
+          setSubscriptionState(prev => ({
+            ...prev,
+            isLoading: false,
+            error: 'Unable to access the API. Please try again later.'
+          }));
+          return;
+        }
+        
         throw new Error(response.error || 'Failed to scan emails');
       }
 
-      console.log('Email scan completed:', {
-        subscriptionCount: response.data?.subscriptions?.length || 0,
-        priceChangesCount: response.data?.priceChanges?.length || 0
-      });
-
-      setSubscriptionState({
-        isLoading: false,
-        error: null,
-        subscriptions: response.data?.subscriptions || [],
-        priceChanges: response.data?.priceChanges || null,
-        lastScanTime: new Date().toISOString()
-      });
+      if (response.data) {
+        setSubscriptionState(prev => ({
+          ...prev,
+          isLoading: false,
+          subscriptions: response.data.subscriptions,
+          priceChanges: response.data.priceChanges,
+          lastScanTime: new Date().toISOString()
+        }));
+      }
     } catch (error) {
       console.error('Error scanning emails:', error);
-      
       setSubscriptionState(prev => ({
         ...prev,
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to scan emails'
       }));
-
-      // If the error is due to expired tokens, trigger a re-authentication
-      if (error instanceof Error && 
-          (error.message.includes('token expired') || 
-           error.message.includes('invalid token'))) {
-        console.log('Token expired, initiating re-authentication...');
-        await signOut(); // This should redirect to login
-      }
     }
   };
 
