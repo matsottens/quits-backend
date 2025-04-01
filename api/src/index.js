@@ -30,10 +30,25 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 // Middleware
 app.use(cors({
-  origin: ['https://www.quits.cc', 'https://quits.vercel.app', 'http://localhost:3000', 'https://quits-api.onrender.com', 'https://api.quits.cc'],
+  origin: [
+    'https://quits.cc',
+    'https://www.quits.cc',
+    'https://quits.vercel.app',
+    'http://localhost:3000',
+    'https://quits-api.onrender.com',
+    'https://api.quits.cc'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gmail-Token', 'X-User-ID']
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'X-Gmail-Token',
+    'X-User-ID',
+    'Origin',
+    'Accept'
+  ]
 }));
 
 app.use(bodyParser.json());

@@ -4,8 +4,21 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 // Helper function to normalize domain
 const normalizeDomain = (url: string) => {
-  const withoutWww = url.replace(/^www\./, '');
-  return withoutWww.startsWith('http') ? withoutWww : `https://${withoutWww.replace(/^\/+/, '')}`;
+  // Remove protocol if present
+  const withoutProtocol = url.replace(/^https?:\/\//, '');
+  // Remove www if present
+  const withoutWww = withoutProtocol.replace(/^www\./, '');
+  return `https://${withoutWww}`;
+};
+
+// Helper function to get all possible origin variations
+const getOriginVariations = (origin: string): string[] => {
+  const normalized = normalizeDomain(origin);
+  const domain = normalized.replace(/^https?:\/\//, '');
+  return [
+    `https://${domain}`,
+    `https://www.${domain}`
+  ];
 };
 
 // API URL with protocol
@@ -52,6 +65,7 @@ class ApiService {
   private static instance: ApiService;
   private retryCount: number = 0;
   private readonly MAX_RETRIES = 2;
+  private originVariations: string[] = [];
   
   private constructor() {}
 
@@ -119,19 +133,19 @@ class ApiService {
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       const headers = await this.getAuthHeaders();
-      const currentOrigin = window.location.origin;
       
-      // Try both www and non-www versions if needed
-      const origins = this.retryCount === 0 
-        ? [normalizeDomain(currentOrigin)]
-        : [currentOrigin, normalizeDomain(currentOrigin)];
-      
-      const origin = origins[Math.min(this.retryCount, origins.length - 1)];
+      // Initialize origin variations if not already set
+      if (this.originVariations.length === 0) {
+        this.originVariations = getOriginVariations(window.location.origin);
+      }
+
+      // Get current origin to try
+      const currentOrigin = this.originVariations[this.retryCount % this.originVariations.length];
 
       console.log('Making API request:', {
         url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
         method: options.method || 'GET',
-        origin,
+        origin: currentOrigin,
         retryCount: this.retryCount,
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
@@ -155,7 +169,7 @@ class ApiService {
         headers: {
           ...headers,
           ...options.headers,
-          'Origin': origin
+          'Origin': currentOrigin
         },
         signal: controller.signal,
         mode: 'cors',
@@ -183,8 +197,9 @@ class ApiService {
         throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
       }
 
-      // Reset retry count on successful request
+      // Reset retry count and origin variations on successful request
       this.retryCount = 0;
+      this.originVariations = [];
       
       const data = await response.json();
       return { success: true, data };
@@ -200,14 +215,16 @@ class ApiService {
         return this.makeRequest(endpoint, options);
       }
 
-      // Reset retry count after max retries or other errors
+      // Reset retry count and origin variations after max retries or other errors
       this.retryCount = 0;
+      this.originVariations = [];
 
       if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
         console.error('CORS error after all retries:', {
           message: error.message,
           origin: window.location.origin,
-          url: `${API_URL_WITH_PROTOCOL}${endpoint}`
+          url: `${API_URL_WITH_PROTOCOL}${endpoint}`,
+          triedOrigins: this.originVariations
         });
         return { 
           success: false, 
