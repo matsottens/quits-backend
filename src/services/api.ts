@@ -181,8 +181,25 @@ class ApiService {
 
       clearTimeout(timeoutId);
 
+      // Log response status and headers for debugging
+      console.log('API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        url: response.url
+      });
+
+      // Try to get the response text first
+      const responseText = await response.text();
+      console.log('Raw response text:', responseText);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (e) {
+          errorData = { error: responseText };
+        }
         
         if (response.status === 401) {
           if (errorData?.error === 'Gmail token expired or invalid') {
@@ -199,11 +216,19 @@ class ApiService {
         throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
       }
 
+      // Try to parse the response as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+        throw new Error('Invalid JSON response from API');
+      }
+
       // Reset retry count and origin variations on successful request
       this.retryCount = 0;
       this.originVariations = [];
       
-      const data = await response.json();
       return { success: true, data };
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -252,31 +277,38 @@ class ApiService {
 
   public async scanEmails(): Promise<ApiResponse<ScanEmailsResponse>> {
     try {
-      const response = await this.makeRequest<ScanEmailsResponse>('/api/scan-emails');
-      if (response.success && response.data) {
-        const data = response.data as ScanEmailsResponse;
-        return {
-          ...response,
-          data: {
-            ...data,
-            subscriptions: data.subscriptions.map(transformSubscriptionData),
-            priceChanges: data.priceChanges?.map(transformPriceChange) || null
-          }
-        };
-      }
-      return response as ApiResponse<ScanEmailsResponse>;
-    } catch (error) {
-      console.error('Error scanning emails:', {
-        error,
-        stack: error instanceof Error ? error.stack : undefined,
-        message: error instanceof Error ? error.message : 'Unknown error'
+      console.log('Starting scanEmails request...');
+      const response = await this.makeRequest<ScanEmailsResponse>('/api/scan-emails', {
+        method: 'POST'
       });
 
-      throw new Error(
-        error instanceof Error 
-          ? `Failed to scan emails: ${error.message}`
-          : 'Failed to scan emails: Unknown error'
-      );
+      if (!response.success) {
+        console.error('scanEmails failed:', response.error);
+        return response;
+      }
+
+      if (!response.data) {
+        console.error('scanEmails returned no data');
+        return {
+          success: false,
+          error: 'No data received from scan-emails endpoint'
+        };
+      }
+
+      console.log('scanEmails successful:', {
+        count: response.data.count,
+        subscriptionsCount: response.data.subscriptions?.length,
+        priceChangesCount: response.data.priceChanges?.length
+      });
+
+      return response;
+    } catch (error) {
+      console.error('Error in scanEmails:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
+      };
     }
   }
 
