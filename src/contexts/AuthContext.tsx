@@ -282,13 +282,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error(response.error || 'Failed to scan emails');
       }
 
-      if (response.data) {
+      const data = response.data;
+      if (data && typeof data === 'object' && 'subscriptions' in data && 'priceChanges' in data) {
         setSubscriptionState(prev => ({
           ...prev,
           isLoading: false,
-          subscriptions: response.data.subscriptions,
-          priceChanges: response.data.priceChanges,
+          subscriptions: data.subscriptions || [],
+          priceChanges: data.priceChanges || null,
           lastScanTime: new Date().toISOString()
+        }));
+      } else {
+        // Handle case where response.data is undefined or doesn't have the expected shape
+        setSubscriptionState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: 'Invalid data received from the server'
         }));
       }
     } catch (error) {
