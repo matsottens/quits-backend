@@ -5,14 +5,14 @@
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist"
+        "distDir": "build"
       }
     }
   ],
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "framework": "vite",
-  "outputDirectory": "dist",
+  "framework": "create-react-app",
+  "outputDirectory": "build",
   "rewrites": [
     {
       "source": "/api/:path*",
