@@ -25,10 +25,7 @@ Object.entries(requiredEnvVars).forEach(([key, value]) => {
 
 console.log('Environment configuration:', {
   supabaseUrl: process.env.SUPABASE_URL,
-  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI,
-  corsOrigins: process.env.CORS_ORIGIN ? 
-    process.env.CORS_ORIGIN.split(',').map(origin => origin.trim()) : 
-    ['https://quits.cc', 'https://www.quits.cc']
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI
 });
 
 // Initialize Supabase client
@@ -89,64 +86,25 @@ const supabase = createClient(cleanSupabaseUrl, supabaseServiceKey, {
 })();
 
 // Configure CORS
-const corsOrigins = process.env.CORS_ORIGIN ? 
-  process.env.CORS_ORIGIN.split(',').map(origin => origin.trim()) : 
-  ['https://quits.cc', 'https://www.quits.cc'];
+const corsOrigins = ['https://www.quits.cc'];
 
-console.log('Server starting with CORS origins:', corsOrigins);
-
-// CORS pre-flight middleware
-app.options('*', cors({
-  origin: function(origin, callback) {
-    console.log('Pre-flight request from origin:', origin);
-    if (!origin || corsOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('Blocked by CORS (pre-flight):', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'X-Gmail-Token',
-    'X-User-ID',
-    'Origin',
-    'Accept'
-  ]
-}));
-
-// Main CORS middleware
-app.use(cors({
-  origin: function(origin, callback) {
-    console.log('Incoming request from origin:', origin);
-    if (!origin || corsOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('Blocked by CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'X-Gmail-Token',
-    'X-User-ID',
-    'Origin',
-    'Accept'
-  ]
-}));
-
-// Request logging middleware
+// Simple CORS middleware
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  const origin = req.headers.origin;
+
+  // Handle CORS
+  if (!origin || origin === 'https://www.quits.cc') {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Gmail-Token, X-User-ID, Origin, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+  }
+
   next();
 });
 
@@ -159,14 +117,9 @@ app.get('/', (req, res) => {
 
 // Health check endpoint (no auth required)
 app.get('/api/health', (req, res) => {
-  console.log('Health check endpoint called');
   res.json({ 
     status: 'ok', 
-    timestamp: new Date().toISOString(),
-    cors: {
-      origins: corsOrigins,
-      env: process.env.NODE_ENV
-    }
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -174,9 +127,15 @@ app.get('/api/health', (req, res) => {
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-    console.log('Missing authorization header');
-    return res.status(401).json({ error: 'No authorization header' });
+    return res.status(401).json({ error: 'No authentication token provided' });
   }
+
+  // Validate Bearer token format
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    return res.status(401).json({ error: 'Invalid authentication format' });
+  }
+
   next();
 };
 
