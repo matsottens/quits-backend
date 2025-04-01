@@ -15,29 +15,23 @@ if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing Supabase configuration');
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  },
-  global: {
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    fetch: fetch
-  }
-});
+// Configure CORS
+const corsOrigins = process.env.CORS_ORIGIN ? 
+  process.env.CORS_ORIGIN.split(',') : 
+  ['https://quits.cc', 'https://www.quits.cc'];
 
-// Middleware
+console.log('Allowed CORS origins:', corsOrigins);
+
 app.use(cors({
-  origin: [
-    'https://quits.cc',
-    'https://www.quits.cc',
-    'https://quits.vercel.app',
-    'http://localhost:3000',
-    'https://quits-api.onrender.com',
-    'https://api.quits.cc'
-  ],
+  origin: function(origin, callback) {
+    console.log('Incoming request from origin:', origin);
+    if (!origin || corsOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
@@ -51,17 +45,32 @@ app.use(cors({
   ]
 }));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Headers:', req.headers);
+  next();
+});
+
 app.use(bodyParser.json());
 
 // Health check endpoint (no auth required)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    cors: {
+      origins: corsOrigins,
+      env: process.env.NODE_ENV
+    }
+  });
 });
 
 // Protected routes middleware
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
+    console.log('Missing authorization header');
     return res.status(401).json({ error: 'No authorization header' });
   }
   next();
@@ -70,14 +79,18 @@ const requireAuth = (req, res, next) => {
 // Email scanning endpoint (protected)
 app.get('/api/scan-emails', requireAuth, async (req, res) => {
   try {
+    console.log('Scanning emails - Request headers:', req.headers);
+    
     const gmailToken = req.headers['x-gmail-token'];
     const userId = req.headers['x-user-id'];
 
     if (!gmailToken) {
+      console.log('Missing Gmail token');
       return res.status(401).json({ error: 'No Gmail token provided' });
     }
 
     if (!userId) {
+      console.log('Missing user ID');
       return res.status(401).json({ error: 'No user ID provided' });
     }
 
@@ -110,6 +123,8 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
       console.error('Error storing subscription:', error);
       return res.status(500).json({ error: 'Failed to store subscription data' });
     }
+
+    console.log('Successfully processed email scan for user:', userId);
 
     res.json({
       success: true,
