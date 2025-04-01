@@ -9,45 +9,43 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:10000';
 
-// CORS configuration
-const allowedOrigins = [
-  'http://localhost:10000',
-  'http://localhost:3000',
-  'https://quits.cc',
-  'https://www.quits.cc'
-];
+// Middleware to handle CORS preflight
+app.use((req, res, next) => {
+  // Set CORS headers on all responses including errors
+  res.set({
+    'Access-Control-Allow-Origin': FRONTEND_URL,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Gmail-Token, X-User-ID',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '86400'
+  });
 
-app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gmail-Token', 'X-User-ID']
-}));
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
 
-// Session configuration MUST come before passport middleware
-app.use(session({
+// Session configuration
+const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: true,
-  saveUninitialized: true,
+  resave: false,
+  saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // set to true in production
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 24 * 60 * 60 * 1000,
     sameSite: 'lax',
     path: '/',
-    domain: process.env.NODE_ENV === 'production' ? '.quits.cc' : 'localhost'
+    domain: 'localhost'
   }
-}));
+};
 
+// Apply session middleware
+app.use(session(sessionConfig));
+
+// Initialize passport after session
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -60,15 +58,14 @@ passport.deserializeUser((user, done) => {
   done(null, user);
 });
 
-// Configure Google Strategy
+// Configure Google Strategy with environment variables
 passport.use(new GoogleStrategy({
-    clientID: '82730443897-1c90hk21hl7re899k2ktt0bmuce1b04g.apps.googleusercontent.com',
-    clientSecret: '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',
-    callbackURL: 'http://localhost:5000/auth/google/callback',
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL,
     proxy: true
   },
   (accessToken, refreshToken, profile, done) => {
-    // Store the tokens with the user profile
     const user = {
       id: profile.id,
       email: profile.emails[0].value,
@@ -81,11 +78,11 @@ passport.use(new GoogleStrategy({
   }
 ));
 
-// Add this middleware to log session and authentication status
+// Debug middleware
 app.use((req, res, next) => {
-  console.log('Session:', req.session);
-  console.log('User:', req.user);
-  console.log('Authenticated:', req.isAuthenticated());
+  console.log(`${req.method} ${req.url}`);
+  console.log('Session ID:', req.sessionID);
+  console.log('Is Authenticated:', req.isAuthenticated());
   next();
 });
 
