@@ -141,7 +141,7 @@ const requireAuth = (req, res, next) => {
 };
 
 // Email scanning endpoint (protected)
-app.get('/api/scan-emails', requireAuth, async (req, res) => {
+app.post('/api/scan-emails', requireAuth, async (req, res) => {
   try {
     const gmailToken = req.headers['x-gmail-token'];
     const userId = req.headers['x-user-id'];
@@ -150,7 +150,8 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
     console.log('Scan emails request received:', {
       hasGmailToken: !!gmailToken,
       hasUserId: !!userId,
-      hasAuthToken: !!authToken
+      hasAuthToken: !!authToken,
+      method: req.method
     });
 
     if (!gmailToken) {
@@ -175,12 +176,22 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
     });
 
     // For testing - return mock data first to verify the endpoint works
-    const mockEmail = {
-      id: 'mock-email-1',
-      subject: 'Test Subscription',
-      from: 'test@example.com',
-      date: new Date().toISOString(),
-      body: 'This is a test subscription email'
+    const mockResponse = {
+      success: true,
+      message: 'Email scan completed successfully',
+      count: 1,
+      subscriptions: [
+        {
+          provider: 'Test Provider',
+          price: 9.99,
+          frequency: 'monthly',
+          renewal_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          term_months: 1,
+          is_price_increase: false,
+          lastDetectedDate: new Date().toISOString()
+        }
+      ],
+      priceChanges: null
     };
 
     // Test Supabase connection and permissions
@@ -198,50 +209,18 @@ app.get('/api/scan-emails', requireAuth, async (req, res) => {
         });
       }
 
-      console.log('Database connection test successful');
-    } catch (dbError) {
-      console.error('Database test error:', dbError);
+      // Return mock data for now
+      return res.json(mockResponse);
+    } catch (error) {
+      console.error('Error in scan-emails endpoint:', error);
       return res.status(500).json({ 
-        error: 'Database error',
-        details: dbError.message
-      });
-    }
-
-    // Try to insert test data
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .insert([
-        {
-          user_id: userId,
-          provider: 'example.com',
-          type: 'test',
-          price: 9.99,
-          frequency: 'monthly',
-          email_id: mockEmail.id,
-          last_detected_date: new Date().toISOString()
-        }
-      ])
-      .select();
-
-    if (error) {
-      console.error('Error storing subscription:', error);
-      return res.status(500).json({ 
-        error: 'Failed to store subscription data',
+        error: 'Internal server error',
         details: error.message
       });
     }
-
-    console.log('Subscription stored successfully:', data[0]);
-
-    res.json({
-      success: true,
-      message: 'Email scan initiated',
-      email: mockEmail,
-      subscription: data[0]
-    });
   } catch (error) {
-    console.error('Unexpected error:', error);
-    res.status(500).json({ 
+    console.error('Error in scan-emails endpoint:', error);
+    return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message
     });
@@ -271,7 +250,7 @@ app.listen(port, '0.0.0.0', () => {
   console.log('Available endpoints:');
   console.log('- GET /');
   console.log('- GET /api/health');
-  console.log('- GET /api/scan-emails (protected)');
+  console.log('- POST /api/scan-emails (protected)');
 });
 
 // Export the Express app
