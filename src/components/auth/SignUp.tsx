@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase';
+import { User } from '@supabase/supabase-js';
 
-interface SignUpData {
-  user: {
-    email: string;
-    confirmed_at: string | null;
-    identities?: Array<any>;  // Define proper type if available
+interface SignUpResponse {
+  data: {
+    user: User | null;
+    session: any | null;
   };
+  error: any | null;
 }
 
 export const SignUp: React.FC = () => {
@@ -39,30 +40,30 @@ export const SignUp: React.FC = () => {
     try {
       setLoading(true);
 
-      const signUpData = await supabase.auth.signUp({
+      const signUpResponse = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
-      });
+      }) as SignUpResponse;
 
-      if (signUpData.error) {
-        throw signUpData.error;
+      if (signUpResponse.error) {
+        throw signUpResponse.error;
       }
 
       // Check if user exists and has data
-      if (!signUpData.user) {
+      if (!signUpResponse.data.user) {
         throw new Error('No user data received');
       }
 
       // Safely check identities
-      const hasIdentities = signUpData.user.identities && signUpData.user.identities.length > 0;
+      const hasIdentities = signUpResponse.data.user.identities && signUpResponse.data.user.identities.length > 0;
 
       // Log signup data (excluding sensitive information)
       console.log('Signup successful:', {
-        email: signUpData.user.email,
-        confirmed: signUpData.user.confirmed_at,
+        email: signUpResponse.data.user.email,
+        confirmed: signUpResponse.data.user.confirmed_at,
         hasIdentities
       });
       
