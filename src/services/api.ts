@@ -1,13 +1,14 @@
 import { supabase } from '../supabase';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
 
 // Helper function to normalize domain
 const normalizeDomain = (url: string) => {
-  // Remove protocol if present
-  const withoutProtocol = url.replace(/^https?:\/\//, '');
+  // Remove any existing protocol
+  const withoutProtocol = url.replace(/^https?:\/\/+/, '');
   // Remove www if present
   const withoutWww = withoutProtocol.replace(/^www\./, '');
+  // Ensure clean URL format
   return `https://${withoutWww}`;
 };
 
