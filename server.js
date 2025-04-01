@@ -4,40 +4,33 @@ const session = require('express-session');
 const passport = require('passport');
 const cors = require('cors');
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
+const { google } = require('googleapis');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:10000';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// Middleware to handle CORS preflight
-app.use((req, res, next) => {
-  // Set CORS headers on all responses including errors
-  res.set({
-    'Access-Control-Allow-Origin': FRONTEND_URL,
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Gmail-Token, X-User-ID',
-    'Access-Control-Allow-Credentials': 'true',
-    'Access-Control-Max-Age': '86400'
-  });
+// Enable CORS with credentials
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Gmail-Token', 'X-User-ID']
+}));
 
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
+// Handle preflight requests
+app.options('*', cors());
 
 // Session configuration
 const sessionConfig = {
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000,
-    sameSite: 'lax',
-    path: '/',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     domain: 'localhost'
   }
 };
@@ -58,7 +51,7 @@ passport.deserializeUser((user, done) => {
   done(null, user);
 });
 
-// Configure Google Strategy with environment variables
+// Configure Google Strategy
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -81,52 +74,93 @@ passport.use(new GoogleStrategy({
 // Debug middleware
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
-  console.log('Session ID:', req.sessionID);
-  console.log('Is Authenticated:', req.isAuthenticated());
+  console.log('Session:', req.session);
+  console.log('User:', req.user);
   next();
+});
+
+// Helper function to get Gmail API client
+const getGmailClient = (accessToken) => {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_CALLBACK_URL
+  );
+  
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+    scope: 'https://www.googleapis.com/auth/gmail.readonly'
+  });
+
+  return google.gmail({ version: 'v1', auth: oauth2Client });
+};
+
+// Gmail API proxy endpoints
+app.get('/api/gmail/messages', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const gmail = getGmailClient(req.user.accessToken);
+    const response = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 10 // Adjust as needed
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Gmail API Error:', error);
+    
+    // Handle token expiration
+    if (error.code === 401) {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+app.get('/api/gmail/message/:id', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const gmail = getGmailClient(req.user.accessToken);
+    const response = await gmail.users.messages.get({
+      userId: 'me',
+      id: req.params.id
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Gmail API Error:', error);
+    
+    if (error.code === 401) {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    
+    res.status(500).json({ error: 'Failed to fetch message' });
+  }
 });
 
 // Routes
 app.get('/auth/google', (req, res, next) => {
-  // If user is already authenticated and setup is complete, redirect to scanning page
-  if (req.isAuthenticated() && req.user?.setup_complete) {
-    return res.redirect(`${FRONTEND_URL}/scanning`);
-  }
-  
-  // Set a flag in the session to indicate this is initial setup
-  if (req.query.setup === 'true') {
-    req.session.is_setup = true;
-  }
-  
-  // Continue with normal OAuth flow for new users or setup
   passport.authenticate('google', {
     scope: ['profile', 'email', 'https://www.googleapis.com/auth/gmail.readonly'],
     accessType: 'offline',
-    // Only force consent screen for initial setup
-    prompt: req.session.is_setup ? 'consent' : 'none', 
+    prompt: 'consent',
     includeGrantedScopes: true
   })(req, res, next);
 });
 
 app.get('/auth/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${FRONTEND_URL}/login`,
-    session: true
-  }),
+  passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
-    // Store the tokens in session
     if (req.user) {
       req.session.accessToken = req.user.accessToken;
       req.session.refreshToken = req.user.refreshToken;
-      req.session.user = req.user;
-      
-      // Check if this was part of setup
-      const isSetup = req.session.is_setup;
-      if (isSetup) {
-        // Clear the setup flag
-        req.session.is_setup = false;
-      }
-      
       req.session.save((err) => {
         if (err) {
           console.error('Session save error:', err);
@@ -140,22 +174,13 @@ app.get('/auth/google/callback',
   }
 );
 
-// Handle the frontend callback
-app.get('/auth/callback', (req, res) => {
-  res.redirect(`${FRONTEND_URL}/scanning`);
-});
-
+// API endpoints
 app.get('/auth/user', (req, res) => {
-  console.log('Auth check - Session:', req.session);
-  console.log('Auth check - User:', req.user);
-  console.log('Auth check - Is Authenticated:', req.isAuthenticated());
-  
   if (req.isAuthenticated()) {
     const { accessToken, refreshToken, ...user } = req.user;
     res.json({
       authenticated: true,
-      user: user,
-      setup_complete: user.setup_complete
+      user: user
     });
   } else {
     res.json({
@@ -165,28 +190,12 @@ app.get('/auth/user', (req, res) => {
   }
 });
 
-// Endpoint to check if user needs to complete setup
-app.get('/auth/needs-setup', (req, res) => {
-  if (req.isAuthenticated()) {
-    res.json({
-      needs_setup: !req.user.setup_complete
-    });
-  } else {
-    res.json({
-      needs_setup: true
-    });
-  }
-});
-
 app.get('/auth/logout', (req, res) => {
-  // Clear the session
   req.logout(() => {
     req.session.destroy((err) => {
       if (err) {
         console.error('Session destruction error:', err);
       }
-      
-      // Send back a successful response
       res.json({ success: true });
     });
   });
