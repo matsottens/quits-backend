@@ -2,21 +2,18 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
+      "src": "server.js",
+      "use": "@vercel/node",
       "config": {
-        "distDir": "build"
+        "includeFiles": ["src/**"]
       }
     }
   ],
+  "outputDirectory": ".",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://quits-api.vercel.app/api/:path*"
-    },
-    {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/server.js"
     }
   ],
   "env": {
