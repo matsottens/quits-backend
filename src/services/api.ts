@@ -161,7 +161,8 @@ class ApiService {
           'Content-Type': 'application/json'
         },
         signal: controller.signal,
-        credentials: 'include'
+        credentials: 'include',
+        mode: 'cors'
       });
 
       clearTimeout(timeoutId);
