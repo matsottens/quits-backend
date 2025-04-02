@@ -1,5 +1,9 @@
 {
   "version": 2,
+  "name": "quits-frontend",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "framework": "create-react-app",
   "builds": [
     {
       "src": "package.json",
@@ -26,16 +30,5 @@
     "REACT_APP_ENABLE_MANUAL_SUBSCRIPTION": "true",
     "REACT_APP_SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
     "REACT_APP_API_URL": "https://quits-api.vercel.app"
-  },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.google.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://*.google.com https://*.googleapis.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.google.com https://*.googleapis.com; connect-src 'self' https://*.google.com https://*.googleapis.com https://pihflemmavointdxjdsx.supabase.co https://quits-api.vercel.app https://www.quits.cc https://quits.cc; frame-src 'self' https://*.google.com https://*.googleapis.com;"
-        }
-      ]
-    }
-  ]
+  }
 } 
