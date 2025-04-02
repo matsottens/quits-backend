@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { BellIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { BellIcon, CheckIcon, ArrowTrendingUpIcon, CalendarIcon } from '@heroicons/react/24/outline';
 
 interface Notification {
   id: string;
@@ -92,14 +92,14 @@ export const NotificationCenter: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold flex items-center">
-          <BellIcon className="h-6 w-6 mr-2" />
+          <BellIcon className="h-6 w-6 text-blue-500 mr-2" />
           Notifications
         </h2>
         {unreadCount > 0 && (
-          <span className="bg-red-500 text-white text-sm rounded-full px-2 py-1">
+          <span className="bg-red-500 text-white text-sm font-medium rounded-full px-2.5 py-1 min-w-[1.5rem] text-center">
             {unreadCount}
           </span>
         )}
@@ -107,32 +107,47 @@ export const NotificationCenter: React.FC = () => {
 
       <div className="space-y-4">
         {notifications.length === 0 ? (
-          <p className="text-gray-500 text-center py-4">No notifications</p>
+          <div className="bg-gray-50 rounded-lg p-6 text-center">
+            <p className="text-gray-500">No notifications</p>
+          </div>
         ) : (
           notifications.map(notification => (
             <div
               key={notification.id}
-              className={`p-4 rounded-lg border ${
-                notification.read ? 'bg-gray-50' : 'bg-blue-50'
+              className={`p-4 rounded-lg border transition-all ${
+                notification.read 
+                  ? 'bg-gray-50 border-gray-200' 
+                  : 'bg-blue-50 border-blue-200 shadow-sm'
               }`}
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-medium">
+                  <h3 className="font-medium flex items-center">
                     {notification.type === 'price_increase' 
-                      ? `Price Increase: ${notification.provider}`
-                      : `Upcoming Renewal: ${notification.provider}`}
+                      ? (
+                        <>
+                          <ArrowTrendingUpIcon className="h-4 w-4 text-red-500 mr-1.5" />
+                          <span>Price Increase: {notification.provider}</span>
+                        </>
+                      )
+                      : (
+                        <>
+                          <CalendarIcon className="h-4 w-4 text-blue-500 mr-1.5" />
+                          <span>Upcoming Renewal: {notification.provider}</span>
+                        </>
+                      )}
                   </h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 mt-1.5">
                     {notification.type === 'price_increase' ? (
                       <>
-                        Price increasing from ${notification.details.oldPrice} to ${notification.details.newPrice} 
-                        ({notification.details.percentageChange?.toFixed(1)}% increase)
+                        Price increasing from <span className="font-medium">${notification.details.oldPrice}</span> to <span className="font-medium">${notification.details.newPrice}</span> 
+                        (<span className="text-red-600 font-medium">{notification.details.percentageChange?.toFixed(1)}% increase</span>)
                       </>
                     ) : (
                       <>
-                        Renewing in {notification.details.days_until_renewal} days
-                        (${notification.details.price} per {notification.details.frequency})
+                        Renewing in <span className="font-medium text-blue-600">{notification.details.days_until_renewal} days</span>
+                        <span className="mx-1">·</span>
+                        <span className="font-medium">${notification.details.price}</span> per {notification.details.frequency}
                       </>
                     )}
                   </p>
@@ -143,7 +158,8 @@ export const NotificationCenter: React.FC = () => {
                 {!notification.read && (
                   <button
                     onClick={() => markAsRead(notification.id)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-blue-500 hover:text-blue-700 p-1 rounded-full hover:bg-blue-100 transition-colors"
+                    title="Mark as read"
                   >
                     <CheckIcon className="h-5 w-5" />
                   </button>

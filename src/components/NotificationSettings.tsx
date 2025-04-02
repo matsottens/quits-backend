@@ -90,27 +90,33 @@ export const NotificationSettings: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="p-6">
       <div className="flex items-center mb-6">
         <BellIcon className="h-6 w-6 text-blue-500 mr-2" />
         <h2 className="text-xl font-semibold">Notification Settings</h2>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-lg">
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
           Settings saved successfully!
         </div>
       )}
 
       <div className="space-y-6">
         {/* Email Notifications */}
-        <div>
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
           <label className="flex items-center space-x-3">
             <input
               type="checkbox"
@@ -118,16 +124,16 @@ export const NotificationSettings: React.FC = () => {
               onChange={(e) => setSettings({ ...settings, email_notifications: e.target.checked })}
               className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
             />
-            <span className="text-gray-700">Enable email notifications</span>
+            <span className="text-gray-700 font-medium">Enable email notifications</span>
           </label>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-500 ml-8">
             Receive email notifications for price changes and upcoming renewals
           </p>
         </div>
 
         {/* Price Change Threshold */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Price Change Threshold (%)
           </label>
           <div className="mt-1">
@@ -146,8 +152,8 @@ export const NotificationSettings: React.FC = () => {
         </div>
 
         {/* Renewal Reminder Days */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Renewal Reminder Days
           </label>
           <div className="mt-1">
@@ -170,11 +176,19 @@ export const NotificationSettings: React.FC = () => {
           <button
             onClick={saveSettings}
             disabled={saving}
-            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+            className={`w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${
               saving ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            {saving ? 'Saving...' : 'Save Settings'}
+            {saving ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : 'Save Settings'}
           </button>
         </div>
       </div>

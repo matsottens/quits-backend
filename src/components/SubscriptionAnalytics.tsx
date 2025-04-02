@@ -87,37 +87,52 @@ export const SubscriptionAnalytics: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-sm font-medium text-gray-500">Total Subscriptions</h3>
+        <div className="bg-white rounded-lg shadow p-4 border border-gray-100 transition-all hover:shadow-md">
+          <div className="flex items-center">
+            <ChartBarIcon className="h-6 w-6 text-blue-500 mr-2" />
+            <h3 className="text-sm font-medium text-gray-500">Total Subscriptions</h3>
+          </div>
           <p className="mt-2 text-2xl font-semibold">{analytics.totalSubscriptions}</p>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-sm font-medium text-gray-500">Monthly Cost</h3>
+        <div className="bg-white rounded-lg shadow p-4 border border-gray-100 transition-all hover:shadow-md">
+          <div className="flex items-center">
+            <CurrencyDollarIcon className="h-6 w-6 text-green-500 mr-2" />
+            <h3 className="text-sm font-medium text-gray-500">Monthly Cost</h3>
+          </div>
           <p className="mt-2 text-2xl font-semibold">${analytics.totalMonthlyCost.toFixed(2)}</p>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-sm font-medium text-gray-500">Avg Price Change</h3>
+        <div className="bg-white rounded-lg shadow p-4 border border-gray-100 transition-all hover:shadow-md">
+          <div className="flex items-center">
+            <ArrowTrendingUpIcon className="h-6 w-6 text-red-500 mr-2" />
+            <h3 className="text-sm font-medium text-gray-500">Avg Price Change</h3>
+          </div>
           <p className="mt-2 text-2xl font-semibold">{analytics.averagePriceChange.toFixed(1)}%</p>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-sm font-medium text-gray-500">Upcoming Renewals</h3>
+        <div className="bg-white rounded-lg shadow p-4 border border-gray-100 transition-all hover:shadow-md">
+          <div className="flex items-center">
+            <CalendarIcon className="h-6 w-6 text-purple-500 mr-2" />
+            <h3 className="text-sm font-medium text-gray-500">Upcoming Renewals</h3>
+          </div>
           <p className="mt-2 text-2xl font-semibold">{analytics.upcomingRenewals}</p>
         </div>
       </div>
 
       {analytics.priceChanges && analytics.priceChanges.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Recent Price Changes</h2>
+        <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
+          <h2 className="text-lg font-semibold mb-4 flex items-center">
+            <ArrowTrendingUpIcon className="h-5 w-5 text-gray-700 mr-2" />
+            Recent Price Changes
+          </h2>
           <div className="space-y-4">
             {analytics.priceChanges.map((change, index) => (
               <div key={index} className="border-b pb-4 last:border-b-0">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">{change.provider}</h3>
-                  <span className={`text-sm ${
-                    change.percentageChange > 0 ? 'text-red-500' : 'text-green-500'
+                  <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                    change.percentageChange > 0 ? 'text-red-800 bg-red-100' : 'text-green-800 bg-green-100'
                   }`}>
                     {change.percentageChange > 0 ? '+' : ''}{change.percentageChange.toFixed(1)}%
                   </span>
@@ -135,14 +150,17 @@ export const SubscriptionAnalytics: React.FC = () => {
       )}
 
       {analytics.upcomingRenewalsList && analytics.upcomingRenewalsList.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Upcoming Renewals</h2>
+        <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
+          <h2 className="text-lg font-semibold mb-4 flex items-center">
+            <CalendarIcon className="h-5 w-5 text-gray-700 mr-2" />
+            Upcoming Renewals
+          </h2>
           <div className="space-y-4">
             {analytics.upcomingRenewalsList.map((renewal, index) => (
               <div key={index} className="border-b pb-4 last:border-b-0">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">{renewal.provider}</h3>
-                  <span className="text-sm text-blue-500">
+                  <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
                     {renewal.daysUntilRenewal} days
                   </span>
                 </div>

@@ -11,13 +11,19 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content - Analytics */}
         <div className="lg:col-span-2">
-          <SubscriptionAnalytics />
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <SubscriptionAnalytics />
+          </div>
         </div>
 
         {/* Sidebar - Notifications and Settings */}
         <div className="space-y-8">
-          <NotificationCenter />
-          <NotificationSettings />
+          <div className="bg-white rounded-lg shadow-lg">
+            <NotificationCenter />
+          </div>
+          <div className="bg-white rounded-lg shadow-lg">
+            <NotificationSettings />
+          </div>
         </div>
       </div>
     </div>
