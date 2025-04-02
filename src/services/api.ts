@@ -37,13 +37,6 @@ export interface PriceChange {
   provider: string;
 }
 
-// Define a type for our custom headers
-type CustomHeaders = HeadersInit & {
-  'Origin'?: string;
-  'X-User-ID'?: string;
-  'X-Gmail-Token'?: string;
-};
-
 // Update the API URL configuration
 const API_URL = process.env.NODE_ENV === 'production' 
   ? 'https://quits-api.vercel.app'  // Use new Vercel backend URL in production
