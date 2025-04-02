@@ -37,10 +37,8 @@ export interface PriceChange {
   provider: string;
 }
 
-// Update the API URL configuration
-const API_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://quits-api.vercel.app'  // Use new Vercel backend URL in production
-  : '';   // Use empty string for proxy in development (will use rewrites in vercel.json)
+// Update the API URL configuration - always use the full URL
+const API_URL = 'https://quits-api.vercel.app';  // Always use full URL for API requests
 
 class ApiService {
   private static instance: ApiService;
@@ -110,10 +108,9 @@ class ApiService {
   }
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    const url = `${API_URL}${endpoint}`;
-    
-    // Convert headers to a more specific type that TypeScript understands
-    const headers = options.headers as Record<string, string> || {};
+    // Ensure endpoint starts with /
+    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${API_URL}${path}`;
     
     console.log('Making API request:', {
       url,
@@ -121,8 +118,7 @@ class ApiService {
       hasAuthToken: !!options.headers && !!(options.headers as Record<string, string>)['Authorization'],
       hasGmailToken: !!options.headers && !!(options.headers as Record<string, string>)['X-Gmail-Token'],
       hasUserId: !!options.headers && !!(options.headers as Record<string, string>)['X-User-ID'],
-      environment: process.env.NODE_ENV,
-      proxyEnabled: process.env.NODE_ENV !== 'production'
+      environment: process.env.NODE_ENV
     });
 
     try {
@@ -130,7 +126,7 @@ class ApiService {
         ...options,
         headers: {
           'Content-Type': 'application/json',
-          ...headers
+          ...options.headers
         }
       });
 
