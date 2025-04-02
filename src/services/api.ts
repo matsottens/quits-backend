@@ -42,6 +42,13 @@ export interface PriceChange {
   provider: string;
 }
 
+// Define a type for our custom headers
+type CustomHeaders = HeadersInit & {
+  'Origin'?: string;
+  'X-User-ID'?: string;
+  'X-Gmail-Token'?: string;
+};
+
 class ApiService {
   private static instance: ApiService;
   private retryCount: number = 0;
@@ -109,7 +116,10 @@ class ApiService {
     }
   }
 
-  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  private async makeRequest<T>(
+    endpoint: string,
+    options: RequestInit & { headers?: CustomHeaders } = {}
+  ): Promise<ApiResponse<T>> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
@@ -132,7 +142,7 @@ class ApiService {
       const method = options.method || 'GET';
       
       // Get the current origin to use (either from options or window.location)
-      const requestOrigin = options.headers?.['Origin'] || currentOrigin;
+      const requestOrigin = (options.headers as CustomHeaders)?.['Origin'] || currentOrigin;
       
       console.log('Making API request:', {
         url: requestUrl,
