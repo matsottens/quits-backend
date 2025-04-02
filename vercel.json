@@ -1,8 +1,8 @@
 {
   "version": 2,
   "name": "quits-frontend",
-  "buildCommand": "npm run build",
-  "installCommand": "npm ci --no-cache",
+  "buildCommand": "CI=false npm run vercel-build",
+  "installCommand": "npm install --no-frozen-lockfile",
   "outputDirectory": "build",
   "framework": "create-react-app",
   "builds": [
