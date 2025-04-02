@@ -261,8 +261,12 @@ class ApiService {
         // Try a different origin variation
         const nextOrigin = this.originVariations[this.retryCount % this.originVariations.length];
         if (nextOrigin) {
-          window.location.origin = nextOrigin;
-          return this.makeRequest(endpoint, options);
+          // Instead of modifying window.location.origin, modify the request headers
+          const newHeaders = {
+            ...options.headers,
+            'Origin': nextOrigin
+          };
+          return this.makeRequest(endpoint, { ...options, headers: newHeaders });
         }
       }
 
