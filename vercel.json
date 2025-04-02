@@ -1,17 +1,14 @@
 {
   "version": 2,
   "name": "quits-frontend",
-  "buildCommand": "CI=false npm run vercel-build",
+  "buildCommand": "npm run build",
   "installCommand": "npm install --no-frozen-lockfile",
-  "outputDirectory": "build",
-  "framework": "create-react-app",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
+      "use": "@vercel/node"
     }
   ],
   "rewrites": [
@@ -25,11 +22,14 @@
     }
   ],
   "env": {
-    "REACT_APP_GOOGLE_CLIENT_ID": "your_google_client_id_here",
-    "REACT_APP_GOOGLE_REDIRECT_URI": "https://quits.cc/auth/google/callback",
-    "REACT_APP_ENABLE_EMAIL_SCANNING": "true",
-    "REACT_APP_ENABLE_MANUAL_SUBSCRIPTION": "true",
-    "REACT_APP_SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
-    "REACT_APP_API_URL": "https://quits-api.vercel.app"
-  }
+    "VITE_SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
+    "VITE_API_URL": "https://quits-api.vercel.app",
+    "VITE_ENABLE_EMAIL_SCANNING": "true",
+    "VITE_ENABLE_MANUAL_SUBSCRIPTION": "true",
+    "VITE_ENV": "production"
+  },
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 } 
