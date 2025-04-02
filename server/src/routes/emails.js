@@ -27,11 +27,10 @@ router.post('/scan-emails', async (req, res) => {
 
     // First, check if a subscription with this email_id already exists
     console.log('Checking for existing subscription...');
-    const { data: existingSubscription, error: checkError } = await supabase
+    const { data: existingSubscriptions, error: checkError } = await supabase
       .from('subscriptions')
       .select('*')
-      .eq('email_id', mockEmail.id)
-      .single();
+      .eq('email_id', mockEmail.id);
 
     if (checkError) {
       console.error('Error checking existing subscription:', {
@@ -40,13 +39,13 @@ router.post('/scan-emails', async (req, res) => {
         details: checkError.details,
         hint: checkError.hint
       });
-      if (checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-        return res.status(500).json({ 
-          error: 'Failed to check existing subscription',
-          details: checkError.message
-        });
-      }
+      return res.status(500).json({ 
+        error: 'Failed to check existing subscription',
+        details: checkError.message
+      });
     }
+
+    const existingSubscription = existingSubscriptions?.[0];
 
     if (existingSubscription) {
       console.log('Found existing subscription, updating...');
