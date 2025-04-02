@@ -2,11 +2,7 @@ const corsConfig = {
   // List of all allowed origins
   allowedOrigins: [
     'https://www.quits.cc',
-    'https://quits.cc',
-    'https://api.quits.cc',
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'https://quits-frontend.vercel.app'
+    'https://quits.cc'
   ],
 
   // Allowed HTTP methods

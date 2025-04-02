@@ -121,7 +121,7 @@ class ApiService {
     options: RequestInit & { headers?: CustomHeaders } = {}
   ): Promise<ApiResponse<T>> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
       const headers = await this.getAuthHeaders();
@@ -130,11 +130,10 @@ class ApiService {
       // Initialize origin variations if not already done
       if (this.originVariations.length === 0) {
         const domain = currentOrigin.replace(/^https?:\/\//, '').replace(/^www\./, '');
+        // Only include HTTPS origins
         this.originVariations = [
           `https://www.${domain}`,
-          `https://${domain}`,
-          `http://www.${domain}`,
-          `http://${domain}`
+          `https://${domain}`
         ];
       }
 
