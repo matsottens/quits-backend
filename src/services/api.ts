@@ -3,7 +3,7 @@ import { supabase } from '../supabase';
 // Add API URL configuration
 const API_URL = process.env.NODE_ENV === 'development' 
   ? '' // Use proxy in development
-  : '/api'; // Use /api prefix in production
+  : ''; // Use empty string in production to prevent double /api prefix
 
 interface ApiResponse<T> {
   success: boolean;
@@ -125,7 +125,8 @@ class ApiService {
 
     try {
       const headers = await this.getAuthHeaders();
-      const requestUrl = `${API_URL}${endpoint}`;
+      // Ensure endpoint starts with /api
+      const requestUrl = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
       const method = options.method || 'GET';
       
       // Log detailed request information
@@ -142,7 +143,7 @@ class ApiService {
           headers: Object.keys(options.headers || {})
         },
         fullUrl: window.location.origin + requestUrl,
-        proxyEnabled: API_URL === '/api'
+        proxyEnabled: true
       });
 
       if (!headers['Authorization']) {
