@@ -81,64 +81,11 @@ const customCorsMiddleware = (req, res, next) => {
     }
   });
 
-  // If there's no origin, allow the request (e.g., mobile apps)
-  if (!origin) {
-    return next();
-  }
-
-  // List of allowed domains (including both www and non-www versions)
-  const allowedDomains = [
-    'https://www.quits.cc',
-    'https://quits.cc',
-    'https://api.quits.cc',
-    'http://localhost:3000',
-    'http://localhost:5000'
-  ];
-
-  // Check if the origin is allowed
-  const isAllowed = allowedDomains.includes(origin);
-
-  // Set CORS headers
-  if (isAllowed) {
-    // For credentials, we must set the exact origin
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', '86400');
-    res.setHeader('Vary', 'Origin'); // Important for CDN caching
-  }
-
   // Log request status
   console.log(`[${requestId}] CORS status:`, {
     origin,
-    isAllowed,
     allowedOrigin: res.getHeader('Access-Control-Allow-Origin')
   });
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    if (isAllowed) {
-      res.status(204).end();
-    } else {
-      res.status(403).json({
-        error: 'CORS error',
-        message: 'Origin not allowed',
-        origin: origin
-      });
-    }
-    return;
-  }
-
-  // If origin is not allowed, return 403
-  if (!isAllowed) {
-    res.status(403).json({
-      error: 'CORS error',
-      message: 'Origin not allowed',
-      origin: origin
-    });
-    return;
-  }
 
   next();
 };

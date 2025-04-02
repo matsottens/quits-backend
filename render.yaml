@@ -28,8 +28,6 @@ services:
         value: production
       - key: API_URL
         value: https://api.quits.cc
-      - key: CORS_ORIGIN
-        value: https://quits.cc
     buildFilter:
       paths:
         - server/**
@@ -51,24 +49,6 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
-      - path: /*
-        name: Access-Control-Allow-Origin
-        value: https://quits.cc
-      - path: /api/scan-emails
-        name: Access-Control-Allow-Origin
-        value: https://www.quits.cc
-      - path: /*
-        name: Access-Control-Allow-Methods
-        value: GET, POST, PUT, DELETE, OPTIONS, PATCH
-      - path: /*
-        name: Access-Control-Allow-Headers
-        value: Content-Type, Authorization, X-Gmail-Token, X-User-ID, X-Requested-With, Accept, Origin
-      - path: /*
-        name: Access-Control-Allow-Credentials
-        value: "true"
-      - path: /*
-        name: Access-Control-Max-Age
-        value: "86400"
       - path: /*
         name: Vary
         value: Origin 
