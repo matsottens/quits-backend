@@ -119,10 +119,12 @@ class ApiService {
 
       // Initialize origin variations if not already done
       if (this.originVariations.length === 0) {
+        const domain = currentOrigin.replace(/^https?:\/\//, '').replace(/^www\./, '');
         this.originVariations = [
-          currentOrigin,
-          currentOrigin.replace('www.', ''),
-          currentOrigin.replace('https://', 'http://')
+          `https://www.${domain}`,
+          `https://${domain}`,
+          `http://www.${domain}`,
+          `http://${domain}`
         ];
       }
 
@@ -238,10 +240,15 @@ class ApiService {
         // Try a different origin variation
         const nextOrigin = this.originVariations[this.retryCount % this.originVariations.length];
         if (nextOrigin) {
-          // Instead of modifying window.location.origin, modify the request headers
+          console.log('Retrying with origin:', nextOrigin);
+          // Get fresh auth headers for the retry
+          const retryHeaders = await this.getAuthHeaders();
+          // Create new headers with the next origin
           const newHeaders = {
+            ...retryHeaders,
             ...options.headers,
-            'Origin': nextOrigin
+            'Origin': nextOrigin,
+            'Content-Type': 'application/json'
           };
           return this.makeRequest(endpoint, { ...options, headers: newHeaders });
         }
