@@ -31,18 +31,39 @@ const analyticsRouter = require('./routes/analytics');
 const testRouter = require('./routes/test');
 const emailsRouter = require('./routes/emails');
 
-// Add request method logging middleware
+// Add request logging middleware
 app.use((req, res, next) => {
-  console.log('Incoming request:', {
+  const requestId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+  console.log(`[${requestId}] Incoming request:`, {
+    timestamp: new Date().toISOString(),
     method: req.method,
-    path: req.path,
     url: req.url,
+    path: req.path,
     headers: {
       ...req.headers,
       authorization: req.headers.authorization ? '[REDACTED]' : undefined,
       cookie: req.headers.cookie ? '[REDACTED]' : undefined
-    }
+    },
+    body: req.body,
+    query: req.query,
+    params: req.params,
+    origin: req.headers.origin,
+    host: req.headers.host,
+    ip: req.ip,
+    ips: req.ips,
+    protocol: req.protocol,
+    secure: req.secure
   });
+
+  // Log response
+  res.on('finish', () => {
+    console.log(`[${requestId}] Response:`, {
+      timestamp: new Date().toISOString(),
+      statusCode: res.statusCode,
+      headers: res.getHeaders()
+    });
+  });
+
   next();
 });
 
@@ -56,6 +77,7 @@ const corsOptions = {
 
     // Use the corsConfig to check if origin is allowed
     if (corsConfig.isAllowedOrigin(origin)) {
+      console.log('CORS: Allowing origin:', origin);
       callback(null, origin); // Return the exact origin instead of true
     } else {
       console.log('CORS: Origin not allowed:', origin);
@@ -73,7 +95,7 @@ const corsOptions = {
 // Apply CORS middleware globally
 app.use(cors(corsOptions));
 
-// Add request logging middleware for scan-emails endpoint
+// Add specific logging for scan-emails endpoint
 app.use('/api/scan-emails', (req, res, next) => {
   console.log('Request to /api/scan-emails:', {
     method: req.method,
@@ -1489,8 +1511,30 @@ app.use((req, res) => {
   });
 });
 
-// Start the server
+// Add a test route for scan-emails
+app.get('/api/scan-emails/test', (req, res) => {
+  console.log('Test route hit for /api/scan-emails');
+  res.json({
+    success: true,
+    message: 'Test route working',
+    timestamp: new Date().toISOString(),
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+      cookie: req.headers.cookie ? '[REDACTED]' : undefined
+    }
+  });
+});
+
+// Start the server with more detailed logging
 const server = app.listen(PORT, () => {
+  console.log('Server configuration:', {
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT,
+    isProduction: process.env.NODE_ENV === 'production',
+    nodeVersion: process.version,
+    startTime: new Date().toISOString()
+  });
   console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });
 

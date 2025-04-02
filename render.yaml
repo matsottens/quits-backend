@@ -2,43 +2,39 @@ services:
   - type: web
     name: quits-api
     env: node
-    rootDir: server
     buildCommand: npm install
-    startCommand: node src/index.js
+    startCommand: node server/src/index.js
     envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
+      - key: NODE_ENV
+        value: production
       - key: PORT
         value: 10000
-      - key: NODE_VERSION
-        value: "22.x"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_CALLBACK_URL
+        value: https://api.quits.cc/auth/google/callback
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
         sync: false
       - key: CLIENT_URL
-        value: https://www.quits.cc
-      - key: SESSION_SECRET
-        sync: false
-      - key: NODE_ENV
-        value: production
+        value: https://quits.cc
       - key: API_URL
         value: https://api.quits.cc
-    buildFilter:
-      paths:
-        - server/**
-        - server/package.json
-        - server/package-lock.json
-        - server/.env
     healthCheckPath: /api/test-cors
     autoDeploy: true
     github:
       repo: matsottens/quits-backend
       branch: main
+    buildFilter:
+      paths:
+        - src/**
+        - package.json
+        - package-lock.json
     headers:
       - path: /*
         name: Strict-Transport-Security

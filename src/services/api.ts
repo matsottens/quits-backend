@@ -44,6 +44,11 @@ type CustomHeaders = HeadersInit & {
   'X-Gmail-Token'?: string;
 };
 
+// Add API URL configuration
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? '' // Use proxy in development
+  : 'https://api.quits.cc'; // Use full URL in production
+
 class ApiService {
   private static instance: ApiService;
   private retryCount: number = 0;
@@ -137,8 +142,8 @@ class ApiService {
           ...options,
           headers: Object.keys(options.headers || {})
         },
-        fullUrl: window.location.origin + requestUrl,
-        proxyEnabled: true
+        fullUrl: API_URL + requestUrl,
+        proxyEnabled: API_URL === ''
       });
 
       if (!headers['Authorization']) {
