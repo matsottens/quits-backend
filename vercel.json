@@ -2,27 +2,25 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
+      "src": "server.js",
+      "use": "@vercel/node"
     }
   ],
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/server.js"
     }
   ],
   "env": {
-    "REACT_APP_GOOGLE_CLIENT_ID": "your_google_client_id_here",
-    "REACT_APP_GOOGLE_CLIENT_SECRET": "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",
-    "REACT_APP_GOOGLE_REDIRECT_URI": "https://quits.vercel.app/auth/google/callback",
-    "REACT_APP_ENABLE_EMAIL_SCANNING": "true",
-    "REACT_APP_ENABLE_MANUAL_SUBSCRIPTION": "true",
-    "REACT_APP_SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
-    "REACT_APP_API_URL": "https://quits-api.vercel.app"
+    "NODE_ENV": "production",
+    "GOOGLE_CLIENT_ID": "your_google_client_id_here",
+    "GOOGLE_CLIENT_SECRET": "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",
+    "GOOGLE_CALLBACK_URL": "https://quits-api.vercel.app/auth/google/callback",
+    "SESSION_SECRET": "your_session_secret_here",
+    "SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
+    "SUPABASE_SERVICE_KEY": "your_supabase_service_key",
+    "CLIENT_URL": "https://quits.cc"
   },
   "headers": [
     {
