@@ -5,29 +5,6 @@ const API_URL = process.env.NODE_ENV === 'development'
   ? '' // Use proxy in development
   : 'https://api.quits.cc'; // Use full URL in production
 
-// Helper function to normalize domain
-const normalizeDomain = (url: string) => {
-  // Remove any existing protocol
-  const withoutProtocol = url.replace(/^https?:\/\/+/, '');
-  // Remove www if present
-  const withoutWww = withoutProtocol.replace(/^www\./, '');
-  // Ensure clean URL format
-  return `https://${withoutWww}`;
-};
-
-// Helper function to get all possible origin variations
-const getOriginVariations = (origin: string): string[] => {
-  const normalized = normalizeDomain(origin);
-  const domain = normalized.replace(/^https?:\/\//, '');
-  return [
-    `https://${domain}`,
-    `https://www.${domain}`
-  ];
-};
-
-// Remove API_URL_WITH_PROTOCOL since we'll use relative URLs
-// const API_URL_WITH_PROTOCOL = normalizeDomain(API_URL);
-
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
