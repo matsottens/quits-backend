@@ -131,10 +131,13 @@ class ApiService {
       const requestUrl = `${API_URL}${endpoint}`;
       const method = options.method || 'GET';
       
+      // Get the current origin to use (either from options or window.location)
+      const requestOrigin = options.headers?.['Origin'] || currentOrigin;
+      
       console.log('Making API request:', {
         url: requestUrl,
         method,
-        origin: currentOrigin,
+        origin: requestOrigin,
         retryCount: this.retryCount,
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
@@ -165,7 +168,7 @@ class ApiService {
         headers: {
           ...headers,
           ...options.headers,
-          'Origin': currentOrigin,
+          'Origin': requestOrigin,
           'Content-Type': 'application/json'
         },
         signal: controller.signal,
@@ -250,6 +253,7 @@ class ApiService {
             'Origin': nextOrigin,
             'Content-Type': 'application/json'
           };
+          // Make a new request with the updated headers
           return this.makeRequest(endpoint, { ...options, headers: newHeaders });
         }
       }

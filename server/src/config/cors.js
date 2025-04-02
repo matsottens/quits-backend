@@ -22,7 +22,9 @@ const corsConfig = {
     'X-Gmail-Token',
     'X-User-ID',
     'X-API-Key',
-    'X-Request-ID'
+    'X-Request-ID',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
   ],
 
   // Exposed headers

@@ -49,38 +49,24 @@ app.use((req, res, next) => {
 // CORS configuration
 const corsOptions = {
   origin: function(origin, callback) {
-    const allowedOrigins = [
-      'https://www.quits.cc',
-      'https://quits.cc',
-      'http://localhost:3000'
-    ];
-    
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
       return callback(null, true);
     }
 
-    // Check if the origin is in the allowed list
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
+    // Use the corsConfig to check if origin is allowed
+    if (corsConfig.isAllowedOrigin(origin)) {
+      callback(null, origin); // Return the exact origin instead of true
     } else {
       console.log('CORS: Origin not allowed:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
-    'X-User-ID',
-    'X-Gmail-Token',
-    'Origin'
-  ],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 86400,
+  methods: corsConfig.allowedMethods,
+  allowedHeaders: corsConfig.allowedHeaders,
+  exposedHeaders: corsConfig.exposedHeaders,
+  maxAge: corsConfig.maxAge,
   preflightContinue: false
 };
 
