@@ -37,8 +37,8 @@ export interface PriceChange {
   provider: string;
 }
 
-// Update the API URL configuration - always use the full URL
-const API_URL = 'https://quits-api.vercel.app';  // Always use full URL for API requests
+// Update the API URL configuration
+const API_URL = 'https://quits-api.vercel.app'; // Vercel production URL
 
 class ApiService {
   private static instance: ApiService;
