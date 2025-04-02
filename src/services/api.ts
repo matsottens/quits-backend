@@ -1,10 +1,5 @@
 import { supabase } from '../supabase';
 
-// Add API URL configuration
-const API_URL = process.env.NODE_ENV === 'development' 
-  ? '' // Use proxy in development
-  : ''; // Use empty string in production to prevent double /api prefix
-
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
