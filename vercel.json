@@ -28,8 +28,6 @@
     "VITE_ENABLE_MANUAL_SUBSCRIPTION": "true",
     "VITE_ENV": "production"
   },
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+  "cleanUrls": true,
+  "trailingSlash": false
 } 
