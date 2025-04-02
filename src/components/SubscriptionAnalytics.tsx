@@ -194,4 +194,3 @@ export const SubscriptionAnalytics: React.FC<SubscriptionAnalyticsProps> = ({ sc
     </div>
   );
 }; 
-}; 
