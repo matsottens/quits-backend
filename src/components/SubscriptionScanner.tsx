@@ -21,13 +21,18 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
     
     try {
       const result = await scanEmails();
-      setScanResult({
-        count: result.count,
-        lastScan: new Date()
-      });
       
-      if (onScanComplete) {
-        onScanComplete(result.count);
+      if (result) {
+        const count = result.count || 0;
+        
+        setScanResult({
+          count,
+          lastScan: new Date()
+        });
+        
+        if (onScanComplete) {
+          onScanComplete(count);
+        }
       }
     } catch (err: any) {
       console.error('Scan error:', err);
