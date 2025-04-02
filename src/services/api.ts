@@ -1,9 +1,7 @@
 import { supabase } from '../supabase';
 
 // Add API URL configuration
-const API_URL = process.env.NODE_ENV === 'development' 
-  ? '' // Use proxy in development
-  : 'https://api.quits.cc'; // Use full URL in production
+const API_URL = ''; // Always use proxy
 
 interface ApiResponse<T> {
   success: boolean;
@@ -125,29 +123,12 @@ class ApiService {
 
     try {
       const headers = await this.getAuthHeaders();
-      const currentOrigin = window.location.origin;
-
-      // Initialize origin variations if not already done
-      if (this.originVariations.length === 0) {
-        const domain = currentOrigin.replace(/^https?:\/\//, '').replace(/^www\./, '');
-        // Only include HTTPS origins
-        this.originVariations = [
-          `https://www.${domain}`,
-          `https://${domain}`
-        ];
-      }
-
       const requestUrl = `${API_URL}${endpoint}`;
       const method = options.method || 'GET';
-      
-      // Get the current origin to use (either from options or window.location)
-      const requestOrigin = (options.headers as CustomHeaders)?.['Origin'] || currentOrigin;
       
       console.log('Making API request:', {
         url: requestUrl,
         method,
-        origin: requestOrigin,
-        retryCount: this.retryCount,
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
         hasUserId: !!headers['X-User-ID'],
@@ -173,17 +154,14 @@ class ApiService {
 
       const response = await fetch(requestUrl, {
         ...options,
-        method, // Explicitly set the method
+        method,
         headers: {
           ...headers,
           ...options.headers,
-          'Origin': requestOrigin,
           'Content-Type': 'application/json'
         },
         signal: controller.signal,
-        mode: 'cors',
-        credentials: 'include',
-        referrerPolicy: 'strict-origin-when-cross-origin'
+        credentials: 'include'
       });
 
       clearTimeout(timeoutId);
@@ -233,57 +211,11 @@ class ApiService {
         console.error('Failed to parse response as JSON:', e);
         throw new Error('Invalid JSON response from API');
       }
-
-      // Reset retry count and origin variations on successful request
-      this.retryCount = 0;
-      this.originVariations = [];
       
       return { success: true, data };
     } catch (error: any) {
       if (error.name === 'AbortError') {
         return { success: false, error: 'Request timed out. Please try again.' };
-      }
-
-      // Handle CORS errors with retry logic
-      if ((error.message.includes('CORS') || error.message.includes('Failed to fetch')) && this.retryCount < this.MAX_RETRIES) {
-        console.log(`CORS error, retrying with different origin (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})`);
-        this.retryCount++;
-        
-        // Try a different origin variation
-        const nextOrigin = this.originVariations[this.retryCount % this.originVariations.length];
-        if (nextOrigin) {
-          console.log('Retrying with origin:', nextOrigin);
-          // Get fresh auth headers for the retry
-          const retryHeaders = await this.getAuthHeaders();
-          // Create new headers with the next origin
-          const newHeaders = {
-            ...retryHeaders,
-            ...options.headers,
-            'Origin': nextOrigin,
-            'Content-Type': 'application/json'
-          };
-          // Make a new request with the updated headers
-          return this.makeRequest(endpoint, { ...options, headers: newHeaders });
-        }
-      }
-
-      // Reset retry count and origin variations after max retries or other errors
-      this.retryCount = 0;
-      this.originVariations = [];
-
-      if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-        console.error('CORS error after all retries:', {
-          message: error.message,
-          origin: window.location.origin,
-          url: endpoint,
-          triedOrigins: this.originVariations,
-          environment: process.env.NODE_ENV
-        });
-        return { 
-          success: false, 
-          error: 'Unable to access the API. Please try again later.',
-          details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        };
       }
 
       console.error('API request error:', {
