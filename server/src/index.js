@@ -115,7 +115,7 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 // Apply request tracking after CORS
-app.use(requestTracker);
+// app.use(requestTracker); // Commented out undefined middleware
 
 // Test endpoint for CORS
 app.get('/api/test-cors', (req, res) => {
@@ -1523,6 +1523,29 @@ app.get('/api/scan-emails/test', (req, res) => {
       authorization: req.headers.authorization ? '[REDACTED]' : undefined,
       cookie: req.headers.cookie ? '[REDACTED]' : undefined
     }
+  });
+});
+
+// Add a health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    nodeVersion: process.version
+  });
+});
+
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Quits API server is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    endpoints: [
+      '/health',
+      '/api/test-cors',
+      '/api/scan-emails'
+    ]
   });
 });
 
