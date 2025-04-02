@@ -40,7 +40,7 @@ export interface PriceChange {
 // Update the API URL configuration
 const API_URL = process.env.NODE_ENV === 'production' 
   ? 'https://quits-api.vercel.app'  // Use new Vercel backend URL in production
-  : '';   // Use empty string for proxy in development
+  : '';   // Use empty string for proxy in development (will use rewrites in vercel.json)
 
 class ApiService {
   private static instance: ApiService;
