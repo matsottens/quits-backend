@@ -28,8 +28,10 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-        target: 'https://quits-api.vercel.app',
+        target: 'http://localhost:5000',
         changeOrigin: true,
+        secure: false,
+        ws: true,
       },
     },
   },

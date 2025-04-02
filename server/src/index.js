@@ -69,30 +69,36 @@ app.use((req, res, next) => {
 
 // CORS configuration
 const corsOptions = {
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://quits.cc',
+      'https://www.quits.cc'
+    ];
+    
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    // Use the corsConfig to check if origin is allowed
-    if (corsConfig.isAllowedOrigin(origin)) {
-      console.log('CORS: Allowing origin:', origin);
-      callback(null, origin); // Return the exact origin instead of true
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
     } else {
-      console.log('CORS: Origin not allowed:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  methods: corsConfig.allowedMethods,
-  allowedHeaders: corsConfig.allowedHeaders,
-  exposedHeaders: corsConfig.exposedHeaders,
-  maxAge: corsConfig.maxAge,
-  preflightContinue: false
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'Accept', 
+    'X-User-ID', 
+    'X-Gmail-Token',
+    'Origin'
+  ]
 };
 
-// Apply CORS middleware globally
+// Apply CORS middleware
 app.use(cors(corsOptions));
 
 // Add specific logging for scan-emails endpoint

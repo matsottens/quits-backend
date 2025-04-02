@@ -38,7 +38,7 @@ export interface PriceChange {
 }
 
 // Update the API URL configuration
-const API_URL = 'https://quits-api.vercel.app'; // Vercel production URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 class ApiService {
   private static instance: ApiService;
