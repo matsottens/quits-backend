@@ -2,7 +2,7 @@
   "version": 2,
   "name": "quits-frontend",
   "buildCommand": "npm run build",
-  "installCommand": "npm install --no-cache",
+  "installCommand": "npm ci --no-cache",
   "outputDirectory": "build",
   "framework": "create-react-app",
   "builds": [
