@@ -1,7 +1,9 @@
 import { supabase } from '../supabase';
 
 // Add API URL configuration
-const API_URL = ''; // Always use proxy
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? '' // Use proxy in development
+  : '/api'; // Use /api prefix in production
 
 interface ApiResponse<T> {
   success: boolean;
@@ -126,6 +128,7 @@ class ApiService {
       const requestUrl = `${API_URL}${endpoint}`;
       const method = options.method || 'GET';
       
+      // Log detailed request information
       console.log('Making API request:', {
         url: requestUrl,
         method,
@@ -137,7 +140,9 @@ class ApiService {
         options: {
           ...options,
           headers: Object.keys(options.headers || {})
-        }
+        },
+        fullUrl: window.location.origin + requestUrl,
+        proxyEnabled: API_URL === '/api'
       });
 
       if (!headers['Authorization']) {
@@ -167,14 +172,17 @@ class ApiService {
 
       clearTimeout(timeoutId);
 
-      // Log response status and headers for debugging
+      // Log detailed response information
       console.log('API Response:', {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
         url: response.url,
         type: response.type,
-        ok: response.ok
+        ok: response.ok,
+        redirected: response.redirected,
+        redirectType: response.type,
+        finalUrl: response.url
       });
 
       // Try to get the response text first
