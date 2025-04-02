@@ -38,7 +38,7 @@ export const SubscriptionAnalytics: React.FC = () => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
 
   const fetchAnalytics = useCallback(async () => {
     if (!user) return;

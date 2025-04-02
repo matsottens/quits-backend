@@ -19,7 +19,7 @@ export const NotificationSettings: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.quits.cc';
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
 
   useEffect(() => {
     const fetchSettings = async () => {

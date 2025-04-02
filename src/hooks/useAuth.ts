@@ -135,6 +135,6 @@ export const useAuth = (): AuthReturn => {
     googleLogin,
     signup,
     logout,
-    apiUrl: process.env.REACT_APP_API_URL || 'https://api.quits.cc'
+    apiUrl: import.meta.env.VITE_API_URL || 'https://api.quits.cc'
   };
 }; 

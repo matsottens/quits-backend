@@ -20,11 +20,11 @@ export interface GoogleAuthResponse {
 }
 
 export const initiateGoogleAuth = () => {
-  console.log('Initiating Google Auth with redirect URI:', process.env.REACT_APP_GOOGLE_REDIRECT_URI);
+  console.log('Initiating Google Auth with redirect URI:', import.meta.env.VITE_GOOGLE_REDIRECT_URI);
   
   const params = new URLSearchParams({
-    client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || '',
-    redirect_uri: process.env.REACT_APP_GOOGLE_REDIRECT_URI || '',
+    client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    redirect_uri: import.meta.env.VITE_GOOGLE_REDIRECT_URI || '',
     response_type: 'code',
     scope: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
     access_type: 'offline',
@@ -40,15 +40,15 @@ export const initiateGoogleAuth = () => {
 export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResponse> => {
   try {
     console.log('GoogleAuth - Starting token exchange');
-    console.log('GoogleAuth - Using redirect URI:', process.env.REACT_APP_GOOGLE_REDIRECT_URI);
-    console.log('GoogleAuth - Client ID available:', !!process.env.REACT_APP_GOOGLE_CLIENT_ID);
-    console.log('GoogleAuth - Client Secret available:', !!process.env.REACT_APP_GOOGLE_CLIENT_SECRET);
+    console.log('GoogleAuth - Using redirect URI:', import.meta.env.VITE_GOOGLE_REDIRECT_URI);
+    console.log('GoogleAuth - Client ID available:', !!import.meta.env.VITE_GOOGLE_CLIENT_ID);
+    console.log('GoogleAuth - Client Secret available:', !!import.meta.env.VITE_GOOGLE_CLIENT_SECRET);
     
     const tokenData = {
-      client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
-      client_secret: process.env.REACT_APP_GOOGLE_CLIENT_SECRET,
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      client_secret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET,
       code,
-      redirect_uri: process.env.REACT_APP_GOOGLE_REDIRECT_URI,
+      redirect_uri: import.meta.env.VITE_GOOGLE_REDIRECT_URI,
       grant_type: 'authorization_code',
     };
 
@@ -100,8 +100,8 @@ export const handleGoogleCallback = async (code: string): Promise<GoogleAuthResp
 export const refreshGoogleToken = async (refreshToken: string): Promise<string> => {
   try {
     const response = await axios.post(GOOGLE_TOKEN_URL, {
-      client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
-      client_secret: process.env.REACT_APP_GOOGLE_CLIENT_SECRET,
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      client_secret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET,
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     });

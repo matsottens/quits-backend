@@ -3,6 +3,8 @@ const { createClient } = require('@supabase/supabase-js');
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseClientId = process.env.SUPABASE_CLIENT_ID;
+const supabaseClientSecret = process.env.SUPABASE_CLIENT_SECRET;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing Supabase configuration. Please check your .env file.');
@@ -11,7 +13,11 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
-    persistSession: false
+    persistSession: false,
+    flowType: 'pkce',
+    detectSessionInUrl: true,
+    client_id: supabaseClientId,
+    client_secret: supabaseClientSecret
   }
 });
 
