@@ -108,26 +108,42 @@ class ApiService {
   }
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    // Ensure endpoint starts with /
-    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const url = `${API_URL}${path}`;
-    
-    console.log('Making API request:', {
-      url,
-      method: options.method || 'GET',
-      hasAuthToken: !!options.headers && !!(options.headers as Record<string, string>)['Authorization'],
-      hasGmailToken: !!options.headers && !!(options.headers as Record<string, string>)['X-Gmail-Token'],
-      hasUserId: !!options.headers && !!(options.headers as Record<string, string>)['X-User-ID'],
-      environment: process.env.NODE_ENV
-    });
-
     try {
+      const headers = await this.getAuthHeaders();
+      
+      // Ensure endpoint starts with /api
+      const path = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+      const url = `${API_URL}${path}`;
+      
+      console.log('Making API request:', {
+        url,
+        method: options.method || 'GET',
+        hasAuthToken: !!headers['Authorization'],
+        hasGmailToken: !!headers['X-Gmail-Token'],
+        hasUserId: !!headers['X-User-ID'],
+        environment: process.env.NODE_ENV
+      });
+
+      if (!headers['Authorization']) {
+        throw new Error('No authentication token available. Please sign in again.');
+      }
+
+      if (!headers['X-Gmail-Token']) {
+        throw new Error('No Gmail token available. Please sign in with Google again.');
+      }
+
+      if (!headers['X-User-ID']) {
+        throw new Error('No user ID available. Please sign in again.');
+      }
+
       const response = await fetch(url, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...headers,
           ...options.headers
-        }
+        },
+        credentials: 'include'
       });
 
       // Log detailed response information
