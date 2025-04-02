@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/node",
+      "config": {
+        "buildCommand": "npm install",
+        "outputDirectory": "."
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/index.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "GOOGLE_CLIENT_ID": "your_google_client_id_here",
+    "GOOGLE_CLIENT_SECRET": "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",
+    "GOOGLE_CALLBACK_URL": "https://quits-api.vercel.app/auth/google/callback",
+    "SESSION_SECRET": "your_session_secret_here",
+    "SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
+    "SUPABASE_SERVICE_KEY": "your_supabase_service_key",
+    "CLIENT_URL": "https://quits.cc"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://quits.cc"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        }
+      ]
+    }
+  ]
+} 

@@ -44,10 +44,10 @@ type CustomHeaders = HeadersInit & {
   'X-Gmail-Token'?: string;
 };
 
-// Add API URL configuration
-const API_URL = process.env.NODE_ENV === 'development' 
-  ? '' // Use proxy in development
-  : 'https://api.quits.cc'; // Use full URL in production
+// Update the API URL configuration
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://quits-api.vercel.app'  // Use new Vercel backend URL in production
+  : 'http://localhost:10000';   // Use localhost in development
 
 class ApiService {
   private static instance: ApiService;

@@ -9,18 +9,10 @@
       }
     }
   ],
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "framework": "create-react-app",
-  "outputDirectory": "build",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/:path*",
-      "destination": "https://api.quits.cc/api/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "env": {
@@ -30,7 +22,7 @@
     "REACT_APP_ENABLE_EMAIL_SCANNING": "true",
     "REACT_APP_ENABLE_MANUAL_SUBSCRIPTION": "true",
     "REACT_APP_SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
-    "REACT_APP_API_URL": "https://api.quits.cc"
+    "REACT_APP_API_URL": "https://quits-api.vercel.app"
   },
   "headers": [
     {
@@ -38,28 +30,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.google.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://*.google.com https://*.googleapis.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.google.com https://*.googleapis.com; connect-src 'self' https://*.google.com https://*.googleapis.com https://pihflemmavointdxjdsx.supabase.co https://api.quits.cc https://www.quits.cc https://quits.cc; frame-src 'self' https://*.google.com https://*.googleapis.com;"
-        }
-      ]
-    },
-    {
-      "source": "/api/:path*",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://www.quits.cc"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "X-Requested-With, Content-Type, Accept, Authorization, X-Gmail-Token, X-User-ID"
-        },
-        {
-          "key": "Access-Control-Allow-Credentials",
-          "value": "true"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.google.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://*.google.com https://*.googleapis.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.google.com https://*.googleapis.com; connect-src 'self' https://*.google.com https://*.googleapis.com https://pihflemmavointdxjdsx.supabase.co https://quits-api.vercel.app https://www.quits.cc https://quits.cc; frame-src 'self' https://*.google.com https://*.googleapis.com;"
         }
       ]
     }

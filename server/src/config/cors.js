@@ -1,89 +1,55 @@
-const corsConfig = {
-  // List of all allowed origins
-  allowedOrigins: [
-    'https://www.quits.cc',
-    'https://quits.cc'
-  ],
+const allowedOrigins = [
+  'https://quits.cc',
+  'https://www.quits.cc',
+  'https://quits.vercel.app',
+  'http://localhost:3000'
+];
 
-  // Allowed HTTP methods
-  allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+const allowedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'];
 
-  // Allowed headers
-  allowedHeaders: [
-    'Origin',
-    'X-Requested-With',
-    'Content-Type',
-    'Accept',
-    'Authorization',
-    'X-Gmail-Token',
-    'X-User-ID',
-    'X-API-Key',
-    'X-Request-ID',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
+const allowedHeaders = [
+  'Content-Type',
+  'Authorization',
+  'X-Requested-With',
+  'Accept',
+  'X-User-ID',
+  'X-Gmail-Token',
+  'Origin'
+];
 
-  // Exposed headers
-  exposedHeaders: [
-    'Content-Range',
-    'X-Content-Range',
-    'X-Request-ID'
-  ],
+const exposedHeaders = ['Content-Range', 'X-Content-Range'];
 
-  // Whether to allow credentials
-  credentials: true,
+const maxAge = 86400; // 24 hours
 
-  // Max age for preflight requests (24 hours)
-  maxAge: 86400,
+const allowCredentials = true;
 
-  // Function to check if an origin is allowed
-  isAllowedOrigin: (origin) => {
-    if (!origin) return true; // Allow requests with no origin (e.g., mobile apps)
-    
-    // In development, allow all origins
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Development mode: allowing all origins');
-      return true;
-    }
-    
-    // Normalize the origin by removing trailing slashes and converting to lowercase
-    const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
-    
-    // Log the origin check
-    console.log('Checking origin:', {
-      original: origin,
-      normalized: normalizedOrigin,
-      allowed: corsConfig.allowedOrigins.some(allowedOrigin => 
-        allowedOrigin.toLowerCase().replace(/\/$/, '') === normalizedOrigin
-      )
-    });
-    
-    // Check if the origin is in the allowed list
-    return corsConfig.allowedOrigins.some(allowedOrigin => 
-      allowedOrigin.toLowerCase().replace(/\/$/, '') === normalizedOrigin
-    );
-  },
+function isAllowedOrigin(origin) {
+  if (!origin) return true; // Allow requests with no origin (like mobile apps or curl requests)
+  return allowedOrigins.includes(origin);
+}
 
-  // Function to get CORS headers for a specific origin
-  getCorsHeaders: (origin) => {
-    if (!corsConfig.isAllowedOrigin(origin)) {
-      console.log('Origin not allowed:', origin);
-      return null;
-    }
-
-    const headers = {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': corsConfig.allowedMethods.join(', '),
-      'Access-Control-Allow-Headers': corsConfig.allowedHeaders.join(', '),
-      'Access-Control-Expose-Headers': corsConfig.exposedHeaders.join(', '),
-      'Access-Control-Allow-Credentials': corsConfig.credentials.toString(),
-      'Access-Control-Max-Age': corsConfig.maxAge.toString(),
-      'Vary': 'Origin'
-    };
-
-    console.log('Generated CORS headers:', headers);
-    return headers;
+function getCorsHeaders(origin) {
+  if (!origin || !isAllowedOrigin(origin)) {
+    return {};
   }
-};
 
-module.exports = corsConfig; 
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': allowedMethods.join(', '),
+    'Access-Control-Allow-Headers': allowedHeaders.join(', '),
+    'Access-Control-Expose-Headers': exposedHeaders.join(', '),
+    'Access-Control-Allow-Credentials': allowCredentials,
+    'Access-Control-Max-Age': maxAge
+  };
+}
+
+module.exports = {
+  allowedOrigins,
+  allowedMethods,
+  allowedHeaders,
+  exposedHeaders,
+  maxAge,
+  allowCredentials,
+  isAllowedOrigin,
+  getCorsHeaders
+}; 
