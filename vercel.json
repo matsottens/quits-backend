@@ -2,24 +2,26 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.js",
-      "use": "@vercel/node",
+      "src": "package.json",
+      "use": "@vercel/static-build",
       "config": {
-        "includeFiles": ["src/**"]
+        "distDir": "build"
       }
     }
   ],
-  "outputDirectory": ".",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://quits-api.vercel.app/api/:path*"
+    },
+    {
       "source": "/(.*)",
-      "destination": "/server.js"
+      "destination": "/index.html"
     }
   ],
   "env": {
     "REACT_APP_GOOGLE_CLIENT_ID": "your_google_client_id_here",
-    "REACT_APP_GOOGLE_CLIENT_SECRET": "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",
-    "REACT_APP_GOOGLE_REDIRECT_URI": "https://quits.vercel.app/auth/google/callback",
+    "REACT_APP_GOOGLE_REDIRECT_URI": "https://quits.cc/auth/google/callback",
     "REACT_APP_ENABLE_EMAIL_SCANNING": "true",
     "REACT_APP_ENABLE_MANUAL_SUBSCRIPTION": "true",
     "REACT_APP_SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
