@@ -2,7 +2,7 @@
 
 Subscription management application.
 
-Last deployment trigger: 2025-04-02
+Last deployment trigger: 2025-04-03
 
 ## Features
 
