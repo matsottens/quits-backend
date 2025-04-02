@@ -1,6 +1,8 @@
-# Quits - Subscription Management App
+# Quits Frontend
 
-A modern React application for managing subscriptions and notifications.
+Subscription management application.
+
+Last deployment trigger: 2025-04-02
 
 ## Features
 
