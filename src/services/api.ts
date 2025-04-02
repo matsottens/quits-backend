@@ -322,4 +322,13 @@ const transformPriceChange = (change: PriceChange): PriceChange => {
   };
 };
 
+// Export convenience functions for common API calls
+export const scanEmails = async () => {
+  const response = await apiService.scanEmails();
+  if (!response.success) {
+    throw new Error(response.error || 'Failed to scan emails');
+  }
+  return response.data;
+};
+
 export const apiService = ApiService.getInstance(); 

@@ -4,7 +4,8 @@ import {
   ChartBarIcon, 
   CurrencyDollarIcon, 
   ArrowTrendingUpIcon,
-  CalendarIcon
+  CalendarIcon,
+  EnvelopeIcon
 } from '@heroicons/react/24/outline';
 
 interface PriceChange {
@@ -34,7 +35,11 @@ interface AnalyticsData {
   upcomingRenewalsList: UpcomingRenewal[];
 }
 
-export const SubscriptionAnalytics: React.FC = () => {
+interface SubscriptionAnalyticsProps {
+  scanCount?: number | null;
+}
+
+export const SubscriptionAnalytics: React.FC<SubscriptionAnalyticsProps> = ({ scanCount }) => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,7 +73,7 @@ export const SubscriptionAnalytics: React.FC = () => {
     fetchAnalytics();
   }, [user, apiUrl]);
 
-  if (loading) {
+  if (loading && !scanCount) {
     return (
       <div className="flex items-center justify-center p-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -76,13 +81,7 @@ export const SubscriptionAnalytics: React.FC = () => {
     );
   }
 
-  if (!analytics) {
-    return (
-      <div className="text-center p-4">
-        <p className="text-gray-500">No analytics data available</p>
-      </div>
-    );
-  }
+  const displayMetrics = scanCount !== null || analytics;
 
   return (
     <div className="space-y-6">
@@ -92,7 +91,9 @@ export const SubscriptionAnalytics: React.FC = () => {
             <ChartBarIcon className="h-6 w-6 text-blue-500 mr-2" />
             <h3 className="text-sm font-medium text-gray-500">Total Subscriptions</h3>
           </div>
-          <p className="mt-2 text-2xl font-semibold">{analytics.totalSubscriptions}</p>
+          <p className="mt-2 text-2xl font-semibold">
+            {analytics?.totalSubscriptions || scanCount || 0}
+          </p>
         </div>
         
         <div className="bg-white rounded-lg shadow p-4 border border-gray-100 transition-all hover:shadow-md">
@@ -100,7 +101,9 @@ export const SubscriptionAnalytics: React.FC = () => {
             <CurrencyDollarIcon className="h-6 w-6 text-green-500 mr-2" />
             <h3 className="text-sm font-medium text-gray-500">Monthly Cost</h3>
           </div>
-          <p className="mt-2 text-2xl font-semibold">${analytics.totalMonthlyCost.toFixed(2)}</p>
+          <p className="mt-2 text-2xl font-semibold">
+            ${analytics?.totalMonthlyCost.toFixed(2) || "0.00"}
+          </p>
         </div>
         
         <div className="bg-white rounded-lg shadow p-4 border border-gray-100 transition-all hover:shadow-md">
@@ -108,19 +111,32 @@ export const SubscriptionAnalytics: React.FC = () => {
             <ArrowTrendingUpIcon className="h-6 w-6 text-red-500 mr-2" />
             <h3 className="text-sm font-medium text-gray-500">Avg Price Change</h3>
           </div>
-          <p className="mt-2 text-2xl font-semibold">{analytics.averagePriceChange.toFixed(1)}%</p>
+          <p className="mt-2 text-2xl font-semibold">
+            {analytics?.averagePriceChange ? `${analytics.averagePriceChange.toFixed(1)}%` : "0%"}
+          </p>
         </div>
         
         <div className="bg-white rounded-lg shadow p-4 border border-gray-100 transition-all hover:shadow-md">
           <div className="flex items-center">
-            <CalendarIcon className="h-6 w-6 text-purple-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Upcoming Renewals</h3>
+            <EnvelopeIcon className="h-6 w-6 text-indigo-500 mr-2" />
+            <h3 className="text-sm font-medium text-gray-500">Last Scan</h3>
           </div>
-          <p className="mt-2 text-2xl font-semibold">{analytics.upcomingRenewals}</p>
+          <p className="mt-2 text-lg font-semibold">
+            {scanCount !== null ? `${scanCount} subscriptions` : "No scan"}
+          </p>
         </div>
       </div>
 
-      {analytics.priceChanges && analytics.priceChanges.length > 0 && (
+      {!displayMetrics && (
+        <div className="text-center p-8">
+          <p className="text-gray-500">No analytics data available</p>
+          <p className="text-gray-400 text-sm mt-2">
+            Scan your emails to detect subscriptions
+          </p>
+        </div>
+      )}
+
+      {analytics?.priceChanges && analytics.priceChanges.length > 0 && (
         <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
           <h2 className="text-lg font-semibold mb-4 flex items-center">
             <ArrowTrendingUpIcon className="h-5 w-5 text-gray-700 mr-2" />
@@ -149,7 +165,7 @@ export const SubscriptionAnalytics: React.FC = () => {
         </div>
       )}
 
-      {analytics.upcomingRenewalsList && analytics.upcomingRenewalsList.length > 0 && (
+      {analytics?.upcomingRenewalsList && analytics.upcomingRenewalsList.length > 0 && (
         <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
           <h2 className="text-lg font-semibold mb-4 flex items-center">
             <CalendarIcon className="h-5 w-5 text-gray-700 mr-2" />
@@ -177,4 +193,5 @@ export const SubscriptionAnalytics: React.FC = () => {
       )}
     </div>
   );
+}; 
 }; 
