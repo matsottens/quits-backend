@@ -1,14 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { NotificationCenter } from '../components/NotificationCenter';
 import { SubscriptionAnalytics } from '../components/SubscriptionAnalytics';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { SubscriptionScanner } from '../components/SubscriptionScanner';
 
 export const Dashboard: React.FC = () => {
+  const location = useLocation();
   const [scanCount, setScanCount] = useState<number | null>(null);
+  
+  // Check for scan results from navigation state
+  useEffect(() => {
+    // First priority: check location state (from direct navigation)
+    if (location.state && 'scanCount' in location.state) {
+      setScanCount(Number(location.state.scanCount));
+      // Clear the state to avoid showing the same results on refresh
+      window.history.replaceState({}, document.title);
+      return;
+    }
+    
+    // Second priority: check localStorage (from previous scans)
+    const lastScanCount = localStorage.getItem('last_scan_count');
+    if (lastScanCount) {
+      setScanCount(Number(lastScanCount));
+    }
+  }, [location.state]);
 
   const handleScanComplete = (count: number) => {
     setScanCount(count);
+    // Also store in localStorage for persistence
+    localStorage.setItem('last_scan_count', count.toString());
+    localStorage.setItem('last_scan_time', new Date().toISOString());
   };
 
   return (
