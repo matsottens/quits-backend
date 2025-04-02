@@ -70,5 +70,15 @@ module.exports = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    // Safely load tailwindcss-animate, if it's available
+    function() {
+      try {
+        return require("tailwindcss-animate");
+      } catch (e) {
+        console.warn("tailwindcss-animate plugin not found, skipping...");
+        return {};
+      }
+    }()
+  ],
 } 
