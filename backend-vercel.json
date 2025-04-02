@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "name": "quits-api",
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/server.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "GOOGLE_CLIENT_ID": "your_google_client_id_here",
+    "GOOGLE_CALLBACK_URL": "https://quits-api.vercel.app/auth/google/callback",
+    "SESSION_SECRET": "your_session_secret_here",
+    "SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
+    "CLIENT_URL": "https://quits.cc"
+  }
+} 

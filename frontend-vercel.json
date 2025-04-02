@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "name": "quits-frontend",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://quits-api.vercel.app/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "REACT_APP_GOOGLE_CLIENT_ID": "your_google_client_id_here",
+    "REACT_APP_GOOGLE_REDIRECT_URI": "https://quits.cc/auth/google/callback",
+    "REACT_APP_ENABLE_EMAIL_SCANNING": "true",
+    "REACT_APP_ENABLE_MANUAL_SUBSCRIPTION": "true",
+    "REACT_APP_SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
+    "REACT_APP_API_URL": "https://quits-api.vercel.app"
+  }
+} 
