@@ -47,7 +47,7 @@ type CustomHeaders = HeadersInit & {
 // Update the API URL configuration
 const API_URL = process.env.NODE_ENV === 'production' 
   ? 'https://quits-api.vercel.app'  // Use new Vercel backend URL in production
-  : 'http://localhost:10000';   // Use localhost in development
+  : '';   // Use empty string for proxy in development (instead of localhost)
 
 class ApiService {
   private static instance: ApiService;
@@ -116,35 +116,24 @@ class ApiService {
     }
   }
 
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit & { headers?: CustomHeaders } = {}
-  ): Promise<ApiResponse<T>> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const requestUrl = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = process.env.NODE_ENV === 'production' 
+      ? `${API_URL}${requestUrl}`   // Use full URL in production
+      : requestUrl;                 // Use relative URL in development for proxy
+    
+    console.log('Making API request:', {
+      url,
+      method: options.method || 'GET',
+      hasAuthToken: !!options.headers?.['Authorization'],
+      hasGmailToken: !!options.headers?.['X-Gmail-Token'],
+      hasUserId: !!options.headers?.['X-User-ID'],
+      environment: process.env.NODE_ENV,
+      proxyEnabled: process.env.NODE_ENV !== 'production'
+    });
 
     try {
       const headers = await this.getAuthHeaders();
-      // Ensure endpoint starts with /api
-      const requestUrl = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
-      const method = options.method || 'GET';
-      
-      // Log detailed request information
-      console.log('Making API request:', {
-        url: requestUrl,
-        method,
-        hasAuthToken: !!headers['Authorization'],
-        hasGmailToken: !!headers['X-Gmail-Token'],
-        hasUserId: !!headers['X-User-ID'],
-        environment: process.env.NODE_ENV,
-        headers: Object.keys(headers),
-        options: {
-          ...options,
-          headers: Object.keys(options.headers || {})
-        },
-        fullUrl: API_URL + requestUrl,
-        proxyEnabled: API_URL === ''
-      });
 
       if (!headers['Authorization']) {
         throw new Error('No authentication token available. Please sign in again.');
@@ -158,20 +147,14 @@ class ApiService {
         throw new Error('No user ID available. Please sign in again.');
       }
 
-      const response = await fetch(requestUrl, {
+      const response = await fetch(url, {
         ...options,
-        method,
         headers: {
+          'Content-Type': 'application/json',
           ...headers,
-          ...options.headers,
-          'Content-Type': 'application/json'
-        },
-        signal: controller.signal,
-        credentials: 'include',
-        mode: 'cors'
+          ...options.headers
+        }
       });
-
-      clearTimeout(timeoutId);
 
       // Log detailed response information
       console.log('API Response:', {
