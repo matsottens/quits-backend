@@ -1537,16 +1537,85 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.json({
-    message: 'Quits API server is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    endpoints: [
-      '/health',
-      '/api/test-cors',
-      '/api/scan-emails'
-    ]
-  });
+  // Check if the request wants HTML (browser) or JSON (API client)
+  const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
+  
+  if (acceptsHtml) {
+    // Send HTML for browser access
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Quits API</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 800px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            h1 { color: #26457A; }
+            .card {
+              background: #f8f9fa;
+              border-radius: 8px;
+              padding: 20px;
+              margin-bottom: 20px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .endpoint {
+              background: #e9ecef;
+              padding: 10px;
+              border-radius: 4px;
+              margin: 5px 0;
+              font-family: monospace;
+            }
+            .note {
+              background: #fff3cd;
+              padding: 10px;
+              border-radius: 4px;
+              margin-top: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Quits API Server</h1>
+          <div class="card">
+            <p>This is the API backend for the Quits application.</p>
+            <p>Status: <strong>Online</strong></p>
+            <p>Environment: <strong>${process.env.NODE_ENV || 'development'}</strong></p>
+            <p>Last updated: <strong>${new Date().toLocaleString()}</strong></p>
+          </div>
+          
+          <h2>Available Endpoints</h2>
+          <div class="card">
+            <div class="endpoint">/health</div>
+            <div class="endpoint">/api/test-cors</div>
+            <div class="endpoint">/api/scan-emails</div>
+          </div>
+          
+          <div class="note">
+            <p><strong>Note:</strong> This is the API server. If you're looking for the Quits application, please visit <a href="https://quits.cc">https://quits.cc</a></p>
+          </div>
+        </body>
+      </html>
+    `);
+  } else {
+    // Send JSON for API clients
+    res.json({
+      message: 'Quits API server is running',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+      endpoints: [
+        '/health',
+        '/api/test-cors',
+        '/api/scan-emails'
+      ]
+    });
+  }
 });
 
 // Start the server with more detailed logging
