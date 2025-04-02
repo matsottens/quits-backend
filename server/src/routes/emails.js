@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../middleware/auth');
+const { createGmailClient, SEARCH_QUERY } = require('../config/gmail');
 
 // Email scanning endpoint (protected)
 router.post('/scan-emails', async (req, res) => {
@@ -16,109 +17,99 @@ router.post('/scan-emails', async (req, res) => {
       return res.status(401).json({ error: 'No user ID provided' });
     }
 
-    // For now, return mock data
-    const mockEmail = {
-      id: 'mock-email-1',
-      subject: 'Test Subscription',
-      from: 'test@example.com',
-      date: new Date().toISOString(),
-      body: 'This is a test subscription email'
-    };
+    // Create Gmail client
+    const gmail = createGmailClient(gmailToken);
 
-    // First, check if a subscription with this email_id already exists
-    console.log('Checking for existing subscription...');
-    const { data: existingSubscriptions, error: checkError } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('email_id', mockEmail.id);
+    // Search for subscription emails
+    console.log('Searching for subscription emails...');
+    const { data: messages } = await gmail.users.messages.list({
+      userId: 'me',
+      q: SEARCH_QUERY,
+      maxResults: 10
+    });
 
-    if (checkError) {
-      console.error('Error checking existing subscription:', {
-        code: checkError.code,
-        message: checkError.message,
-        details: checkError.details,
-        hint: checkError.hint
-      });
-      return res.status(500).json({ 
-        error: 'Failed to check existing subscription',
-        details: checkError.message
-      });
-    }
-
-    const existingSubscription = existingSubscriptions?.[0];
-
-    if (existingSubscription) {
-      console.log('Found existing subscription, updating...');
-      // Update existing subscription
-      const { data: updatedSubscription, error: updateError } = await supabase
-        .from('subscriptions')
-        .update({
-          last_detected_date: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingSubscription.id)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error('Error updating subscription:', {
-          code: updateError.code,
-          message: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint
-        });
-        return res.status(500).json({ 
-          error: 'Failed to update subscription data',
-          details: updateError.message
-        });
-      }
-
+    if (!messages || !messages.messages) {
+      console.log('No subscription emails found');
       return res.json({
         success: true,
-        message: 'Subscription updated',
-        email: mockEmail,
-        subscription: updatedSubscription
+        message: 'No subscription emails found',
+        count: 0,
+        subscriptions: []
       });
     }
 
-    console.log('No existing subscription found, creating new one...');
-    // Insert new subscription
-    const { data: newSubscription, error: insertError } = await supabase
-      .from('subscriptions')
-      .insert([
-        {
-          user_id: userId,
-          provider: 'example.com',
-          type: 'test',
-          price: 9.99,
-          frequency: 'monthly',
-          email_id: mockEmail.id,
-          last_detected_date: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ])
-      .select()
-      .single();
+    // Process each email
+    const subscriptions = [];
+    for (const message of messages.messages) {
+      const { data: email } = await gmail.users.messages.get({
+        userId: 'me',
+        id: message.id
+      });
 
-    if (insertError) {
-      console.error('Error inserting subscription:', {
-        code: insertError.code,
-        message: insertError.message,
-        details: insertError.details,
-        hint: insertError.hint
-      });
-      return res.status(500).json({ 
-        error: 'Failed to store subscription data',
-        details: insertError.message
-      });
+      // Extract email details
+      const headers = email.payload.headers;
+      const subject = headers.find(h => h.name === 'Subject')?.value || '';
+      const from = headers.find(h => h.name === 'From')?.value || '';
+      const date = headers.find(h => h.name === 'Date')?.value || '';
+
+      // Check if subscription already exists
+      const { data: existingSubscriptions } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('email_id', message.id);
+
+      const existingSubscription = existingSubscriptions?.[0];
+
+      if (existingSubscription) {
+        console.log('Found existing subscription, updating...');
+        // Update existing subscription
+        const { data: updatedSubscription } = await supabase
+          .from('subscriptions')
+          .update({
+            last_detected_date: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingSubscription.id)
+          .select()
+          .single();
+
+        subscriptions.push({
+          email: { id: message.id, subject, from, date },
+          subscription: updatedSubscription
+        });
+      } else {
+        console.log('Creating new subscription...');
+        // Insert new subscription
+        const { data: newSubscription } = await supabase
+          .from('subscriptions')
+          .insert([
+            {
+              user_id: userId,
+              provider: from.split('@')[1]?.split('>')[0] || 'unknown',
+              type: 'email',
+              price: null, // Will be updated by price detection
+              frequency: null, // Will be updated by frequency detection
+              email_id: message.id,
+              last_detected_date: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }
+          ])
+          .select()
+          .single();
+
+        subscriptions.push({
+          email: { id: message.id, subject, from, date },
+          subscription: newSubscription
+        });
+      }
     }
 
     res.json({
       success: true,
-      message: 'Email scan initiated',
-      email: mockEmail,
-      subscription: newSubscription
+      message: 'Email scan completed',
+      count: subscriptions.length,
+      subscriptions
     });
   } catch (error) {
     console.error('Error scanning emails:', {
