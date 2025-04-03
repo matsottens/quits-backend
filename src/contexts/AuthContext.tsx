@@ -13,6 +13,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   scanEmails: () => Promise<void>;
   login: (tokens: any) => Promise<{ user: User; session: Session }>;
+  refreshSession: () => Promise<void>;
 }
 
 interface SubscriptionState {
@@ -35,6 +36,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     priceChanges: null,
     lastScanTime: null
   });
+
+  const refreshSession = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error refreshing session:', error);
+        throw error;
+      }
+
+      if (!session) {
+        console.log('No active session found during refresh');
+        sessionStorage.removeItem('gmail_access_token');
+        setUser(null);
+        window.location.href = '/login';
+        return;
+      }
+
+      // Validate session token
+      if (!session.access_token || !session.access_token.includes('.')) {
+        console.error('Invalid session token format during refresh');
+        await supabase.auth.signOut();
+        window.location.href = '/login';
+        return;
+      }
+
+      // Update user state
+      setUser(session.user);
+
+      // Update Gmail token if available
+      if (session.provider_token) {
+        sessionStorage.setItem('gmail_access_token', session.provider_token);
+        console.log('Updated Gmail token from refreshed session');
+      }
+
+      return session;
+    } catch (error) {
+      console.error('Session refresh failed:', error);
+      await signOut();
+    }
+  };
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -91,6 +133,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.log('Storing provider token from auth change');
             sessionStorage.setItem('gmail_access_token', session.provider_token);
           }
+        } else if (event === 'TOKEN_REFRESHED') {
+          // Handle token refresh
+          await refreshSession();
         }
       } catch (error) {
         console.error('Error handling auth state change:', error);
@@ -217,6 +262,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         hasUser: !!tokens.user
       });
 
+      // Validate token format
+      if (tokens.access_token && !tokens.access_token.includes('.')) {
+        throw new Error('Invalid access token format');
+      }
+
       // Store the Gmail token in sessionStorage only
       if (tokens.access_token) {
         sessionStorage.setItem('gmail_access_token', tokens.access_token);
@@ -242,6 +292,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           hasProviderToken: !!data.session?.provider_token
         });
 
+        // Validate session token
+        if (data.session?.access_token && !data.session.access_token.includes('.')) {
+          console.error('Invalid session token format');
+          await supabase.auth.signOut();
+          throw new Error('Invalid session token format');
+        }
+
         // Store provider token if available
         if (data.session?.provider_token) {
           sessionStorage.setItem('gmail_access_token', data.session.provider_token);
@@ -254,6 +311,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     } catch (error) {
       console.error('Login error:', error);
+      // Clear any invalid tokens
+      sessionStorage.removeItem('gmail_access_token');
+      await supabase.auth.signOut();
       // Redirect to login page on error
       window.location.href = '/login';
       throw error;
@@ -316,7 +376,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signInWithGoogle,
     scanEmails,
     login,
-    subscriptionState
+    refreshSession
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

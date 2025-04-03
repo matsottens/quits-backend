@@ -45,6 +45,8 @@ class ApiService {
   private static instance: ApiService;
   private retryCount: number = 0;
   private readonly MAX_RETRIES = 2;
+  private isRefreshing = false;
+  private refreshPromise: Promise<void> | null = null;
   private originVariations: string[] = [];
   
   private constructor() {}
@@ -55,6 +57,47 @@ class ApiService {
       console.log('Created new ApiService instance');
     }
     return ApiService.instance;
+  }
+
+  private async refreshAuthToken(): Promise<void> {
+    if (this.isRefreshing) {
+      return this.refreshPromise!;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = new Promise(async (resolve, reject) => {
+      try {
+        const { data: { session }, error } = await supabase.auth.refreshSession();
+        
+        if (error) {
+          console.error('Token refresh failed:', error);
+          throw error;
+        }
+
+        if (!session) {
+          throw new Error('No session after refresh');
+        }
+
+        // Update Gmail token if available
+        if (session.provider_token) {
+          sessionStorage.setItem('gmail_access_token', session.provider_token);
+        }
+
+        resolve();
+      } catch (error) {
+        console.error('Failed to refresh token:', error);
+        // Clear tokens and redirect to login
+        sessionStorage.removeItem('gmail_access_token');
+        await supabase.auth.signOut();
+        window.location.href = '/login';
+        reject(error);
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    });
+
+    return this.refreshPromise;
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
@@ -69,7 +112,12 @@ class ApiService {
 
       if (!session?.access_token) {
         console.error('No access token in session');
-        throw new Error('Not authenticated. Please sign in again.');
+        await this.refreshAuthToken();
+        // Try to get the session again after refresh
+        const { data: { session: refreshedSession } } = await supabase.auth.getSession();
+        if (!refreshedSession?.access_token) {
+          throw new Error('Not authenticated. Please sign in again.');
+        }
       }
 
       // Get Gmail token from session storage
@@ -82,6 +130,17 @@ class ApiService {
       if (!session.user?.id) {
         console.error('No user ID in session');
         throw new Error('No user ID available. Please sign in again.');
+      }
+
+      // Ensure the access token is properly formatted
+      const accessToken = session.access_token.trim();
+      if (!accessToken.includes('.')) {
+        console.error('Malformed access token');
+        await this.refreshAuthToken();
+        const { data: { session: refreshedSession } } = await supabase.auth.getSession();
+        if (!refreshedSession?.access_token) {
+          throw new Error('Invalid token format. Please sign in again.');
+        }
       }
 
       // Log successful header creation (excluding sensitive data)
@@ -97,7 +156,7 @@ class ApiService {
       return {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer ${accessToken}`,
         'X-Gmail-Token': gmailToken,
         'X-User-ID': session.user.id,
         'Origin': window.location.origin
@@ -107,7 +166,10 @@ class ApiService {
       // Clear any invalid tokens
       sessionStorage.removeItem('gmail_access_token');
       // Redirect to login if authentication is missing
-      if (error instanceof Error && error.message.includes('Not authenticated')) {
+      if (error instanceof Error && 
+          (error.message.includes('Not authenticated') || 
+           error.message.includes('Invalid token'))) {
+        await supabase.auth.signOut();
         window.location.href = '/login';
       }
       throw error;
@@ -131,18 +193,6 @@ class ApiService {
         environment: process.env.NODE_ENV
       });
 
-      if (!headers['Authorization']) {
-        throw new Error('No authentication token available. Please sign in again.');
-      }
-
-      if (!headers['X-Gmail-Token']) {
-        throw new Error('No Gmail token available. Please sign in with Google again.');
-      }
-
-      if (!headers['X-User-ID']) {
-        throw new Error('No user ID available. Please sign in again.');
-      }
-
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -157,17 +207,10 @@ class ApiService {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
-        url: response.url,
-        type: response.type,
-        ok: response.ok,
-        redirected: response.redirected,
-        redirectType: response.type,
-        finalUrl: response.url
+        url: response.url
       });
 
-      // Try to get the response text first
       const responseText = await response.text();
-      console.log('Raw response text:', responseText);
 
       if (!response.ok) {
         let errorData;
@@ -178,22 +221,16 @@ class ApiService {
         }
         
         if (response.status === 401) {
-          // Handle authentication errors
-          if (errorData?.error === 'Gmail token expired or invalid') {
-            sessionStorage.removeItem('gmail_access_token');
-            window.location.href = '/auth/google';
-            return { success: false, error: 'Gmail token expired. Redirecting to Google auth...' };
-          } else if (errorData?.error === 'Invalid or missing authentication token') {
-            // Try to refresh the session
-            const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
-            if (refreshError || !session) {
-              await supabase.auth.signOut();
-              window.location.href = '/login';
-              return { success: false, error: 'Session expired. Please sign in again.' };
-            }
-            // Retry the request with new session
+          if (this.retryCount < this.MAX_RETRIES) {
+            this.retryCount++;
+            // Try to refresh the token
+            await this.refreshAuthToken();
+            // Retry the request
             return this.makeRequest(endpoint, options);
           } else {
+            this.retryCount = 0;
+            // Clear tokens and redirect to login
+            sessionStorage.removeItem('gmail_access_token');
             await supabase.auth.signOut();
             window.location.href = '/login';
             return { success: false, error: 'Session expired. Please sign in again.' };
@@ -202,6 +239,8 @@ class ApiService {
 
         throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
       }
+
+      this.retryCount = 0;
 
       // Try to parse the response as JSON
       let data;
@@ -213,23 +252,12 @@ class ApiService {
       }
       
       return { success: true, data };
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return { success: false, error: 'Request timed out. Please try again.' };
-      }
-
-      console.error('API request error:', {
-        message: error.message,
-        type: error.name,
-        stack: error.stack,
-        url: endpoint,
-        environment: process.env.NODE_ENV
-      });
-
+    } catch (error) {
+      console.error('API request error:', error);
       return { 
         success: false, 
-        error: error.message || 'Failed to make API request',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: error instanceof Error ? error.message : 'Failed to make API request',
+        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
       };
     }
   }
