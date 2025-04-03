@@ -70,75 +70,50 @@ export const SubscriptionAnalytics: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      <div className="flex items-center justify-center py-10">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (!analytics) {
     return (
-      <div className="text-center p-4">
-        <p className="text-gray-500">No analytics data available</p>
+      <div className="text-center py-10">
+        <p className="text-gray-500">No subscription data available</p>
+        <p className="mt-2 text-sm text-gray-400">Start scanning your emails to find subscriptions</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <ChartBarIcon className="h-6 w-6 text-blue-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Total Subscriptions</h3>
-          </div>
-          <p className="mt-2 text-2xl font-semibold">{analytics.totalSubscriptions}</p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <CurrencyDollarIcon className="h-6 w-6 text-green-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Monthly Cost</h3>
-          </div>
-          <p className="mt-2 text-2xl font-semibold">${analytics.totalMonthlyCost.toFixed(2)}</p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <ArrowTrendingUpIcon className="h-6 w-6 text-red-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Avg Price Change</h3>
-          </div>
-          <p className="mt-2 text-2xl font-semibold">{analytics.averagePriceChange.toFixed(1)}%</p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <CalendarIcon className="h-6 w-6 text-purple-500 mr-2" />
-            <h3 className="text-sm font-medium text-gray-500">Upcoming Renewals</h3>
-          </div>
-          <p className="mt-2 text-2xl font-semibold">{analytics.upcomingRenewals}</p>
-        </div>
-      </div>
-
+    <div className="space-y-8">
+      <h2 className="text-xl font-bold text-gray-800 mb-4">Subscription Analytics</h2>
+      
       {/* Price Changes */}
-      {analytics.priceChanges && analytics.priceChanges.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Recent Price Changes</h2>
-          <div className="space-y-4">
+      {analytics.priceChanges && analytics.priceChanges.length > 0 ? (
+        <div className="rounded-xl overflow-hidden border border-gray-100">
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-4 border-b border-gray-100">
+            <h3 className="text-base font-semibold text-primary flex items-center">
+              <ArrowTrendingUpIcon className="h-5 w-5 mr-2" />
+              Recent Price Changes
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-100">
             {analytics.priceChanges.map((change, index) => (
-              <div key={index} className="border-b pb-4 last:border-b-0">
+              <div key={index} className="p-4 hover:bg-gray-50">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-medium">{change.provider}</h3>
-                  <span className={`text-sm ${
-                    change.percentageChange > 0 ? 'text-red-500' : 'text-green-500'
+                  <h4 className="font-medium text-gray-800">{change.provider}</h4>
+                  <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                    change.percentageChange > 0 
+                      ? 'text-red-700 bg-red-50' 
+                      : 'text-green-700 bg-green-50'
                   }`}>
                     {change.percentageChange > 0 ? '+' : ''}{change.percentageChange.toFixed(1)}%
                   </span>
                 </div>
                 <div className="mt-1 text-sm text-gray-600">
                   <p>From ${change.oldPrice.toFixed(2)} to ${change.newPrice.toFixed(2)}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 mt-1">
                     First detected: {new Date(change.firstDetected).toLocaleDateString()}
                   </p>
                 </div>
@@ -146,33 +121,43 @@ export const SubscriptionAnalytics: React.FC = () => {
             ))}
           </div>
         </div>
+      ) : (
+        <div className="bg-gray-50 rounded-xl p-6 text-center border border-gray-100">
+          <p className="text-gray-500">No recent price changes detected</p>
+        </div>
       )}
 
       {/* Upcoming Renewals */}
-      {analytics.upcomingRenewalsList && analytics.upcomingRenewalsList.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4 flex items-center">
-            <CalendarIcon className="h-5 w-5 mr-2" />
-            Upcoming Renewals
-          </h2>
-          <div className="space-y-4">
+      {analytics.upcomingRenewalsList && analytics.upcomingRenewalsList.length > 0 ? (
+        <div className="rounded-xl overflow-hidden border border-gray-100">
+          <div className="bg-gradient-to-r from-accent/5 to-accent/10 p-4 border-b border-gray-100">
+            <h3 className="text-base font-semibold text-accent flex items-center">
+              <CalendarIcon className="h-5 w-5 mr-2" />
+              Upcoming Renewals
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-100">
             {analytics.upcomingRenewalsList.map((renewal, index) => (
-              <div key={index} className="border-b pb-4 last:border-b-0">
+              <div key={index} className="p-4 hover:bg-gray-50">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-medium">{renewal.provider}</h3>
-                  <span className="text-sm text-blue-500">
+                  <h4 className="font-medium text-gray-800">{renewal.provider}</h4>
+                  <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-700">
                     {renewal.daysUntilRenewal} days
                   </span>
                 </div>
                 <div className="mt-1 text-sm text-gray-600">
                   <p>${renewal.price.toFixed(2)} per {renewal.frequency}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 mt-1">
                     Renewal date: {new Date(renewal.renewal_date).toLocaleDateString()}
                   </p>
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      ) : (
+        <div className="bg-gray-50 rounded-xl p-6 text-center border border-gray-100">
+          <p className="text-gray-500">No upcoming renewals detected</p>
         </div>
       )}
     </div>

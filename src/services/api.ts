@@ -296,8 +296,49 @@ class ApiService {
 
 // Transform raw subscription data to frontend format
 const transformSubscriptionData = (data: SubscriptionData): SubscriptionData => {
+  // Process the provider name to make it more readable
+  let providerName = data.provider || '';
+  
+  // Clean up the provider name
+  if (providerName) {
+    // Extract company name from email domain if it looks like an email address
+    if (providerName.includes('@')) {
+      // Extract the domain part
+      const domainPart = providerName.split('@')[1];
+      if (domainPart) {
+        // Remove domain suffix and convert to proper name format
+        providerName = domainPart
+          .split('.')[0] // Take the first part before any dots
+          .replace(/-/g, ' ') // Replace hyphens with spaces
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize words
+          .join(' ');
+      }
+    }
+    
+    // Clean up common prefixes and codes
+    providerName = providerName
+      .replace(/^no-?reply/i, '')
+      .replace(/^notifications?/i, '')
+      .replace(/^info/i, '')
+      .replace(/^support/i, '')
+      .replace(/^team/i, '')
+      .replace(/^customer/i, '')
+      .replace(/^service/i, '')
+      .trim();
+    
+    // If empty after cleanup, set to "Unknown Service"
+    if (!providerName) {
+      providerName = "Unknown Service";
+    }
+  } else {
+    providerName = "Unknown Service";
+  }
+  
   return {
     ...data,
+    // Update the provider name
+    provider: providerName,
     // Ensure price is a number or null
     price: data.price ? Number(data.price) : null,
     // Ensure renewal_date is in ISO format or null

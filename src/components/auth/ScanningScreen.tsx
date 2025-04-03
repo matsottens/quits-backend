@@ -46,7 +46,44 @@ export const ScanningScreen: React.FC = () => {
         try {
           const result = await scanEmails();
           
-          // Store the result in localStorage to display on dashboard
+          // Process subscription results to ensure provider names and default values
+          if (result?.subscriptions && result.subscriptions.length > 0) {
+            // Ensure each subscription has proper defaults
+            const processedSubscriptions = result.subscriptions.map(sub => {
+              // Process the provider name to make it more user-friendly
+              let providerName = sub.provider || '';
+              
+              // Handle common services by known patterns
+              if (providerName.toLowerCase().includes('netflix')) {
+                providerName = 'Netflix';
+              } else if (providerName.toLowerCase().includes('spotify')) {
+                providerName = 'Spotify';
+              } else if (providerName.toLowerCase().includes('apple')) {
+                providerName = 'Apple';
+              } else if (providerName.toLowerCase().includes('amazon')) {
+                providerName = 'Amazon';
+              } else if (providerName.toLowerCase().includes('disney')) {
+                providerName = 'Disney+';
+              } else if (providerName.toLowerCase().includes('google')) {
+                providerName = 'Google';
+              } else if (providerName.toLowerCase().includes('hbo')) {
+                providerName = 'HBO Max';
+              }
+              
+              return {
+                ...sub,
+                provider: providerName || "Unknown Service",
+                price: sub.price || 0,
+                frequency: sub.frequency || "monthly"
+              };
+            });
+            
+            // Store the processed subscriptions
+            localStorage.setItem('last_subscriptions', JSON.stringify(processedSubscriptions));
+            result.subscriptions = processedSubscriptions;
+          }
+          
+          // Store other scan results
           if (result?.count !== undefined) {
             localStorage.setItem('last_scan_count', result.count.toString());
             localStorage.setItem('last_scan_time', new Date().toISOString());
@@ -65,10 +102,16 @@ export const ScanningScreen: React.FC = () => {
           setProgress(100);
           setStatus('Scan complete!');
           
-          // Navigate to dashboard after a short delay
+          // Navigate to dashboard after a short delay with subscription data
           setTimeout(() => {
             if (!mounted) return;
-            navigate('/dashboard', { state: { fromScan: true, scanCount: result?.count || 0 } });
+            navigate('/dashboard', { 
+              state: { 
+                fromScan: true, 
+                scanCount: result?.count || 0,
+                subscriptions: result?.subscriptions || []
+              } 
+            });
           }, 1000);
         } catch (error) {
           console.error('Error during scan:', error);
@@ -125,25 +168,37 @@ export const ScanningScreen: React.FC = () => {
         left: 0,
         right: 0,
         bottom: 0,
-        bgcolor: 'background.default'
+        bgcolor: '#FFEDD6'
       }}
     >
-      <CircularProgress
-        variant="determinate"
-        value={progress}
-        size={80}
-        thickness={4}
-        sx={{ 
-          mb: 4,
-          color: progress === 100 ? 'success.main' : 'primary.main'
+      <Box
+        sx={{
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          p: 6,
+          width: '100%',
+          maxWidth: '500px',
+          textAlign: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
         }}
-      />
-      <Typography variant="h5" gutterBottom fontWeight="medium">
-        {status}
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-        {progress}% complete
-      </Typography>
+      >
+        <CircularProgress
+          variant="determinate"
+          value={progress}
+          size={80}
+          thickness={4}
+          sx={{ 
+            mb: 4,
+            color: progress === 100 ? 'success.main' : '#26457A'
+          }}
+        />
+        <Typography variant="h5" gutterBottom fontWeight="medium" color="#26457A">
+          {status}
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
+          {progress}% complete
+        </Typography>
+      </Box>
     </Box>
   );
 }; 

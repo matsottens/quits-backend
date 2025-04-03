@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { EnvelopeIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
-import { scanEmails } from '../services/api';
+import { scanEmails, SubscriptionData } from '../services/api';
 
 interface SubscriptionScannerProps {
-  onScanComplete?: (count: number) => void;
+  onScanComplete?: (count: number, subscriptions?: SubscriptionData[]) => void;
 }
 
 export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScanComplete }) => {
@@ -30,8 +30,65 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
           lastScan: new Date()
         });
         
+        // Process subscription results
+        let processedSubscriptions: SubscriptionData[] = [];
+        if (result.subscriptions && result.subscriptions.length > 0) {
+          // Ensure each subscription has proper defaults and clean provider names
+          processedSubscriptions = result.subscriptions.map(sub => {
+            // Process the provider name to make it more user-friendly
+            let providerName = sub.provider || '';
+            
+            // Handle common services by known patterns
+            if (providerName.toLowerCase().includes('netflix')) {
+              providerName = 'Netflix';
+            } else if (providerName.toLowerCase().includes('spotify')) {
+              providerName = 'Spotify';
+            } else if (providerName.toLowerCase().includes('apple')) {
+              providerName = 'Apple';
+            } else if (providerName.toLowerCase().includes('amazon')) {
+              providerName = 'Amazon';
+            } else if (providerName.toLowerCase().includes('disney')) {
+              providerName = 'Disney+';
+            } else if (providerName.toLowerCase().includes('google')) {
+              providerName = 'Google';
+            } else if (providerName.toLowerCase().includes('hbo')) {
+              providerName = 'HBO Max';
+            } else if (providerName.toLowerCase().includes('youtube')) {
+              providerName = 'YouTube Premium';
+            }
+            
+            // If the provider name has an email domain, extract the company name
+            if (providerName.includes('@')) {
+              const domainPart = providerName.split('@')[1];
+              if (domainPart) {
+                // Remove domain suffix and convert to proper name format
+                providerName = domainPart
+                  .split('.')[0] // Take the first part before any dots
+                  .replace(/-/g, ' ') // Replace hyphens with spaces
+                  .split(' ')
+                  .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize words
+                  .join(' ');
+              }
+            }
+            
+            return {
+              ...sub,
+              provider: providerName || "Unknown Service",
+              price: sub.price || 0,
+              frequency: sub.frequency || "monthly"
+            };
+          });
+          
+          // Store the processed subscriptions
+          localStorage.setItem('last_subscriptions', JSON.stringify(processedSubscriptions));
+        }
+        
+        // Store the scan count in localStorage
+        localStorage.setItem('last_scan_count', count.toString());
+        localStorage.setItem('last_scan_time', new Date().toISOString());
+        
         if (onScanComplete) {
-          onScanComplete(count);
+          onScanComplete(count, processedSubscriptions);
         }
       }
     } catch (err: any) {
@@ -46,14 +103,14 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
     <div className="bg-white rounded-lg shadow p-5 border border-gray-100">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold flex items-center">
-          <EnvelopeIcon className="h-5 w-5 text-indigo-600 mr-2" />
+          <EnvelopeIcon className="h-5 w-5 text-primary mr-2" />
           Email Subscription Scanner
         </h2>
         
         <button
           onClick={handleScan}
           disabled={isScanning}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isScanning ? (
             <>
