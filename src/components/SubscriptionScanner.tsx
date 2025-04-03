@@ -30,12 +30,42 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
           lastScan: new Date()
         });
         
-        // Process subscription results with enhanced detection
+        // Process subscription results with enhanced title detection
         let processedSubscriptions: SubscriptionData[] = [];
         if (result.data.subscriptions && result.data.subscriptions.length > 0) {
-          // Enhanced processing for Apple subscriptions
+          // Enhanced processing for subscription emails
           processedSubscriptions = result.data.subscriptions.map(sub => {
             console.log('Processing subscription:', sub);
+            
+            // Extract service name from email title patterns
+            if (sub.title && typeof sub.title === 'string') {
+              console.log('Email title:', sub.title);
+              
+              // Common subscription title patterns
+              const titlePatterns = [
+                // Format: "Service Name Subscription Confirmation"
+                /([A-Za-z0-9\s]+(?:\s[A-Za-z0-9]+)*)\s+Subscription/i,
+                
+                // Format: "Your Service Name subscription"
+                /Your\s+([A-Za-z0-9\s]+(?:\s[A-Za-z0-9]+)*)\s+subscription/i,
+                
+                // Format: "Subscription Confirmation for Service Name"
+                /Subscription\s+(?:Confirmation|Receipt|Invoice)\s+for\s+([A-Za-z0-9\s]+(?:\s[A-Za-z0-9]+)*)/i,
+                
+                // Format: "Service Name - Your subscription details"
+                /^([A-Za-z0-9\s]+(?:\s[A-Za-z0-9]+)*)\s+-\s+Your\s+subscription/i
+              ];
+              
+              for (const pattern of titlePatterns) {
+                const match = sub.title.match(pattern);
+                if (match && match[1]) {
+                  const serviceName = match[1].trim();
+                  console.log(`Found service name in title: "${serviceName}"`);
+                  sub.provider = serviceName;
+                  break;
+                }
+              }
+            }
             
             // Special handling for Apple receipts containing Babbel
             if (sub.provider && typeof sub.provider === 'string') {
@@ -47,7 +77,7 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
                 console.log('Found Babbel subscription through Apple');
                 
                 // Look for pricing pattern in €XX,XX/X months format
-                const pricingMatch = sub.provider.match(/€\s*(\d+[\.,]\d+)\/(\d+)\s*(months|month)/i);
+                const pricingMatch = sub.provider.match(/€\s*(\d+[\.,]\d+)(?:\/(\d+)\s*(months|month))?/i);
                 if (pricingMatch) {
                   const totalPrice = parseFloat(pricingMatch[1].replace(',', '.'));
                   const months = parseInt(pricingMatch[2]);
@@ -62,6 +92,12 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
                 }
                 
                 sub.provider = 'Babbel';
+              }
+              
+              // Sports subscription identification
+              if (providerText.includes('nba') || sub.title?.toLowerCase().includes('nba')) {
+                console.log('Found NBA subscription');
+                sub.provider = 'NBA League Pass';
               }
               
               // Try to extract monetary values from text

@@ -16,6 +16,7 @@ export interface SubscriptionData {
   term_months: number | null;
   is_price_increase: boolean;
   lastDetectedDate: string;
+  title?: string;
 }
 
 // Types for API response
@@ -296,11 +297,31 @@ class ApiService {
 
 // Transform raw subscription data to frontend format
 const transformSubscriptionData = (data: SubscriptionData): SubscriptionData => {
+  // Try to extract service name from email title first
+  if (data.title && typeof data.title === 'string') {
+    console.log('Analyzing email title:', data.title);
+    
+    // Pattern 1: Service name followed by "Subscription" in title
+    const subscriptionTitleMatch = data.title.match(/([A-Za-z0-9\s]+(?:\s[A-Za-z0-9]+)*)\s+Subscription/i);
+    if (subscriptionTitleMatch && subscriptionTitleMatch[1]) {
+      const serviceName = subscriptionTitleMatch[1].trim();
+      console.log(`Found service name in title: "${serviceName}"`);
+      data.provider = serviceName;
+      return processProviderSpecificInfo(data);
+    }
+  }
+  
   // Early detection for Apple subscription receipts
   if (data.provider && data.provider.toLowerCase().includes('apple')) {
     return processAppleSubscription(data);
   }
 
+  // Process with existing service mapping logic
+  return processProviderSpecificInfo(data);
+};
+
+// Helper function to process provider-specific information
+const processProviderSpecificInfo = (data: SubscriptionData): SubscriptionData => {
   // Hardcoded mapping for common subscription services
   const directServiceMap: Record<string, string> = {
     // Popular streaming services
@@ -319,6 +340,13 @@ const transformSubscriptionData = (data: SubscriptionData): SubscriptionData => 
     'paramount': 'Paramount+',
     'showtime': 'Showtime',
     'starz': 'Starz',
+    
+    // Sports subscriptions
+    'nba': 'NBA League Pass',
+    'nfl': 'NFL Game Pass',
+    'mlb': 'MLB.tv',
+    'ufc': 'UFC Fight Pass',
+    'espn': 'ESPN+',
     
     // Language learning services
     'babbel': 'Babbel',
@@ -350,7 +378,7 @@ const transformSubscriptionData = (data: SubscriptionData): SubscriptionData => 
     'cloud': 'Cloud Storage',
   };
   
-  // Extract provider name from input
+  // Extract provider name from input if we haven't already determined it from the title
   let providerName = data.provider || '';
   const rawProvider = providerName.toLowerCase();
   
