@@ -296,58 +296,292 @@ class ApiService {
 
 // Transform raw subscription data to frontend format
 const transformSubscriptionData = (data: SubscriptionData): SubscriptionData => {
-  // Process the provider name to make it more readable
-  let providerName = data.provider || '';
+  // Early detection for Apple subscription receipts
+  if (data.provider && data.provider.toLowerCase().includes('apple')) {
+    return processAppleSubscription(data);
+  }
+
+  // Hardcoded mapping for common subscription services
+  const directServiceMap: Record<string, string> = {
+    // Popular streaming services
+    'netflix': 'Netflix',
+    'spotify': 'Spotify',
+    'apple': 'Apple',
+    'youtube': 'YouTube Premium',
+    'disney': 'Disney+',
+    'hbo': 'HBO Max',
+    'prime': 'Amazon Prime',
+    'amazon': 'Amazon',
+    'pandora': 'Pandora',
+    'hulu': 'Hulu',
+    'crunchyroll': 'Crunchyroll',
+    'peacock': 'Peacock',
+    'paramount': 'Paramount+',
+    'showtime': 'Showtime',
+    'starz': 'Starz',
+    
+    // Language learning services
+    'babbel': 'Babbel',
+    'duolingo': 'Duolingo',
+    'rosetta': 'Rosetta Stone',
+    
+    // Software services
+    'adobe': 'Adobe',
+    'office': 'Microsoft Office',
+    'microsoft': 'Microsoft',
+    'autodesk': 'Autodesk',
+    'dropbox': 'Dropbox',
+    'github': 'GitHub',
+    'slack': 'Slack',
+    'zoom': 'Zoom',
+    
+    // Other popular subscriptions
+    'nytimes': 'New York Times',
+    'wsj': 'Wall Street Journal',
+    'medium': 'Medium',
+    'patreon': 'Patreon',
+    'onlyfans': 'OnlyFans',
+    'substack': 'Substack',
+    
+    // Utilities
+    'domain': 'Domain Registration',
+    'hosting': 'Web Hosting',
+    'vpn': 'VPN Service',
+    'cloud': 'Cloud Storage',
+  };
   
-  // Clean up the provider name
-  if (providerName) {
-    // Extract company name from email domain if it looks like an email address
-    if (providerName.includes('@')) {
-      // Extract the domain part
-      const domainPart = providerName.split('@')[1];
-      if (domainPart) {
-        // Remove domain suffix and convert to proper name format
-        providerName = domainPart
-          .split('.')[0] // Take the first part before any dots
-          .replace(/-/g, ' ') // Replace hyphens with spaces
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize words
-          .join(' ');
+  // Extract provider name from input
+  let providerName = data.provider || '';
+  const rawProvider = providerName.toLowerCase();
+  
+  // Step 1: Direct match against common services
+  for (const [key, value] of Object.entries(directServiceMap)) {
+    if (rawProvider.includes(key)) {
+      providerName = value;
+      console.log(`Direct match found: ${key} → ${value}`);
+      break;
+    }
+  }
+  
+  // Step 2: Handle email-like formats
+  if (providerName === data.provider && providerName.includes('@')) {
+    // Extract domain part
+    const emailParts = providerName.split('@');
+    if (emailParts[1]) {
+      const domainPart = emailParts[1].split('.')[0];
+      
+      // Check if domain matches any known service
+      for (const [key, value] of Object.entries(directServiceMap)) {
+        if (domainPart.toLowerCase() === key) {
+          providerName = value;
+          console.log(`Domain match found: ${domainPart} → ${value}`);
+          break;
+        }
+      }
+      
+      // If still no match, format the domain as the service name
+      if (providerName === data.provider) {
+        providerName = domainPart.charAt(0).toUpperCase() + domainPart.slice(1);
+        console.log(`Using formatted domain: ${providerName}`);
       }
     }
-    
-    // Clean up common prefixes and codes
-    providerName = providerName
-      .replace(/^no-?reply/i, '')
-      .replace(/^notifications?/i, '')
-      .replace(/^info/i, '')
-      .replace(/^support/i, '')
-      .replace(/^team/i, '')
-      .replace(/^customer/i, '')
-      .replace(/^service/i, '')
-      .trim();
-    
-    // If empty after cleanup, set to "Unknown Service"
-    if (!providerName) {
-      providerName = "Unknown Service";
+  }
+  
+  // Step 3: Handle generic "from" or noreply patterns
+  if (providerName === data.provider) {
+    const lowerProvider = providerName.toLowerCase();
+    if (lowerProvider.startsWith('noreply@') || 
+        lowerProvider.startsWith('no-reply@') || 
+        lowerProvider.startsWith('notify@') || 
+        lowerProvider.startsWith('notifications@') || 
+        lowerProvider.startsWith('info@') || 
+        lowerProvider.startsWith('support@') || 
+        lowerProvider.startsWith('billing@')) {
+      
+      const domain = lowerProvider.split('@')[1]?.split('.')[0];
+      if (domain) {
+        // Capitalize first letter of each word
+        providerName = domain
+          .split(/[-_.]/)
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        console.log(`From email pattern: ${providerName}`);
+      }
     }
-  } else {
-    providerName = "Unknown Service";
+  }
+  
+  // Step 4: Extract company name from broader context if available
+  if (!providerName || providerName === data.provider) {
+    // One last attempt - try to extract a valid company name from the provider field
+    const extractedName = extractCompanyName(data.provider);
+    if (extractedName) {
+      providerName = extractedName;
+      console.log(`Extracted company name: ${providerName}`);
+    } else {
+      providerName = "Unknown Service";
+      console.log(`Fallback to Unknown Service`);
+    }
+  }
+
+  // Handle price: use provided price or try to extract from raw data
+  let price = 0;
+  if (data.price !== null && data.price !== undefined) {
+    price = Number(data.price);
+  } else if (typeof data.provider === 'string') {
+    // Try to extract a price from the provider field if it contains monetary values
+    const extractedPrice = extractPriceFromString(data.provider);
+    if (extractedPrice !== null) {
+      price = extractedPrice;
+      console.log(`Extracted price: ${price}`);
+    }
   }
   
   return {
     ...data,
-    // Update the provider name
     provider: providerName,
-    // Ensure price is a number or null
-    price: data.price ? Number(data.price) : null,
-    // Ensure renewal_date is in ISO format or null
-    renewal_date: data.renewal_date ? new Date(data.renewal_date).toISOString() : null,
-    // Default to monthly if frequency is not specified
+    price: price,
     frequency: data.frequency || 'monthly',
-    // Ensure term_months is a number or null
-    term_months: data.term_months ? Number(data.term_months) : null
+    renewal_date: data.renewal_date ? new Date(data.renewal_date).toISOString() : null,
+    term_months: data.term_months ? Number(data.term_months) : null,
   };
+};
+
+// Helper function to process Apple subscription emails
+function processAppleSubscription(data: SubscriptionData): SubscriptionData {
+  console.log('Processing Apple subscription');
+  let provider = 'Apple Subscription';
+  let price = 0;
+  let frequency = 'monthly';
+  let renewalDate = null;
+  
+  // Look for specific app name pattern
+  if (typeof data.provider === 'string') {
+    // Extract app name
+    const appMatch = data.provider.match(/App\s+(.+?)(?=\s+Subscription|$)/i);
+    if (appMatch && appMatch[1]) {
+      provider = appMatch[1].trim();
+      console.log(`Found app name: ${provider}`);
+    }
+    
+    // Look for Babbel specifically
+    if (data.provider.toLowerCase().includes('babbel')) {
+      provider = 'Babbel';
+      console.log('Detected Babbel subscription');
+    }
+    
+    // Extract renewal price with Euro symbol
+    const euroMatch = data.provider.match(/€\s*(\d+[\.,]\d+)(?:\/(\d+)\s*(months|month))?/i);
+    if (euroMatch) {
+      const fullAmount = parseFloat(euroMatch[1].replace(',', '.'));
+      console.log(`Found Euro amount: ${fullAmount}`);
+      
+      // Check if there's a period mentioned
+      if (euroMatch[2] && euroMatch[3]) {
+        const period = parseInt(euroMatch[2]);
+        // Calculate monthly price
+        if (period > 1) {
+          price = fullAmount / period;
+          console.log(`Calculated monthly price: ${price} from ${fullAmount}/${period} months`);
+        } else {
+          price = fullAmount;
+        }
+        
+        // Determine frequency
+        if (euroMatch[3].toLowerCase().includes('month')) {
+          frequency = period > 1 ? 'monthly' : 'monthly';
+        } else {
+          frequency = 'yearly';
+        }
+      } else {
+        price = fullAmount;
+      }
+    }
+    
+    // Look for renewal date pattern
+    const dateMatch = data.provider.match(/(?:starting|renews)\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i);
+    if (dateMatch && dateMatch[1]) {
+      try {
+        renewalDate = new Date(dateMatch[1]).toISOString();
+        console.log(`Found renewal date: ${renewalDate}`);
+      } catch (e) {
+        console.log('Failed to parse renewal date');
+      }
+    }
+  }
+  
+  return {
+    ...data,
+    provider,
+    price,
+    frequency,
+    renewal_date: renewalDate,
+    term_months: null,
+    is_price_increase: false,
+    lastDetectedDate: new Date().toISOString()
+  };
+}
+
+// Helper function to extract a price from a string (looking for $ or € symbols)
+const extractPriceFromString = (str: string): number | null => {
+  if (!str) return null;
+  
+  // Match patterns like $9.99, €10, $13.50
+  const matches = str.match(/[\$€£](\d+[.,]?\d*)/);
+  if (matches && matches[1]) {
+    return parseFloat(matches[1].replace(',', '.'));
+  }
+  
+  // Also try to match numbers followed by currency symbols
+  const altMatches = str.match(/(\d+[.,]?\d*)[\$€£]/);
+  if (altMatches && altMatches[1]) {
+    return parseFloat(altMatches[1].replace(',', '.'));
+  }
+  
+  // Match euro formats with comma decimal separator
+  const euroMatches = str.match(/(\d+),(\d+)\s*€/);
+  if (euroMatches) {
+    return parseFloat(`${euroMatches[1]}.${euroMatches[2]}`);
+  }
+  
+  // Match "X months" patterns
+  const periodMatch = str.match(/€\s*(\d+[.,]\d+)\/(\d+)\s*months/i);
+  if (periodMatch && periodMatch[1] && periodMatch[2]) {
+    const totalAmount = parseFloat(periodMatch[1].replace(',', '.'));
+    const months = parseInt(periodMatch[2]);
+    if (!isNaN(totalAmount) && !isNaN(months) && months > 0) {
+      return totalAmount / months; // Return monthly equivalent
+    }
+  }
+  
+  return null;
+};
+
+// Helper function to extract a potential company name from a raw provider string
+const extractCompanyName = (str: string): string | null => {
+  if (!str) return null;
+  
+  // Potential company name patterns
+  const patterns = [
+    // Try to match "Company Name" <email> pattern
+    /"([^"]+)"/,
+    // Try to match 'Company Name' <email> pattern  
+    /'([^']+)'/,
+    // Try to match Company Name <email> pattern
+    /^([^<]+)</,
+    // Try to match words between brackets
+    /\[([^\]]+)\]/,
+    // Try to match words between parentheses
+    /\(([^)]+)\)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = str.match(pattern);
+    if (matches && matches[1] && matches[1].length > 2) {
+      return matches[1].trim();
+    }
+  }
+  
+  return null;
 };
 
 // Transform raw price change data to frontend format

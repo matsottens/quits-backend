@@ -22,70 +22,70 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
     try {
       const result = await scanEmails();
       
-      if (result) {
-        const count = result.count || 0;
+      if (result && result.success && result.data) {
+        const count = result.data.count || 0;
         
         setScanResult({
           count,
           lastScan: new Date()
         });
         
-        // Process subscription results
+        // Process subscription results with enhanced detection
         let processedSubscriptions: SubscriptionData[] = [];
-        if (result.subscriptions && result.subscriptions.length > 0) {
-          // Ensure each subscription has proper defaults and clean provider names
-          processedSubscriptions = result.subscriptions.map(sub => {
-            // Process the provider name to make it more user-friendly
-            let providerName = sub.provider || '';
+        if (result.data.subscriptions && result.data.subscriptions.length > 0) {
+          // Enhanced processing for Apple subscriptions
+          processedSubscriptions = result.data.subscriptions.map(sub => {
+            console.log('Processing subscription:', sub);
             
-            // Handle common services by known patterns
-            if (providerName.toLowerCase().includes('netflix')) {
-              providerName = 'Netflix';
-            } else if (providerName.toLowerCase().includes('spotify')) {
-              providerName = 'Spotify';
-            } else if (providerName.toLowerCase().includes('apple')) {
-              providerName = 'Apple';
-            } else if (providerName.toLowerCase().includes('amazon')) {
-              providerName = 'Amazon';
-            } else if (providerName.toLowerCase().includes('disney')) {
-              providerName = 'Disney+';
-            } else if (providerName.toLowerCase().includes('google')) {
-              providerName = 'Google';
-            } else if (providerName.toLowerCase().includes('hbo')) {
-              providerName = 'HBO Max';
-            } else if (providerName.toLowerCase().includes('youtube')) {
-              providerName = 'YouTube Premium';
-            }
-            
-            // If the provider name has an email domain, extract the company name
-            if (providerName.includes('@')) {
-              const domainPart = providerName.split('@')[1];
-              if (domainPart) {
-                // Remove domain suffix and convert to proper name format
-                providerName = domainPart
-                  .split('.')[0] // Take the first part before any dots
-                  .replace(/-/g, ' ') // Replace hyphens with spaces
-                  .split(' ')
-                  .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize words
-                  .join(' ');
+            // Special handling for Apple receipts containing Babbel
+            if (sub.provider && typeof sub.provider === 'string') {
+              const providerText = sub.provider.toLowerCase();
+              
+              // Detect Apple subscription with Babbel
+              if ((providerText.includes('apple') || providerText.includes('itunes')) && 
+                  providerText.includes('babbel')) {
+                console.log('Found Babbel subscription through Apple');
+                
+                // Look for pricing pattern in €XX,XX/X months format
+                const pricingMatch = sub.provider.match(/€\s*(\d+[\.,]\d+)\/(\d+)\s*(months|month)/i);
+                if (pricingMatch) {
+                  const totalPrice = parseFloat(pricingMatch[1].replace(',', '.'));
+                  const months = parseInt(pricingMatch[2]);
+                  
+                  // Calculate monthly price
+                  if (!isNaN(totalPrice) && !isNaN(months) && months > 0) {
+                    const monthlyPrice = totalPrice / months;
+                    console.log(`Calculated monthly price: ${monthlyPrice} from ${totalPrice}/${months} months`);
+                    sub.price = monthlyPrice;
+                    sub.frequency = 'monthly';
+                  }
+                }
+                
+                sub.provider = 'Babbel';
+              }
+              
+              // Try to extract monetary values from text
+              if (sub.price === null || sub.price === 0) {
+                const extractedPrice = extractMoneyValue(sub.provider);
+                if (extractedPrice !== null) {
+                  console.log(`Extracted price: ${extractedPrice} from text`);
+                  sub.price = extractedPrice;
+                }
               }
             }
             
-            return {
-              ...sub,
-              provider: providerName || "Unknown Service",
-              price: sub.price || 0,
-              frequency: sub.frequency || "monthly"
-            };
+            return sub;
           });
+    
+          console.log('Processed subscriptions:', processedSubscriptions);
           
-          // Store the processed subscriptions
-          localStorage.setItem('last_subscriptions', JSON.stringify(processedSubscriptions));
+          // Store the data in localStorage with a better key name
+          localStorage.setItem('subscriptions', JSON.stringify(processedSubscriptions));
         }
         
         // Store the scan count in localStorage
-        localStorage.setItem('last_scan_count', count.toString());
-        localStorage.setItem('last_scan_time', new Date().toISOString());
+        localStorage.setItem('subscriptionCount', count.toString());
+        localStorage.setItem('scanDate', new Date().toISOString());
         
         if (onScanComplete) {
           onScanComplete(count, processedSubscriptions);
@@ -97,6 +97,39 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
     } finally {
       setIsScanning(false);
     }
+  };
+  
+  // Helper function to find monetary values in text
+  const extractMoneyValue = (text: string): number | null => {
+    if (!text) return null;
+    
+    // Match currency symbols followed by numbers
+    const prefixMatches = text.match(/[\$€£](\d+[\.,]?\d*)/g);
+    if (prefixMatches && prefixMatches.length > 0) {
+      // Get the first match and clean it
+      const match = prefixMatches[0].replace(/[^\d\.,]/g, '').replace(',', '.');
+      return parseFloat(match);
+    }
+    
+    // Match numbers followed by currency symbols
+    const suffixMatches = text.match(/(\d+[\.,]?\d*)[\$€£]/g);
+    if (suffixMatches && suffixMatches.length > 0) {
+      // Get the first match and clean it
+      const match = suffixMatches[0].replace(/[^\d\.,]/g, '').replace(',', '.');
+      return parseFloat(match);
+    }
+    
+    // Match specific patterns for subscription pricing
+    const periodMatch = text.match(/(\d+[\.,]\d+)\/(\d+)\s*(months|month|jaar|year)/i);
+    if (periodMatch) {
+      const totalAmount = parseFloat(periodMatch[1].replace(',', '.'));
+      const period = parseInt(periodMatch[2]);
+      if (!isNaN(totalAmount) && !isNaN(period) && period > 0) {
+        return totalAmount / period; // Return monthly equivalent
+      }
+    }
+    
+    return null;
   };
   
   return (
