@@ -1,174 +1,122 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { BellIcon, CheckIcon, ArrowTrendingUpIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { apiService } from '../services/api';
+import { Typography } from '../pages/quits-subscription-tracker/components/ui/typography';
 
 interface Notification {
   id: string;
-  type: 'price_increase' | 'renewal_reminder';
-  provider: string;
+  type: 'price_change' | 'renewal' | 'subscription';
+  message: string;
   read: boolean;
-  created_at: string;
-  details: {
+  createdAt: string;
+  data?: {
+    provider?: string;
     oldPrice?: number;
     newPrice?: number;
-    percentageChange?: number;
-    renewal_date?: string;
-    term_months?: number;
-    days_until_renewal?: number;
-    price?: number;
-    frequency?: string;
+    renewalDate?: string;
   };
 }
 
-export const NotificationCenter: React.FC = () => {
-  const { user } = useAuth();
+const NotificationCenter: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-
-  const fetchNotifications = async () => {
-    if (!user) return;
-
-    try {
-      const response = await fetch('/api/notifications', {
-        headers: {
-          'Authorization': `Bearer ${user.id}`,
-          'x-user-id': user.id
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
-      }
-
-      const data = await response.json();
-      setNotifications(data.data.notifications);
-      setUnreadCount(data.data.unreadCount);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const markAsRead = async (notificationId: string) => {
-    if (!user) return;
-
-    try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user.id}`,
-          'x-user-id': user.id
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to mark notification as read');
-      }
-
-      // Update local state
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await apiService.getNotifications();
+        if (response.success && response.data) {
+          setNotifications(response.data);
+        } else {
+          setError('Failed to fetch notifications');
+        }
+      } catch (err) {
+        setError('An error occurred while fetching notifications');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (user) {
       fetchNotifications();
     }
   }, [user]);
 
+  const markAsRead = async (id: string) => {
+    try {
+      await apiService.markNotificationAsRead(id);
+      setNotifications(prev =>
+        prev.map(notification =>
+          notification.id === id ? { ...notification, read: true } : notification
+        )
+      );
+    } catch (err) {
+      setError('Failed to mark notification as read');
+    }
+  };
+
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    );
+    return <div>Loading notifications...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>;
   }
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold flex items-center">
-          <BellIcon className="h-6 w-6 text-blue-500 mr-2" />
-          Notifications
-        </h2>
-        {unreadCount > 0 && (
-          <span className="bg-red-500 text-white text-sm font-medium rounded-full px-2.5 py-1 min-w-[1.5rem] text-center">
-            {unreadCount}
-          </span>
-        )}
-      </div>
-
-      <div className="space-y-4">
-        {notifications.length === 0 ? (
-          <div className="bg-gray-50 rounded-lg p-6 text-center">
-            <p className="text-gray-500">No notifications</p>
-          </div>
-        ) : (
-          notifications.map(notification => (
-            <div
-              key={notification.id}
-              className={`p-4 rounded-lg border transition-all ${
-                notification.read 
-                  ? 'bg-gray-50 border-gray-200' 
-                  : 'bg-blue-50 border-blue-200 shadow-sm'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-medium flex items-center">
-                    {notification.type === 'price_increase' 
-                      ? (
-                        <>
-                          <ArrowTrendingUpIcon className="h-4 w-4 text-red-500 mr-1.5" />
-                          <span>Price Increase: {notification.provider}</span>
-                        </>
-                      )
-                      : (
-                        <>
-                          <CalendarIcon className="h-4 w-4 text-blue-500 mr-1.5" />
-                          <span>Upcoming Renewal: {notification.provider}</span>
-                        </>
-                      )}
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1.5">
-                    {notification.type === 'price_increase' ? (
-                      <>
-                        Price increasing from <span className="font-medium">${notification.details.oldPrice}</span> to <span className="font-medium">${notification.details.newPrice}</span> 
-                        (<span className="text-red-600 font-medium">{notification.details.percentageChange?.toFixed(1)}% increase</span>)
-                      </>
-                    ) : (
-                      <>
-                        Renewing in <span className="font-medium text-blue-600">{notification.details.days_until_renewal} days</span>
-                        <span className="mx-1">·</span>
-                        <span className="font-medium">${notification.details.price}</span> per {notification.details.frequency}
-                      </>
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {new Date(notification.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                {!notification.read && (
-                  <button
-                    onClick={() => markAsRead(notification.id)}
-                    className="text-blue-500 hover:text-blue-700 p-1 rounded-full hover:bg-blue-100 transition-colors"
-                    title="Mark as read"
-                  >
-                    <CheckIcon className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
+    <div className="space-y-4">
+      {notifications.map(notification => (
+        <div
+          key={notification.id}
+          className={`p-4 rounded-lg ${
+            notification.read ? 'bg-gray-50' : 'bg-blue-50'
+          }`}
+        >
+          <div className="flex justify-between items-start">
+            <div>
+              <Typography.span className="font-medium">
+                {notification.type === 'price_change' && 'Price Change'}
+                {notification.type === 'renewal' && 'Renewal Reminder'}
+                {notification.type === 'subscription' && 'New Subscription'}
+              </Typography.span>
+              <Typography.span className="text-sm text-gray-500 ml-2">
+                {new Date(notification.createdAt).toLocaleDateString()}
+              </Typography.span>
             </div>
-          ))
-        )}
-      </div>
+            {!notification.read && (
+              <button
+                onClick={() => markAsRead(notification.id)}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Mark as read
+              </button>
+            )}
+          </div>
+          <Typography.p className="mt-2">{notification.message}</Typography.p>
+          {notification.data && (
+            <div className="mt-2 text-sm text-gray-600">
+              {notification.data.provider && (
+                <Typography.p>Provider: {notification.data.provider}</Typography.p>
+              )}
+              {notification.data.oldPrice && notification.data.newPrice && (
+                <Typography.p>
+                  Price changed from ${notification.data.oldPrice} to $
+                  {notification.data.newPrice}
+                </Typography.p>
+              )}
+              {notification.data.renewalDate && (
+                <Typography.p>
+                  Renewal date: {new Date(notification.data.renewalDate).toLocaleDateString()}
+                </Typography.p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
-}; 
+};
+
+export default NotificationCenter; 

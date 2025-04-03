@@ -124,18 +124,33 @@ const authenticateRequest = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     const userId = req.headers['x-user-id'];
+    const requestId = req.requestId || Math.random().toString(36).substring(7);
     
+    // Log authentication attempt
+    console.log(`[${requestId}] Authentication attempt:`, {
+      hasAuthHeader: !!authHeader,
+      hasUserId: !!userId,
+      path: req.path,
+      method: req.method
+    });
+
     if (!authHeader?.startsWith('Bearer ')) {
+      console.log(`[${requestId}] Invalid auth header format:`, {
+        header: authHeader ? '[REDACTED]' : 'missing'
+      });
       return res.status(401).json({ 
         error: 'Invalid or missing authentication token',
-        details: 'Authorization header must start with Bearer'
+        details: 'Authorization header must start with Bearer',
+        requestId
       });
     }
 
     if (!userId) {
+      console.log(`[${requestId}] Missing user ID header`);
       return res.status(401).json({ 
         error: 'Missing user ID',
-        details: 'X-User-ID header is required'
+        details: 'X-User-ID header is required',
+        requestId
       });
     }
 
@@ -144,19 +159,35 @@ const authenticateRequest = async (req, res, next) => {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     
     if (error || !user) {
+      console.log(`[${requestId}] Token validation failed:`, {
+        error: error?.message || 'No user found',
+        token: token ? '[REDACTED]' : 'missing'
+      });
       return res.status(401).json({ 
         error: 'Invalid or expired token',
-        details: error?.message || 'Token validation failed'
+        details: error?.message || 'Token validation failed',
+        requestId
       });
     }
 
     // Verify the user ID matches
     if (user.id !== userId) {
+      console.log(`[${requestId}] User ID mismatch:`, {
+        tokenUserId: user.id,
+        headerUserId: userId
+      });
       return res.status(401).json({ 
         error: 'User ID mismatch',
-        details: 'Provided user ID does not match authenticated user'
+        details: 'Provided user ID does not match authenticated user',
+        requestId
       });
     }
+
+    // Log successful authentication
+    console.log(`[${requestId}] Authentication successful:`, {
+      userId: user.id,
+      email: user.email
+    });
 
     // Add user to request object
     req.user = user;
@@ -165,7 +196,8 @@ const authenticateRequest = async (req, res, next) => {
     console.error('Authentication error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      requestId: req.requestId
     });
   }
 };

@@ -58,23 +58,40 @@ export const Dashboard: React.FC = () => {
   }, [location.state]);
   
   const calculateTotalCost = (subs: SubscriptionData[]) => {
-    if (!subs || !subs.length) {
-      setTotalMonthlyCost(0);
-      return;
+    return subs.reduce((total, sub) => {
+      const price = sub.price || 0;
+      if (sub.frequency === 'yearly') {
+        return total + (price / 12);
+      }
+      return total + price;
+    }, 0);
+  };
+  
+  // Format price with currency symbol
+  const formatPrice = (price: number | null, frequency: string): string => {
+    if (price === null || price === undefined || isNaN(Number(price))) {
+      return "Price unknown";
     }
     
-    const total = subs.reduce((sum, sub) => {
-      if (!sub.price) return sum;
-      
-      // Convert yearly to monthly
-      if (sub.frequency === 'yearly') {
-        return sum + (sub.price / 12);
-      }
-      
-      return sum + sub.price;
-    }, 0);
+    // Get user's locale from browser
+    const userLocale = navigator.language || "en-US";
     
-    setTotalMonthlyCost(total);
+    // Format price based on frequency
+    if (frequency === 'yearly') {
+      return new Intl.NumberFormat(userLocale, { 
+        style: 'currency', 
+        currency: 'EUR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2 
+      }).format(Number(price)) + '/year';
+    } else {
+      return new Intl.NumberFormat(userLocale, { 
+        style: 'currency', 
+        currency: 'EUR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2 
+      }).format(Number(price)) + '/month';
+    }
   };
 
   return (
@@ -120,6 +137,11 @@ export const Dashboard: React.FC = () => {
                   <h2 className="text-lg font-semibold text-primary flex items-center">
                     <InboxIcon className="h-5 w-5 mr-2" />
                     Your Subscriptions
+                    {scanCount && scanCount > 0 && (
+                      <span className="ml-2 text-sm bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        {scanCount}
+                      </span>
+                    )}
                   </h2>
                 </div>
                 
@@ -132,10 +154,7 @@ export const Dashboard: React.FC = () => {
                             {subscription.provider || "Unknown Service"}
                           </h3>
                           <span className="font-medium text-primary">
-                            {subscription.price ? `$${subscription.price.toFixed(2)}` : '$0.00'}
-                            <span className="text-gray-500 text-sm font-normal ml-1">
-                              /{subscription.frequency === 'yearly' ? 'year' : 'month'}
-                            </span>
+                            {formatPrice(subscription.price, subscription.frequency)}
                           </span>
                         </div>
                         

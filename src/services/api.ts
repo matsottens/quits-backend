@@ -1,13 +1,6 @@
 import { supabase } from '../supabase';
+import { Session } from '@supabase/supabase-js';
 
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  details?: string;
-}
-
-// Types for subscription data
 export interface SubscriptionData {
   provider: string;
   price: number | null;
@@ -16,15 +9,7 @@ export interface SubscriptionData {
   term_months: number | null;
   is_price_increase: boolean;
   lastDetectedDate: string;
-}
-
-// Types for API response
-interface ScanEmailsResponse {
-  success: boolean;
-  message: string;
-  count: number;
-  subscriptions: SubscriptionData[];
-  priceChanges: PriceChange[] | null;
+  title?: string;
 }
 
 export interface PriceChange {
@@ -37,15 +22,34 @@ export interface PriceChange {
   provider: string;
 }
 
-// Update the API URL configuration
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  details?: string;
+}
+
+interface ScanEmailsResponse {
+  success: boolean;
+  message: string;
+  count: number;
+  subscriptions: SubscriptionData[];
+  priceChanges: PriceChange[] | null;
+}
+
+interface ScanEmailsApiResponse {
+  subscriptions: SubscriptionData[];
+  count: number;
+  priceChanges: PriceChange[] | null;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 class ApiService {
   private static instance: ApiService;
-  private retryCount: number = 0;
-  private readonly MAX_RETRIES = 2;
-  private originVariations: string[] = [];
-  
+  private isRefreshing = false;
+  private refreshPromise: Promise<void> | null = null;
+
   private constructor() {}
 
   public static getInstance(): ApiService {
@@ -56,9 +60,47 @@ class ApiService {
     return ApiService.instance;
   }
 
+  private async refreshAuthToken(): Promise<void> {
+    if (this.isRefreshing) {
+      return this.refreshPromise!;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = new Promise(async (resolve, reject) => {
+      try {
+        const { data: { session }, error } = await supabase.auth.refreshSession();
+        
+        if (error) {
+          console.error('Token refresh failed:', error);
+          throw error;
+        }
+
+        if (!session) {
+          throw new Error('No session after refresh');
+        }
+
+        if (session.provider_token) {
+          sessionStorage.setItem('gmail_access_token', session.provider_token);
+        }
+
+        resolve();
+      } catch (error) {
+        console.error('Failed to refresh token:', error);
+        sessionStorage.removeItem('gmail_access_token');
+        await supabase.auth.signOut();
+        window.location.href = '/login';
+        reject(error);
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    });
+
+    return this.refreshPromise;
+  }
+
   private async getAuthHeaders(): Promise<Record<string, string>> {
     try {
-      // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -66,52 +108,66 @@ class ApiService {
         throw new Error('Failed to get authentication session');
       }
 
-      if (!session?.access_token) {
-        console.error('No access token in session');
-        throw new Error('Not authenticated. Please sign in again.');
+      if (!session) {
+        console.error('No session found');
+        await this.refreshAuthToken();
+        const { data: { session: refreshedSession } } = await supabase.auth.getSession();
+        if (!refreshedSession) {
+          throw new Error('Not authenticated. Please sign in again.');
+        }
+        return this.constructHeaders(refreshedSession);
       }
 
-      // Get Gmail token from session storage
-      const gmailToken = sessionStorage.getItem('gmail_access_token');
-      if (!gmailToken) {
-        console.error('No Gmail token found in session storage');
-        throw new Error('No Gmail access token available. Please sign in with Google again.');
-      }
-
-      if (!session.user?.id) {
-        console.error('No user ID in session');
-        throw new Error('No user ID available. Please sign in again.');
-      }
-
-      // Log successful header creation (excluding sensitive data)
-      console.log('Created auth headers:', {
-        hasAccessToken: true,
-        hasGmailToken: true,
-        hasUserId: true,
-        userId: session.user.id,
-        email: session.user.email
-      });
-
-      return {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'X-Gmail-Token': gmailToken,
-        'X-User-ID': session.user.id
-      };
+      return this.constructHeaders(session);
     } catch (error) {
       console.error('Error getting auth headers:', error);
-      // Clear any invalid tokens
       sessionStorage.removeItem('gmail_access_token');
+      if (error instanceof Error && 
+          (error.message.includes('Not authenticated') || 
+           error.message.includes('Invalid token'))) {
+        await supabase.auth.signOut();
+        window.location.href = '/login';
+      }
       throw error;
     }
   }
 
-  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  private constructHeaders(session: Session): Record<string, string> {
+    const gmailToken = sessionStorage.getItem('gmail_access_token');
+    if (!gmailToken) {
+      throw new Error('No Gmail access token available. Please sign in with Google again.');
+    }
+
+    if (!session.user?.id) {
+      throw new Error('No user ID available. Please sign in again.');
+    }
+
+    const accessToken = session.access_token.trim();
+    if (!accessToken.includes('.')) {
+      throw new Error('Invalid token format. Please sign in again.');
+    }
+
+    console.log('Created auth headers:', {
+      hasAccessToken: true,
+      hasGmailToken: true,
+      hasUserId: true,
+      userId: session.user.id,
+      email: session.user.email
+    });
+
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+      'X-Gmail-Token': gmailToken,
+      'X-User-ID': session.user.id,
+      'Origin': window.location.origin
+    };
+  }
+
+  public async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
       const headers = await this.getAuthHeaders();
-      
-      // Ensure endpoint starts with /api
       const path = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
       const url = `${API_URL}${path}`;
       
@@ -120,146 +176,61 @@ class ApiService {
         method: options.method || 'GET',
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
-        hasUserId: !!headers['X-User-ID'],
-        environment: process.env.NODE_ENV
+        hasUserId: !!headers['X-User-ID']
       });
-
-      if (!headers['Authorization']) {
-        throw new Error('No authentication token available. Please sign in again.');
-      }
-
-      if (!headers['X-Gmail-Token']) {
-        throw new Error('No Gmail token available. Please sign in with Google again.');
-      }
-
-      if (!headers['X-User-ID']) {
-        throw new Error('No user ID available. Please sign in again.');
-      }
 
       const response = await fetch(url, {
         ...options,
         headers: {
-          'Content-Type': 'application/json',
           ...headers,
           ...options.headers
-        },
-        credentials: 'include'
+        }
       });
-
-      // Log detailed response information
-      console.log('API Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        url: response.url,
-        type: response.type,
-        ok: response.ok,
-        redirected: response.redirected,
-        redirectType: response.type,
-        finalUrl: response.url
-      });
-
-      // Try to get the response text first
-      const responseText = await response.text();
-      console.log('Raw response text:', responseText);
 
       if (!response.ok) {
-        let errorData;
-        try {
-          errorData = JSON.parse(responseText);
-        } catch (e) {
-          errorData = { error: responseText };
-        }
-        
-        if (response.status === 401) {
-          if (errorData?.error === 'Gmail token expired or invalid') {
-            sessionStorage.removeItem('gmail_access_token');
-            window.location.href = '/auth/google';
-            return { success: false, error: 'Gmail token expired. Redirecting to Google auth...' };
-          } else {
-            await supabase.auth.signOut();
-            window.location.href = '/login';
-            return { success: false, error: 'Session expired. Please sign in again.' };
-          }
-        }
-
-        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      // Try to parse the response as JSON
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse response as JSON:', e);
-        throw new Error('Invalid JSON response from API');
-      }
-      
-      return { success: true, data };
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return { success: false, error: 'Request timed out. Please try again.' };
-      }
-
-      console.error('API request error:', {
-        message: error.message,
-        type: error.name,
-        stack: error.stack,
-        url: endpoint,
-        environment: process.env.NODE_ENV
-      });
-
-      return { 
-        success: false, 
-        error: error.message || 'Failed to make API request',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      const data = await response.json();
+      return {
+        success: true,
+        data: data as T
+      };
+    } catch (error) {
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'An unknown error occurred'
       };
     }
   }
 
-  public async scanEmails(): Promise<ApiResponse<ScanEmailsResponse>> {
+  public async scanEmails(): Promise<ApiResponse<ScanEmailsApiResponse>> {
     try {
-      console.log('Starting scanEmails request...');
-      const response = await this.makeRequest<ScanEmailsResponse>('/api/scan-emails', {
+      const response = await this.makeRequest<ScanEmailsApiResponse>('/scan-emails', {
         method: 'POST'
       });
 
-      if (!response.success) {
-        console.error('scanEmails failed:', response.error);
-        return response;
-      }
-
       if (!response.data) {
-        console.error('scanEmails returned no data');
-        return {
-          success: false,
-          error: 'No data received from scan-emails endpoint'
-        };
+        throw new Error('No data received from scan-emails endpoint');
       }
 
-      // Transform the data using our transform functions
-      const transformedData: ScanEmailsResponse = {
-        ...response.data,
-        subscriptions: response.data.subscriptions.map(transformSubscriptionData),
-        priceChanges: response.data.priceChanges?.map(transformPriceChange) || null
-      };
-
-      console.log('scanEmails successful:', {
-        count: transformedData.count,
-        subscriptionsCount: transformedData.subscriptions?.length,
-        priceChangesCount: transformedData.priceChanges?.length
-      });
+      const { subscriptions = [], count = 0, priceChanges = null } = response.data;
 
       return {
         success: true,
-        data: transformedData
+        data: {
+          subscriptions,
+          count,
+          priceChanges
+        }
       };
     } catch (error) {
-      console.error('Error in scanEmails:', error);
+      console.error('Error scanning emails:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
+        error: error instanceof Error ? error.message : 'Failed to scan emails'
       };
     }
   }
@@ -295,59 +266,310 @@ class ApiService {
 }
 
 // Transform raw subscription data to frontend format
-const transformSubscriptionData = (data: SubscriptionData): SubscriptionData => {
-  // Process the provider name to make it more readable
-  let providerName = data.provider || '';
+const transformSubscriptionData = (data: Partial<SubscriptionData>): SubscriptionData => {
+  const frequency = data.frequency === 'yearly' ? 'yearly' : 'monthly';
+  return {
+    provider: data.provider || 'Unknown',
+    price: data.price || null,
+    frequency,
+    renewal_date: data.renewal_date || null,
+    term_months: data.term_months || null,
+    is_price_increase: data.is_price_increase || false,
+    lastDetectedDate: data.lastDetectedDate || new Date().toISOString(),
+    title: data.title
+  };
+};
+
+// Helper function to process provider-specific information
+const processProviderSpecificInfo = (data: SubscriptionData): SubscriptionData => {
+  // Hardcoded mapping for common subscription services
+  const directServiceMap: Record<string, string> = {
+    // Popular streaming services
+    'netflix': 'Netflix',
+    'spotify': 'Spotify',
+    'apple': 'Apple',
+    'youtube': 'YouTube Premium',
+    'disney': 'Disney+',
+    'hbo': 'HBO Max',
+    'prime': 'Amazon Prime',
+    'amazon': 'Amazon',
+    'pandora': 'Pandora',
+    'hulu': 'Hulu',
+    'crunchyroll': 'Crunchyroll',
+    'peacock': 'Peacock',
+    'paramount': 'Paramount+',
+    'showtime': 'Showtime',
+    'starz': 'Starz',
+    
+    // Sports subscriptions
+    'nba': 'NBA League Pass',
+    'nfl': 'NFL Game Pass',
+    'mlb': 'MLB.tv',
+    'ufc': 'UFC Fight Pass',
+    'espn': 'ESPN+',
+    
+    // Language learning services
+    'babbel': 'Babbel',
+    'duolingo': 'Duolingo',
+    'rosetta': 'Rosetta Stone',
+    
+    // Software services
+    'adobe': 'Adobe',
+    'office': 'Microsoft Office',
+    'microsoft': 'Microsoft',
+    'autodesk': 'Autodesk',
+    'dropbox': 'Dropbox',
+    'github': 'GitHub',
+    'slack': 'Slack',
+    'zoom': 'Zoom',
+    
+    // Other popular subscriptions
+    'nytimes': 'New York Times',
+    'wsj': 'Wall Street Journal',
+    'medium': 'Medium',
+    'patreon': 'Patreon',
+    'onlyfans': 'OnlyFans',
+    'substack': 'Substack',
+    
+    // Utilities
+    'domain': 'Domain Registration',
+    'hosting': 'Web Hosting',
+    'vpn': 'VPN Service',
+    'cloud': 'Cloud Storage',
+  };
   
-  // Clean up the provider name
-  if (providerName) {
-    // Extract company name from email domain if it looks like an email address
-    if (providerName.includes('@')) {
-      // Extract the domain part
-      const domainPart = providerName.split('@')[1];
-      if (domainPart) {
-        // Remove domain suffix and convert to proper name format
-        providerName = domainPart
-          .split('.')[0] // Take the first part before any dots
-          .replace(/-/g, ' ') // Replace hyphens with spaces
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize words
-          .join(' ');
+  // Extract provider name from input if we haven't already determined it from the title
+  let providerName = data.provider || '';
+  const rawProvider = providerName.toLowerCase();
+  
+  // Step 1: Direct match against common services
+  for (const [key, value] of Object.entries(directServiceMap)) {
+    if (rawProvider.includes(key)) {
+      providerName = value;
+      console.log(`Direct match found: ${key} → ${value}`);
+      break;
+    }
+  }
+  
+  // Step 2: Handle email-like formats
+  if (providerName === data.provider && providerName.includes('@')) {
+    // Extract domain part
+    const emailParts = providerName.split('@');
+    if (emailParts[1]) {
+      const domainPart = emailParts[1].split('.')[0];
+      
+      // Check if domain matches any known service
+      for (const [key, value] of Object.entries(directServiceMap)) {
+        if (domainPart.toLowerCase() === key) {
+          providerName = value;
+          console.log(`Domain match found: ${domainPart} → ${value}`);
+          break;
+        }
+      }
+      
+      // If still no match, format the domain as the service name
+      if (providerName === data.provider) {
+        providerName = domainPart.charAt(0).toUpperCase() + domainPart.slice(1);
+        console.log(`Using formatted domain: ${providerName}`);
       }
     }
-    
-    // Clean up common prefixes and codes
-    providerName = providerName
-      .replace(/^no-?reply/i, '')
-      .replace(/^notifications?/i, '')
-      .replace(/^info/i, '')
-      .replace(/^support/i, '')
-      .replace(/^team/i, '')
-      .replace(/^customer/i, '')
-      .replace(/^service/i, '')
-      .trim();
-    
-    // If empty after cleanup, set to "Unknown Service"
-    if (!providerName) {
-      providerName = "Unknown Service";
+  }
+  
+  // Step 3: Handle generic "from" or noreply patterns
+  if (providerName === data.provider) {
+    const lowerProvider = providerName.toLowerCase();
+    if (lowerProvider.startsWith('noreply@') || 
+        lowerProvider.startsWith('no-reply@') || 
+        lowerProvider.startsWith('notify@') || 
+        lowerProvider.startsWith('notifications@') || 
+        lowerProvider.startsWith('info@') || 
+        lowerProvider.startsWith('support@') || 
+        lowerProvider.startsWith('billing@')) {
+      
+      const domain = lowerProvider.split('@')[1]?.split('.')[0];
+      if (domain) {
+        // Capitalize first letter of each word
+        providerName = domain
+          .split(/[-_.]/)
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        console.log(`From email pattern: ${providerName}`);
+      }
     }
-  } else {
-    providerName = "Unknown Service";
+  }
+  
+  // Step 4: Extract company name from broader context if available
+  if (!providerName || providerName === data.provider) {
+    // One last attempt - try to extract a valid company name from the provider field
+    const extractedName = extractCompanyName(data.provider);
+    if (extractedName) {
+      providerName = extractedName;
+      console.log(`Extracted company name: ${providerName}`);
+    } else {
+      providerName = "Unknown Service";
+      console.log(`Fallback to Unknown Service`);
+    }
+  }
+
+  // Handle price: use provided price or try to extract from raw data
+  let price = 0;
+  if (data.price !== null && data.price !== undefined) {
+    price = Number(data.price);
+  } else if (typeof data.provider === 'string') {
+    // Try to extract a price from the provider field if it contains monetary values
+    const extractedPrice = extractPriceFromString(data.provider);
+    if (extractedPrice !== null) {
+      price = extractedPrice;
+      console.log(`Extracted price: ${price}`);
+    }
   }
   
   return {
     ...data,
-    // Update the provider name
     provider: providerName,
-    // Ensure price is a number or null
-    price: data.price ? Number(data.price) : null,
-    // Ensure renewal_date is in ISO format or null
-    renewal_date: data.renewal_date ? new Date(data.renewal_date).toISOString() : null,
-    // Default to monthly if frequency is not specified
+    price: price,
     frequency: data.frequency || 'monthly',
-    // Ensure term_months is a number or null
-    term_months: data.term_months ? Number(data.term_months) : null
+    renewal_date: data.renewal_date ? new Date(data.renewal_date).toISOString() : null,
+    term_months: data.term_months ? Number(data.term_months) : null,
   };
+};
+
+// Helper function to process Apple subscription emails
+function processAppleSubscription(data: SubscriptionData): SubscriptionData {
+  console.log('Processing Apple subscription');
+  let provider = 'Apple Subscription';
+  let price = 0;
+  let frequency: 'monthly' | 'yearly' = data.frequency === 'yearly' ? 'yearly' : 'monthly';
+  let renewalDate = null;
+  
+  // Look for specific app name pattern
+  if (typeof data.provider === 'string') {
+    // Extract app name
+    const appMatch = data.provider.match(/App\s+(.+?)(?=\s+Subscription|$)/i);
+    if (appMatch && appMatch[1]) {
+      provider = appMatch[1].trim();
+      console.log(`Found app name: ${provider}`);
+    }
+    
+    // Look for Babbel specifically
+    if (data.provider.toLowerCase().includes('babbel')) {
+      provider = 'Babbel';
+      console.log('Detected Babbel subscription');
+    }
+    
+    // Extract renewal price with Euro symbol
+    const euroMatch = data.provider.match(/€\s*(\d+[\.,]\d+)(?:\/(\d+)\s*(months|month))?/i);
+    if (euroMatch) {
+      const fullAmount = parseFloat(euroMatch[1].replace(',', '.'));
+      console.log(`Found Euro amount: ${fullAmount}`);
+      
+      // Check if there's a period mentioned
+      if (euroMatch[2] && euroMatch[3]) {
+        const period = parseInt(euroMatch[2]);
+        // Calculate monthly price
+        if (period > 1) {
+          price = fullAmount / period;
+          console.log(`Calculated monthly price: ${price} from ${fullAmount}/${period} months`);
+        } else {
+          price = fullAmount;
+        }
+        
+        // Determine frequency
+        if (euroMatch[3].toLowerCase().includes('month')) {
+          frequency = period > 1 ? 'monthly' : 'monthly';
+        } else {
+          frequency = 'yearly';
+        }
+      } else {
+        price = fullAmount;
+      }
+    }
+    
+    // Look for renewal date pattern
+    const dateMatch = data.provider.match(/(?:starting|renews)\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i);
+    if (dateMatch && dateMatch[1]) {
+      try {
+        renewalDate = new Date(dateMatch[1]).toISOString();
+        console.log(`Found renewal date: ${renewalDate}`);
+      } catch (e) {
+        console.log('Failed to parse renewal date');
+      }
+    }
+  }
+  
+  return {
+    ...data,
+    provider,
+    price,
+    frequency,
+    renewal_date: renewalDate,
+    term_months: null,
+    is_price_increase: false,
+    lastDetectedDate: new Date().toISOString()
+  };
+}
+
+// Helper function to extract a price from a string (looking for $ or € symbols)
+const extractPriceFromString = (str: string): number | null => {
+  if (!str) return null;
+  
+  // Match patterns like $9.99, €10, $13.50
+  const matches = str.match(/[\$€£](\d+[.,]?\d*)/);
+  if (matches && matches[1]) {
+    return parseFloat(matches[1].replace(',', '.'));
+  }
+  
+  // Also try to match numbers followed by currency symbols
+  const altMatches = str.match(/(\d+[.,]?\d*)[\$€£]/);
+  if (altMatches && altMatches[1]) {
+    return parseFloat(altMatches[1].replace(',', '.'));
+  }
+  
+  // Match euro formats with comma decimal separator
+  const euroMatches = str.match(/(\d+),(\d+)\s*€/);
+  if (euroMatches) {
+    return parseFloat(`${euroMatches[1]}.${euroMatches[2]}`);
+  }
+  
+  // Match "X months" patterns
+  const periodMatch = str.match(/€\s*(\d+[.,]\d+)\/(\d+)\s*months/i);
+  if (periodMatch && periodMatch[1] && periodMatch[2]) {
+    const totalAmount = parseFloat(periodMatch[1].replace(',', '.'));
+    const months = parseInt(periodMatch[2]);
+    if (!isNaN(totalAmount) && !isNaN(months) && months > 0) {
+      return totalAmount / months; // Return monthly equivalent
+    }
+  }
+  
+  return null;
+};
+
+// Helper function to extract a potential company name from a raw provider string
+const extractCompanyName = (str: string): string | null => {
+  if (!str) return null;
+  
+  // Potential company name patterns
+  const patterns = [
+    // Try to match "Company Name" <email> pattern
+    /"([^"]+)"/,
+    // Try to match 'Company Name' <email> pattern  
+    /'([^']+)'/,
+    // Try to match Company Name <email> pattern
+    /^([^<]+)</,
+    // Try to match words between brackets
+    /\[([^\]]+)\]/,
+    // Try to match words between parentheses
+    /\(([^)]+)\)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = str.match(pattern);
+    if (matches && matches[1] && matches[1].length > 2) {
+      return matches[1].trim();
+    }
+  }
+  
+  return null;
 };
 
 // Transform raw price change data to frontend format
@@ -363,13 +585,34 @@ const transformPriceChange = (change: PriceChange): PriceChange => {
   };
 };
 
-// Export convenience functions for common API calls
-export const scanEmails = async () => {
-  const response = await apiService.scanEmails();
-  if (!response.success) {
-    throw new Error(response.error || 'Failed to scan emails');
+// Scan emails for subscriptions
+export const scanEmails = async (): Promise<ApiResponse<ScanEmailsApiResponse>> => {
+  try {
+    const response = await ApiService.getInstance().makeRequest<ScanEmailsApiResponse>('/scan-emails', {
+      method: 'POST'
+    });
+
+    if (!response.data) {
+      throw new Error('No data received from scan-emails endpoint');
+    }
+
+    const { subscriptions = [], count = 0, priceChanges = null } = response.data;
+
+    return {
+      success: true,
+      data: {
+        subscriptions,
+        count,
+        priceChanges
+      }
+    };
+  } catch (error) {
+    console.error('Error scanning emails:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to scan emails'
+    };
   }
-  return response.data;
 };
 
 export const apiService = ApiService.getInstance(); 

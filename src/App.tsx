@@ -6,20 +6,22 @@ import { Login } from './components/auth/Login';
 import { SignUp } from './components/auth/SignUp';
 import { Dashboard } from './components/dashboard/Dashboard';
 import Settings from './components/settings/Settings';
-import { OAuthRedirect } from './components/auth/OAuthRedirect';
-import { ScanningScreen } from './components/auth/ScanningScreen';
+import OAuthRedirect from './components/auth/OAuthRedirect';
+import ScanningScreen from './components/auth/ScanningScreen';
 import { SubscriptionSelection } from './components/auth/SubscriptionSelection';
 import { EmailOAuthConsent } from './components/auth/EmailOAuthConsent';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { Box, CircularProgress } from '@mui/material';
 import { AuthCallback } from './components/auth/AuthCallback';
+import PrivateRoute from './components/PrivateRoute';
+import SignIn from './pages/SignIn';
 
 // Protected Route component with Layout
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
@@ -36,9 +38,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 // Public Route component - redirects to dashboard if already authenticated
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
@@ -53,26 +55,25 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
-function App() {
+const App: React.FC = () => {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <ThemeProvider>
       <AuthProvider>
         <Router>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route path="/signup" element={<PublicRoute><SignUp /></PublicRoute>} />
+            <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/signin" />} />
+            <Route path="/signin" element={user ? <Navigate to="/dashboard" /> : <SignIn />} />
+            <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <SignUp />} />
             <Route path="/auth/google/callback" element={<OAuthRedirect />} />
             <Route path="/auth/consent" element={<EmailOAuthConsent />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route
-              path="/scanning"
-              element={
-                <ProtectedRoute>
-                  <ScanningScreen />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/scanning" element={<ScanningScreen />} />
             <Route
               path="/subscription-selection"
               element={
@@ -84,9 +85,9 @@ function App() {
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute>
+                <PrivateRoute>
                   <Dashboard />
-                </ProtectedRoute>
+                </PrivateRoute>
               }
             />
             <Route
@@ -102,6 +103,6 @@ function App() {
       </AuthProvider>
     </ThemeProvider>
   );
-}
+};
 
 export default App; 
