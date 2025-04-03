@@ -2,67 +2,56 @@
 
 import * as React from "react"
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group"
-import { cva, type VariantProps } from "class-variance-authority"
+
 import { cn } from "@/lib/utils"
+import { toggleVariants } from "@/components/ui/toggle"
 
-const toggleVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground",
-  {
-    variants: {
-      variant: {
-        default: "bg-transparent hover:bg-accent hover:text-accent-foreground",
-        outline:
-          "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
-      },
-      size: {
-        default: "h-10 px-3",
-        sm: "h-9 px-2.5",
-        lg: "h-11 px-5",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
+type ToggleGroupContextValue = {
+  size?: "default" | "sm" | "lg"
+  variant?: "default" | "outline"
+}
 
-const ToggleGroupContext = React.createContext<
-  VariantProps<typeof toggleVariants>
->({})
+const ToggleGroupContext = React.createContext<ToggleGroupContextValue>({
+  size: "default",
+  variant: "default",
+})
+
+type ToggleGroupProps = Omit<React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root>, "type"> & {
+  type?: "single" | "multiple"
+}
 
 const ToggleGroup = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root> &
-    VariantProps<typeof toggleVariants>
->(({ className, variant, size, children, ...props }, ref) => (
+  ToggleGroupProps
+>(({ className, type = "single", ...props }, ref) => (
   <ToggleGroupPrimitive.Root
     ref={ref}
-    className={cn("flex items-center justify-center gap-1", className)}
+    type={type}
+    className={cn("flex flex-wrap items-center justify-start gap-1", className)}
     {...props}
-  >
-    <ToggleGroupContext.Provider value={{ variant, size }}>
-      {children}
-    </ToggleGroupContext.Provider>
-  </ToggleGroupPrimitive.Root>
+  />
 ))
 ToggleGroup.displayName = ToggleGroupPrimitive.Root.displayName
 
+type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item> & {
+  value: string
+}
+
 const ToggleGroupItem = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item> &
-    VariantProps<typeof toggleVariants>
->(({ className, children, variant, size, ...props }, ref) => {
+  ToggleGroupItemProps
+>(({ className, children, value, ...props }, ref) => {
   const context = React.useContext(ToggleGroupContext)
-
   return (
     <ToggleGroupPrimitive.Item
       ref={ref}
+      value={value}
       className={cn(
         toggleVariants({
-          variant: context.variant || variant,
-          size: context.size || size,
+          size: context.size,
+          variant: context.variant,
         }),
+        "data-[state=on]:bg-accent data-[state=on]:text-accent-foreground",
         className
       )}
       {...props}
@@ -73,4 +62,4 @@ const ToggleGroupItem = React.forwardRef<
 })
 ToggleGroupItem.displayName = ToggleGroupPrimitive.Item.displayName
 
-export { ToggleGroup, ToggleGroupItem }
+export { ToggleGroup, ToggleGroupItem } 
