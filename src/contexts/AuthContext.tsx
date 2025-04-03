@@ -1,19 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
-import { apiService } from '../services/api';
 import { SubscriptionData, PriceChange } from '../services/api';
 
-interface AuthContextType {
+interface AuthState {
   user: User | null;
-  loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
-  scanEmails: () => Promise<void>;
-  login: (tokens: any) => Promise<{ user: User; session: Session }>;
-  refreshSession: () => Promise<void>;
+  session: Session | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
 interface SubscriptionState {
@@ -24,11 +18,39 @@ interface SubscriptionState {
   lastScanTime: string | null;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface AuthContextType extends AuthState {
+  signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+  clearError: () => void;
+  scanEmails: () => Promise<void>;
+  subscriptionState: SubscriptionState;
+}
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    session: null,
+    isLoading: true,
+    error: null
+  });
+
   const [subscriptionState, setSubscriptionState] = useState<SubscriptionState>({
     isLoading: false,
     error: null,
@@ -37,328 +59,151 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     lastScanTime: null
   });
 
+  const clearError = () => {
+    setAuthState(prev => ({ ...prev, error: null }));
+  };
+
+  const handleAuthError = (error: Error) => {
+    console.error('Auth error:', error);
+    setAuthState(prev => ({
+      ...prev,
+      error: error.message,
+      isLoading: false
+    }));
+  };
+
   const refreshSession = async () => {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      setAuthState(prev => ({ ...prev, isLoading: true }));
+      const { data: { session }, error } = await supabase.auth.refreshSession();
       
       if (error) {
-        console.error('Error refreshing session:', error);
         throw error;
       }
 
-      if (!session) {
-        console.log('No active session found during refresh');
-        sessionStorage.removeItem('gmail_access_token');
-        setUser(null);
-        window.location.href = '/login';
-        return;
-      }
-
-      // Validate session token
-      if (!session.access_token || !session.access_token.includes('.')) {
-        console.error('Invalid session token format during refresh');
-        await supabase.auth.signOut();
-        window.location.href = '/login';
-        return;
-      }
-
-      // Update user state
-      setUser(session.user);
-
-      // Update Gmail token if available
-      if (session.provider_token) {
+      if (session?.provider_token) {
         sessionStorage.setItem('gmail_access_token', session.provider_token);
-        console.log('Updated Gmail token from refreshed session');
       }
 
-      return session;
+      setAuthState(prev => ({
+        ...prev,
+        session,
+        user: session?.user ?? null,
+        isLoading: false,
+        error: null
+      }));
     } catch (error) {
-      console.error('Session refresh failed:', error);
-      await signOut();
+      handleAuthError(error instanceof Error ? error : new Error('Failed to refresh session'));
     }
   };
-
-  useEffect(() => {
-    // Check active sessions and sets the user
-    const initializeAuth = async () => {
-      try {
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // If no session, clear any stale tokens
-        if (!session) {
-          sessionStorage.removeItem('gmail_access_token');
-          setUser(null);
-          return;
-        }
-
-        setUser(session.user);
-        
-        // Check and store provider tokens
-        if (session.provider_token) {
-          sessionStorage.setItem('gmail_access_token', session.provider_token);
-          console.log('Stored provider token from session');
-        }
-
-        // If we have a user but no Gmail token, we need to re-authenticate
-        const hasGmailToken = sessionStorage.getItem('gmail_access_token');
-        if (session.user && !hasGmailToken) {
-          console.log('No Gmail token found, redirecting to Google auth');
-          await signInWithGoogle();
-        }
-      } catch (error) {
-        console.error('Error checking auth status:', error);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    // Listen for changes on auth state (sign in, sign out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setLoading(true);
-      try {
-        console.log('Auth state changed:', event, session?.user?.email);
-        console.log('Provider token available:', !!session?.provider_token);
-        
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          sessionStorage.removeItem('gmail_access_token');
-        } else if (session?.user) {
-          setUser(session.user);
-          // Store provider token if available
-          if (session.provider_token) {
-            console.log('Storing provider token from auth change');
-            sessionStorage.setItem('gmail_access_token', session.provider_token);
-          }
-        } else if (event === 'TOKEN_REFRESHED') {
-          // Handle token refresh
-          await refreshSession();
-        }
-      } catch (error) {
-        console.error('Error handling auth state change:', error);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
+      setAuthState(prev => ({ ...prev, isLoading: true }));
+      const { data: { session, user }, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password
       });
-      if (error) throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const signUp = async (email: string, password: string) => {
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      return { error };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      setLoading(true);
-      // Clear all stored tokens
-      sessionStorage.removeItem('gmail_access_token');
-      
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
-      // Clear user state
-      setUser(null);
-      
-      // Clear any cached auth state
-      await supabase.auth.refreshSession();
-      
-      // Force reload the page to clear any remaining state
-      window.location.href = '/login';
+
+      setAuthState(prev => ({
+        ...prev,
+        session,
+        user,
+        isLoading: false,
+        error: null
+      }));
     } catch (error) {
-      console.error('Error signing out:', error);
-      throw error;
-    } finally {
-      setLoading(false);
+      handleAuthError(error instanceof Error ? error : new Error('Failed to sign in'));
     }
   };
 
   const signInWithGoogle = async () => {
     try {
-      setLoading(true);
-      
-      // Clear any existing tokens to ensure fresh auth
-      sessionStorage.removeItem('gmail_access_token');
-      
-      const redirectTo = window.location.host.includes('localhost')
-        ? 'http://localhost:3000/auth/callback'
-        : `${window.location.origin}/auth/callback`;
-
-      console.log('Starting Google sign-in with redirect:', redirectTo);
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      setAuthState(prev => ({ ...prev, isLoading: true }));
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-            scope: 'https://www.googleapis.com/auth/gmail.readonly email profile',
-            response_type: 'code'
-          },
-          skipBrowserRedirect: false
+          scopes: 'https://www.googleapis.com/auth/gmail.readonly',
+          redirectTo: `${window.location.origin}/auth/callback`
         }
       });
 
-      if (error) {
-        console.error('OAuth error:', error);
-        throw error;
-      }
-
-      if (!data.url) {
-        throw new Error('No URL returned from Supabase OAuth');
-      }
-
-      // Store the state for verification after redirect
-      const urlParams = new URLSearchParams(new URL(data.url).search);
-      const state = urlParams.get('state');
-      if (state) {
-        sessionStorage.setItem('oauth_state', state);
-      }
-
-      console.log('Redirecting to OAuth URL:', data.url);
-      window.location.href = data.url;
+      if (error) throw error;
     } catch (error) {
-      console.error('Error initiating Google sign-in:', error);
-      // Redirect to login page on error
-      window.location.href = '/login';
-    } finally {
-      setLoading(false);
+      handleAuthError(error instanceof Error ? error : new Error('Failed to sign in with Google'));
     }
   };
 
-  const login = async (tokens: any) => {
+  const signUp = async (email: string, password: string) => {
     try {
-      console.log('Logging in with tokens:', {
-        hasAccessToken: !!tokens.access_token,
-        hasIdToken: !!tokens.id_token,
-        hasUser: !!tokens.user
+      setAuthState(prev => ({ ...prev, isLoading: true }));
+      const { data: { session, user }, error } = await supabase.auth.signUp({
+        email,
+        password
       });
 
-      // Validate token format
-      if (tokens.access_token && !tokens.access_token.includes('.')) {
-        throw new Error('Invalid access token format');
-      }
+      if (error) throw error;
 
-      // Store the Gmail token in sessionStorage only
-      if (tokens.access_token) {
-        sessionStorage.setItem('gmail_access_token', tokens.access_token);
-        console.log('Stored Gmail access token');
-      }
-
-      // Sign in with Supabase using the Google ID token
-      if (tokens.id_token) {
-        const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'google',
-          token: tokens.id_token,
-          nonce: sessionStorage.getItem('supabase.auth.nonce') || undefined
-        });
-
-        if (error) {
-          console.error('Supabase sign in error:', error);
-          throw error;
-        }
-
-        console.log('Supabase sign in successful:', {
-          hasSession: !!data.session,
-          hasUser: !!data.user,
-          hasProviderToken: !!data.session?.provider_token
-        });
-
-        // Validate session token
-        if (data.session?.access_token && !data.session.access_token.includes('.')) {
-          console.error('Invalid session token format');
-          await supabase.auth.signOut();
-          throw new Error('Invalid session token format');
-        }
-
-        // Store provider token if available
-        if (data.session?.provider_token) {
-          sessionStorage.setItem('gmail_access_token', data.session.provider_token);
-        }
-
-        setUser(data.user);
-        return data;
-      } else {
-        throw new Error('No ID token provided');
-      }
+      setAuthState(prev => ({
+        ...prev,
+        session,
+        user,
+        isLoading: false,
+        error: null
+      }));
     } catch (error) {
-      console.error('Login error:', error);
-      // Clear any invalid tokens
+      handleAuthError(error instanceof Error ? error : new Error('Failed to sign up'));
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      setAuthState(prev => ({ ...prev, isLoading: true }));
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) throw error;
+
       sessionStorage.removeItem('gmail_access_token');
-      await supabase.auth.signOut();
-      // Redirect to login page on error
-      window.location.href = '/login';
-      throw error;
+      
+      setAuthState({
+        user: null,
+        session: null,
+        isLoading: false,
+        error: null
+      });
+    } catch (error) {
+      handleAuthError(error instanceof Error ? error : new Error('Failed to sign out'));
     }
   };
 
   const scanEmails = async () => {
     try {
       setSubscriptionState(prev => ({ ...prev, isLoading: true, error: null }));
-      const response = await apiService.scanEmails();
-      
-      if (!response.success) {
-        // Check if it's a CORS error
-        if (response.error?.includes('CORS error')) {
-          console.error('CORS error during email scan:', response.error);
-          setSubscriptionState(prev => ({
-            ...prev,
-            isLoading: false,
-            error: 'Unable to access the API. Please try again later.'
-          }));
-          return;
+      const response = await fetch('/api/scan-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authState.session?.access_token}`,
+          'X-User-ID': authState.user?.id || ''
         }
-        
-        throw new Error(response.error || 'Failed to scan emails');
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to scan emails');
       }
 
-      const data = response.data;
-      if (data && typeof data === 'object' && 'subscriptions' in data && 'priceChanges' in data) {
-        setSubscriptionState(prev => ({
-          ...prev,
-          isLoading: false,
-          subscriptions: data.subscriptions || [],
-          priceChanges: data.priceChanges || null,
-          lastScanTime: new Date().toISOString()
-        }));
-      } else {
-        // Handle case where response.data is undefined or doesn't have the expected shape
-        setSubscriptionState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: 'Invalid data received from the server'
-        }));
-      }
+      const data = await response.json();
+      
+      setSubscriptionState(prev => ({
+        ...prev,
+        isLoading: false,
+        subscriptions: data.subscriptions || [],
+        priceChanges: data.priceChanges || null,
+        lastScanTime: new Date().toISOString()
+      }));
     } catch (error) {
-      console.error('Error scanning emails:', error);
       setSubscriptionState(prev => ({
         ...prev,
         isLoading: false,
@@ -367,25 +212,65 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) throw error;
+
+        if (session?.provider_token) {
+          sessionStorage.setItem('gmail_access_token', session.provider_token);
+        }
+
+        setAuthState(prev => ({
+          ...prev,
+          session,
+          user: session?.user ?? null,
+          isLoading: false
+        }));
+      } catch (error) {
+        handleAuthError(error instanceof Error ? error : new Error('Failed to initialize auth'));
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
+      
+      if (session?.provider_token) {
+        sessionStorage.setItem('gmail_access_token', session.provider_token);
+      }
+
+      setAuthState(prev => ({
+        ...prev,
+        session,
+        user: session?.user ?? null,
+        isLoading: false
+      }));
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const value = {
-    user,
-    loading,
+    ...authState,
     signIn,
+    signInWithGoogle,
     signUp,
     signOut,
-    signInWithGoogle,
+    refreshSession,
+    clearError,
     scanEmails,
-    login,
-    refreshSession
+    subscriptionState
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }; 

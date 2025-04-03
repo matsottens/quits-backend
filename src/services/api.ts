@@ -1,13 +1,6 @@
 import { supabase } from '../supabase';
+import { Session } from '@supabase/supabase-js';
 
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  details?: string;
-}
-
-// Types for subscription data
 export interface SubscriptionData {
   provider: string;
   price: number | null;
@@ -17,15 +10,6 @@ export interface SubscriptionData {
   is_price_increase: boolean;
   lastDetectedDate: string;
   title?: string;
-}
-
-// Types for API response
-interface ScanEmailsResponse {
-  success: boolean;
-  message: string;
-  count: number;
-  subscriptions: SubscriptionData[];
-  priceChanges: PriceChange[] | null;
 }
 
 export interface PriceChange {
@@ -38,17 +22,34 @@ export interface PriceChange {
   provider: string;
 }
 
-// Update the API URL configuration
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  details?: string;
+}
+
+interface ScanEmailsResponse {
+  success: boolean;
+  message: string;
+  count: number;
+  subscriptions: SubscriptionData[];
+  priceChanges: PriceChange[] | null;
+}
+
+interface ScanEmailsApiResponse {
+  subscriptions: SubscriptionData[];
+  count: number;
+  priceChanges: PriceChange[] | null;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 class ApiService {
   private static instance: ApiService;
-  private retryCount: number = 0;
-  private readonly MAX_RETRIES = 2;
   private isRefreshing = false;
   private refreshPromise: Promise<void> | null = null;
-  private originVariations: string[] = [];
-  
+
   private constructor() {}
 
   public static getInstance(): ApiService {
@@ -78,7 +79,6 @@ class ApiService {
           throw new Error('No session after refresh');
         }
 
-        // Update Gmail token if available
         if (session.provider_token) {
           sessionStorage.setItem('gmail_access_token', session.provider_token);
         }
@@ -86,7 +86,6 @@ class ApiService {
         resolve();
       } catch (error) {
         console.error('Failed to refresh token:', error);
-        // Clear tokens and redirect to login
         sessionStorage.removeItem('gmail_access_token');
         await supabase.auth.signOut();
         window.location.href = '/login';
@@ -102,7 +101,6 @@ class ApiService {
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
     try {
-      // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -110,62 +108,20 @@ class ApiService {
         throw new Error('Failed to get authentication session');
       }
 
-      if (!session?.access_token) {
-        console.error('No access token in session');
-        await this.refreshAuthToken();
-        // Try to get the session again after refresh
-        const { data: { session: refreshedSession } } = await supabase.auth.getSession();
-        if (!refreshedSession?.access_token) {
-        throw new Error('Not authenticated. Please sign in again.');
-        }
-      }
-
-      // Get Gmail token from session storage
-      const gmailToken = sessionStorage.getItem('gmail_access_token');
-      if (!gmailToken) {
-        console.error('No Gmail token found in session storage');
-        throw new Error('No Gmail access token available. Please sign in with Google again.');
-      }
-
-      if (!session.user?.id) {
-        console.error('No user ID in session');
-        throw new Error('No user ID available. Please sign in again.');
-      }
-
-      // Ensure the access token is properly formatted
-      const accessToken = session.access_token.trim();
-      if (!accessToken.includes('.')) {
-        console.error('Malformed access token');
+      if (!session) {
+        console.error('No session found');
         await this.refreshAuthToken();
         const { data: { session: refreshedSession } } = await supabase.auth.getSession();
-        if (!refreshedSession?.access_token) {
-          throw new Error('Invalid token format. Please sign in again.');
+        if (!refreshedSession) {
+          throw new Error('Not authenticated. Please sign in again.');
         }
+        return this.constructHeaders(refreshedSession);
       }
 
-      // Log successful header creation (excluding sensitive data)
-      console.log('Created auth headers:', {
-        hasAccessToken: true,
-        hasGmailToken: true,
-        hasUserId: true,
-        userId: session.user.id,
-        email: session.user.email
-      });
-
-      // Return headers with proper Bearer token format
-      return {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-        'X-Gmail-Token': gmailToken,
-        'X-User-ID': session.user.id,
-        'Origin': window.location.origin
-      };
+      return this.constructHeaders(session);
     } catch (error) {
       console.error('Error getting auth headers:', error);
-      // Clear any invalid tokens
       sessionStorage.removeItem('gmail_access_token');
-      // Redirect to login if authentication is missing
       if (error instanceof Error && 
           (error.message.includes('Not authenticated') || 
            error.message.includes('Invalid token'))) {
@@ -176,22 +132,44 @@ class ApiService {
     }
   }
 
-  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  private constructHeaders(session: Session): Record<string, string> {
+    const gmailToken = sessionStorage.getItem('gmail_access_token');
+    if (!gmailToken) {
+      throw new Error('No Gmail access token available. Please sign in with Google again.');
+    }
+
+    if (!session.user?.id) {
+      throw new Error('No user ID available. Please sign in again.');
+    }
+
+    const accessToken = session.access_token.trim();
+    if (!accessToken.includes('.')) {
+      throw new Error('Invalid token format. Please sign in again.');
+    }
+
+    console.log('Created auth headers:', {
+      hasAccessToken: true,
+      hasGmailToken: true,
+      hasUserId: true,
+      userId: session.user.id,
+      email: session.user.email
+    });
+
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+      'X-Gmail-Token': gmailToken,
+      'X-User-ID': session.user.id,
+      'Origin': window.location.origin
+    };
+  }
+
+  public async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
-      // Ensure endpoint starts with /api
+      const headers = await this.getAuthHeaders();
       const path = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
       const url = `${API_URL}${path}`;
-      
-      // Get fresh headers for each request
-      const headers = await this.getAuthHeaders();
-      
-      const requestOptions = {
-        ...options,
-        headers: {
-          ...headers,
-          ...options.headers
-        }
-      };
       
       console.log('Making API request:', {
         url,
@@ -201,73 +179,17 @@ class ApiService {
         hasUserId: !!headers['X-User-ID']
       });
 
-      const response = await fetch(url, requestOptions);
-      
-      // Handle 401 errors specifically
-      if (response.status === 401) {
-        console.log('Received 401, attempting token refresh...');
-        await this.refreshAuthToken();
-        
-        // Get fresh headers after token refresh
-        const newHeaders = await this.getAuthHeaders();
-        
-        // Retry the request with new headers
-        const retryResponse = await fetch(url, {
-          ...requestOptions,
+      const response = await fetch(url, {
+        ...options,
         headers: {
-            ...newHeaders,
+          ...headers,
           ...options.headers
-          }
-        });
-        
-        if (retryResponse.status === 401) {
-          console.error('Still unauthorized after token refresh');
-          // Force re-authentication
-            await supabase.auth.signOut();
-            window.location.href = '/login';
-          throw new Error('Authentication failed. Please sign in again.');
         }
-        
-        return await this.processResponse<T>(retryResponse);
-      }
+      });
 
-      return await this.processResponse<T>(response);
-    } catch (error) {
-      console.error('API request failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unknown error occurred',
-        details: error instanceof Error ? error.stack : undefined
-      };
-    }
-  }
-
-  private async processResponse<T>(response: Response): Promise<ApiResponse<T>> {
-    try {
-      const contentType = response.headers.get('content-type');
-      const isJson = contentType && contentType.includes('application/json');
-      
       if (!response.ok) {
-        if (isJson) {
-          const errorData = await response.json();
-          return {
-            success: false,
-            error: errorData.message || errorData.error || `HTTP error ${response.status}`,
-            details: JSON.stringify(errorData)
-          };
-        }
-        return {
-          success: false,
-          error: `HTTP error ${response.status}`,
-          details: await response.text()
-        };
-      }
-
-      if (!isJson) {
-        return {
-          success: true,
-          data: await response.text() as unknown as T
-        };
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -276,58 +198,39 @@ class ApiService {
         data: data as T
       };
     } catch (error) {
-      console.error('Error processing response:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to process response',
-        details: error instanceof Error ? error.stack : undefined
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'An unknown error occurred'
       };
     }
   }
 
-  public async scanEmails(): Promise<ApiResponse<ScanEmailsResponse>> {
+  public async scanEmails(): Promise<ApiResponse<ScanEmailsApiResponse>> {
     try {
-      console.log('Starting scanEmails request...');
-      const response = await this.makeRequest<ScanEmailsResponse>('/api/scan-emails', {
+      const response = await this.makeRequest<ScanEmailsApiResponse>('/scan-emails', {
         method: 'POST'
       });
 
-      if (!response.success) {
-        console.error('scanEmails failed:', response.error);
-        return response;
-      }
-
       if (!response.data) {
-        console.error('scanEmails returned no data');
-        return {
-          success: false,
-          error: 'No data received from scan-emails endpoint'
-        };
+        throw new Error('No data received from scan-emails endpoint');
       }
 
-      // Transform the data using our transform functions
-      const transformedData: ScanEmailsResponse = {
-        ...response.data,
-        subscriptions: response.data.subscriptions.map(transformSubscriptionData),
-        priceChanges: response.data.priceChanges?.map(transformPriceChange) || null
-      };
-
-      console.log('scanEmails successful:', {
-        count: transformedData.count,
-        subscriptionsCount: transformedData.subscriptions?.length,
-        priceChangesCount: transformedData.priceChanges?.length
-      });
+      const { subscriptions = [], count = 0, priceChanges = null } = response.data;
 
       return {
         success: true,
-        data: transformedData
+        data: {
+          subscriptions,
+          count,
+          priceChanges
+        }
       };
     } catch (error) {
-      console.error('Error in scanEmails:', error);
+      console.error('Error scanning emails:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
+        error: error instanceof Error ? error.message : 'Failed to scan emails'
       };
     }
   }
@@ -363,28 +266,18 @@ class ApiService {
 }
 
 // Transform raw subscription data to frontend format
-const transformSubscriptionData = (data: SubscriptionData): SubscriptionData => {
-  // Try to extract service name from email title first
-  if (data.title && typeof data.title === 'string') {
-    console.log('Analyzing email title:', data.title);
-    
-    // Pattern 1: Service name followed by "Subscription" in title
-    const subscriptionTitleMatch = data.title.match(/([A-Za-z0-9\s]+(?:\s[A-Za-z0-9]+)*)\s+Subscription/i);
-    if (subscriptionTitleMatch && subscriptionTitleMatch[1]) {
-      const serviceName = subscriptionTitleMatch[1].trim();
-      console.log(`Found service name in title: "${serviceName}"`);
-      data.provider = serviceName;
-      return processProviderSpecificInfo(data);
-    }
-  }
-  
-  // Early detection for Apple subscription receipts
-  if (data.provider && data.provider.toLowerCase().includes('apple')) {
-    return processAppleSubscription(data);
-  }
-
-  // Process with existing service mapping logic
-  return processProviderSpecificInfo(data);
+const transformSubscriptionData = (data: Partial<SubscriptionData>): SubscriptionData => {
+  const frequency = data.frequency === 'yearly' ? 'yearly' : 'monthly';
+  return {
+    provider: data.provider || 'Unknown',
+    price: data.price || null,
+    frequency,
+    renewal_date: data.renewal_date || null,
+    term_months: data.term_months || null,
+    is_price_increase: data.is_price_increase || false,
+    lastDetectedDate: data.lastDetectedDate || new Date().toISOString(),
+    title: data.title
+  };
 };
 
 // Helper function to process provider-specific information
@@ -546,7 +439,7 @@ function processAppleSubscription(data: SubscriptionData): SubscriptionData {
   console.log('Processing Apple subscription');
   let provider = 'Apple Subscription';
   let price = 0;
-  let frequency = 'monthly';
+  let frequency: 'monthly' | 'yearly' = data.frequency === 'yearly' ? 'yearly' : 'monthly';
   let renewalDate = null;
   
   // Look for specific app name pattern
@@ -693,50 +586,31 @@ const transformPriceChange = (change: PriceChange): PriceChange => {
 };
 
 // Scan emails for subscriptions
-export const scanEmails = async (): Promise<ApiResponse<any>> => {
+export const scanEmails = async (): Promise<ApiResponse<ScanEmailsApiResponse>> => {
   try {
-    console.log('Making scan request to API...');
-    const apiService = ApiService.getInstance();
-    const response = await apiService.makeRequest('/scan-emails', {
+    const response = await ApiService.getInstance().makeRequest<ScanEmailsApiResponse>('/scan-emails', {
       method: 'POST'
     });
-    
-    console.log('Raw scan response:', response);
-    
-    if (!response) {
-      throw new Error('No response received from scan');
+
+    if (!response.data) {
+      throw new Error('No data received from scan-emails endpoint');
     }
 
-    if (response.error) {
-      console.error('Scan error:', response.error);
-      return {
-        success: false,
-        error: response.error
-      };
-    }
-
-    // Ensure we have the expected data structure
-    if (!response.data || !Array.isArray(response.data.subscriptions)) {
-      console.error('Invalid response format:', response);
-      return {
-        success: false,
-        error: 'Invalid response format from server'
-      };
-    }
+    const { subscriptions = [], count = 0, priceChanges = null } = response.data;
 
     return {
       success: true,
       data: {
-        subscriptions: response.data.subscriptions,
-        count: response.data.count || response.data.subscriptions.length,
-        priceChanges: response.data.priceChanges || null
+        subscriptions,
+        count,
+        priceChanges
       }
     };
-  } catch (error: any) {
-    console.error('Error in scanEmails:', error);
+  } catch (error) {
+    console.error('Error scanning emails:', error);
     return {
       success: false,
-      error: error.message || 'Failed to scan emails'
+      error: error instanceof Error ? error.message : 'Failed to scan emails'
     };
   }
 };

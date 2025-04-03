@@ -52,17 +52,13 @@ export const SignUp: React.FC = () => {
     try {
       setLoading(true);
 
-      const { error } = await signUp(formData.email, formData.password);
-      if (error) {
-        setError(error.message);
-      } else {
-        setSuccess('Sign up successful! Redirecting to dashboard...');
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 2000);
-      }
+      await signUp(formData.email, formData.password);
+      setSuccess('Sign up successful! Redirecting to dashboard...');
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
     } catch (err) {
-      setError('An error occurred during sign up');
+      setError(err instanceof Error ? err.message : 'Failed to sign up');
     } finally {
       setLoading(false);
     }
