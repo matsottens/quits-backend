@@ -116,7 +116,7 @@ class ApiService {
         // Try to get the session again after refresh
         const { data: { session: refreshedSession } } = await supabase.auth.getSession();
         if (!refreshedSession?.access_token) {
-          throw new Error('Not authenticated. Please sign in again.');
+        throw new Error('Not authenticated. Please sign in again.');
         }
       }
 
@@ -178,86 +178,109 @@ class ApiService {
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
-      const headers = await this.getAuthHeaders();
-      
       // Ensure endpoint starts with /api
       const path = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
       const url = `${API_URL}${path}`;
+      
+      // Get fresh headers for each request
+      const headers = await this.getAuthHeaders();
+      
+      const requestOptions = {
+        ...options,
+        headers: {
+          ...headers,
+          ...options.headers
+        }
+      };
       
       console.log('Making API request:', {
         url,
         method: options.method || 'GET',
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
-        hasUserId: !!headers['X-User-ID'],
-        environment: process.env.NODE_ENV
+        hasUserId: !!headers['X-User-ID']
       });
 
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...headers,
-          ...options.headers
-        },
-        credentials: 'include'
-      });
-
-      // Log detailed response information
-      console.log('API Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        url: response.url
-      });
-
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = JSON.parse(responseText);
-        } catch (e) {
-          errorData = { error: responseText };
-        }
+      const response = await fetch(url, requestOptions);
+      
+      // Handle 401 errors specifically
+      if (response.status === 401) {
+        console.log('Received 401, attempting token refresh...');
+        await this.refreshAuthToken();
         
-        if (response.status === 401) {
-          if (this.retryCount < this.MAX_RETRIES) {
-            this.retryCount++;
-            // Try to refresh the token
-            await this.refreshAuthToken();
-            // Retry the request
-            return this.makeRequest(endpoint, options);
-          } else {
-            this.retryCount = 0;
-            // Clear tokens and redirect to login
-            sessionStorage.removeItem('gmail_access_token');
+        // Get fresh headers after token refresh
+        const newHeaders = await this.getAuthHeaders();
+        
+        // Retry the request with new headers
+        const retryResponse = await fetch(url, {
+          ...requestOptions,
+        headers: {
+            ...newHeaders,
+          ...options.headers
+          }
+        });
+        
+        if (retryResponse.status === 401) {
+          console.error('Still unauthorized after token refresh');
+          // Force re-authentication
             await supabase.auth.signOut();
             window.location.href = '/login';
-            return { success: false, error: 'Session expired. Please sign in again.' };
-          }
+          throw new Error('Authentication failed. Please sign in again.');
         }
-
-        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
+        
+        return await this.processResponse<T>(retryResponse);
       }
 
-      this.retryCount = 0;
-
-      // Try to parse the response as JSON
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse response as JSON:', e);
-        throw new Error('Invalid JSON response from API');
-      }
-      
-      return { success: true, data };
+      return await this.processResponse<T>(response);
     } catch (error) {
-      console.error('API request error:', error);
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'An unknown error occurred',
+        details: error instanceof Error ? error.stack : undefined
+      };
+    }
+  }
+
+  private async processResponse<T>(response: Response): Promise<ApiResponse<T>> {
+    try {
+      const contentType = response.headers.get('content-type');
+      const isJson = contentType && contentType.includes('application/json');
+      
+      if (!response.ok) {
+        if (isJson) {
+          const errorData = await response.json();
+          return {
+            success: false,
+            error: errorData.message || errorData.error || `HTTP error ${response.status}`,
+            details: JSON.stringify(errorData)
+          };
+        }
+        return {
+          success: false,
+          error: `HTTP error ${response.status}`,
+          details: await response.text()
+        };
+      }
+
+      if (!isJson) {
+        return {
+          success: true,
+          data: await response.text() as unknown as T
+        };
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data as T
+      };
+    } catch (error) {
+      console.error('Error processing response:', error);
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Failed to make API request',
-        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
+        error: error instanceof Error ? error.message : 'Failed to process response',
+        details: error instanceof Error ? error.stack : undefined
       };
     }
   }
