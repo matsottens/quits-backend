@@ -93,17 +93,23 @@ class ApiService {
         email: session.user.email
       });
 
+      // Return headers with proper Bearer token format
       return {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
         'X-Gmail-Token': gmailToken,
-        'X-User-ID': session.user.id
+        'X-User-ID': session.user.id,
+        'Origin': window.location.origin
       };
     } catch (error) {
       console.error('Error getting auth headers:', error);
       // Clear any invalid tokens
       sessionStorage.removeItem('gmail_access_token');
+      // Redirect to login if authentication is missing
+      if (error instanceof Error && error.message.includes('Not authenticated')) {
+        window.location.href = '/login';
+      }
       throw error;
     }
   }
@@ -140,7 +146,6 @@ class ApiService {
       const response = await fetch(url, {
         ...options,
         headers: {
-          'Content-Type': 'application/json',
           ...headers,
           ...options.headers
         },
@@ -173,10 +178,21 @@ class ApiService {
         }
         
         if (response.status === 401) {
+          // Handle authentication errors
           if (errorData?.error === 'Gmail token expired or invalid') {
             sessionStorage.removeItem('gmail_access_token');
             window.location.href = '/auth/google';
             return { success: false, error: 'Gmail token expired. Redirecting to Google auth...' };
+          } else if (errorData?.error === 'Invalid or missing authentication token') {
+            // Try to refresh the session
+            const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError || !session) {
+              await supabase.auth.signOut();
+              window.location.href = '/login';
+              return { success: false, error: 'Session expired. Please sign in again.' };
+            }
+            // Retry the request with new session
+            return this.makeRequest(endpoint, options);
           } else {
             await supabase.auth.signOut();
             window.location.href = '/login';
@@ -625,13 +641,53 @@ const transformPriceChange = (change: PriceChange): PriceChange => {
   };
 };
 
-// Export convenience functions for common API calls
-export const scanEmails = async () => {
-  const response = await apiService.scanEmails();
-  if (!response.success) {
-    throw new Error(response.error || 'Failed to scan emails');
+// Scan emails for subscriptions
+export const scanEmails = async (): Promise<ApiResponse<any>> => {
+  try {
+    console.log('Making scan request to API...');
+    const apiService = ApiService.getInstance();
+    const response = await apiService.makeRequest('/scan-emails', {
+      method: 'POST'
+    });
+    
+    console.log('Raw scan response:', response);
+    
+    if (!response) {
+      throw new Error('No response received from scan');
+    }
+
+    if (response.error) {
+      console.error('Scan error:', response.error);
+      return {
+        success: false,
+        error: response.error
+      };
+    }
+
+    // Ensure we have the expected data structure
+    if (!response.data || !Array.isArray(response.data.subscriptions)) {
+      console.error('Invalid response format:', response);
+      return {
+        success: false,
+        error: 'Invalid response format from server'
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        subscriptions: response.data.subscriptions,
+        count: response.data.count || response.data.subscriptions.length,
+        priceChanges: response.data.priceChanges || null
+      }
+    };
+  } catch (error: any) {
+    console.error('Error in scanEmails:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to scan emails'
+    };
   }
-  return response.data;
 };
 
 export const apiService = ApiService.getInstance(); 

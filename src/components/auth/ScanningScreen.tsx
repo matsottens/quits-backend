@@ -39,8 +39,17 @@ export const ScanningScreen: React.FC = () => {
         console.log('Starting email scan...');
         
         const response = await scanEmails();
+        console.log('Scan response:', response); // Add this log
         
         clearInterval(progressInterval);
+        
+        if (!response) {
+          throw new Error('No response from scan');
+        }
+
+        if (response.error) {
+          throw new Error(response.error);
+        }
         
         if (response.success && response.data) {
           console.log('Scan completed successfully:', response.data);
@@ -76,16 +85,13 @@ export const ScanningScreen: React.FC = () => {
             if (isMounted) navigate('/dashboard');
           }, 1500);
         } else {
-          if (isMounted) {
-            setError(response.error || 'Failed to scan emails');
-            console.error('Scan error:', response.error);
-          }
+          throw new Error('Invalid response format from scan');
         }
-      } catch (err) {
+      } catch (err: any) {
         clearInterval(progressInterval);
         if (isMounted) {
           console.error('Error during scan:', err);
-          setError('Failed to scan emails. Please try again.');
+          setError(err.message || 'Failed to scan emails. Please try again.');
         }
       }
     };
@@ -120,8 +126,8 @@ export const ScanningScreen: React.FC = () => {
             <div className="mb-4">
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div 
-                  className="bg-primary h-3 rounded-full" 
-                  style={{ width: `${progress}%`, transition: 'width 0.5s ease-in-out' }}
+                  className="bg-primary h-3 rounded-full transition-all duration-500 ease-in-out" 
+                  style={{ width: `${progress}%` }}
                 />
               </div>
               <p className="mt-2 text-gray-600">{progress}% complete</p>
