@@ -80,8 +80,8 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "tsc && vite build",
-    "vercel-build": "tsc && vite build",
+    "build": "npx tsc --skipLibCheck && vite build",
+    "vercel-build": "npx tsc --skipLibCheck && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },

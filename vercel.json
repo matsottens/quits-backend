@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "quits-frontend",
-  "buildCommand": "npm install && npm run build",
+  "buildCommand": "npm run build",
   "installCommand": "npm install",
   "outputDirectory": "dist",
   "framework": "vite",
