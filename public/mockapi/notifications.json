@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": "1",
+      "type": "price_change",
+      "title": "Price Change Alert",
+      "message": "Netflix subscription price has increased from $13.99 to $15.99 (14.3%)",
+      "created_at": "2023-05-15T14:30:00Z",
+      "read": false
+    },
+    {
+      "id": "2",
+      "type": "renewal",
+      "title": "Upcoming Renewal",
+      "message": "Your Spotify subscription will renew in 2 days at $10.99",
+      "created_at": "2023-05-08T09:15:00Z",
+      "read": true
+    },
+    {
+      "id": "3",
+      "type": "system",
+      "title": "Welcome to Quits",
+      "message": "Thank you for signing up! Start scanning your emails to find subscriptions.",
+      "created_at": "2023-05-01T10:00:00Z",
+      "read": true
+    }
+  ]
+} 

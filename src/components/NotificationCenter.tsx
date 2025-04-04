@@ -1,23 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { BellIcon, CheckIcon, ArrowTrendingUpIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { apiService } from '../services/api';
 
 interface Notification {
   id: string;
-  type: 'price_increase' | 'renewal_reminder';
-  provider: string;
-  read: boolean;
+  type: string;
+  title: string;
+  message: string;
   created_at: string;
-  details: {
-    oldPrice?: number;
-    newPrice?: number;
-    percentageChange?: number;
-    renewal_date?: string;
-    term_months?: number;
-    days_until_renewal?: number;
-    price?: number;
-    frequency?: string;
-  };
+  read: boolean;
 }
 
 export const NotificationCenter: React.FC = () => {
@@ -25,27 +17,36 @@ export const NotificationCenter: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const isLocalDev = localStorage.getItem('isLocalDev') === 'true';
 
   const fetchNotifications = async () => {
     if (!user) return;
 
     try {
-      const response = await fetch('/api/notifications', {
-        headers: {
-          'Authorization': `Bearer ${user.id}`,
-          'x-user-id': user.id
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
+      const response = await apiService.getNotifications();
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch notifications');
       }
-
-      const data = await response.json();
-      setNotifications(data.data.notifications);
-      setUnreadCount(data.data.unreadCount);
+      
+      // Handle the structure of the mock data
+      let notificationsList: Notification[];
+      if (Array.isArray(response.data)) {
+        notificationsList = response.data;
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        notificationsList = response.data.data;
+      } else {
+        notificationsList = [];
+        console.warn('Unexpected notification data structure:', response.data);
+      }
+      
+      setNotifications(notificationsList);
+      setUnreadCount(notificationsList.filter(notif => !notif.read).length);
+      setError(null);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setError('Failed to fetch notifications');
     } finally {
       setLoading(false);
     }
@@ -55,16 +56,10 @@ export const NotificationCenter: React.FC = () => {
     if (!user) return;
 
     try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user.id}`,
-          'x-user-id': user.id
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to mark notification as read');
+      const response = await apiService.markNotificationAsRead(notificationId);
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to mark notification as read');
       }
 
       // Update local state
@@ -105,6 +100,18 @@ export const NotificationCenter: React.FC = () => {
         )}
       </div>
 
+      {isLocalDev && (
+        <div className="mb-4 p-2 bg-yellow-50 text-yellow-700 rounded-lg text-xs">
+          <span className="font-medium">Dev Mode:</span> Using mock notification data
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg">
+          {error}
+        </div>
+      )}
+
       <div className="space-y-4">
         {notifications.length === 0 ? (
           <div className="bg-gray-50 rounded-lg p-6 text-center">
@@ -123,33 +130,22 @@ export const NotificationCenter: React.FC = () => {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-medium flex items-center">
-                    {notification.type === 'price_increase' 
+                    {notification.type === 'price_change' 
                       ? (
                         <>
                           <ArrowTrendingUpIcon className="h-4 w-4 text-red-500 mr-1.5" />
-                          <span>Price Increase: {notification.provider}</span>
+                          <span>{notification.title}</span>
                         </>
                       )
                       : (
                         <>
                           <CalendarIcon className="h-4 w-4 text-blue-500 mr-1.5" />
-                          <span>Upcoming Renewal: {notification.provider}</span>
+                          <span>{notification.title}</span>
                         </>
                       )}
                   </h3>
                   <p className="text-sm text-gray-600 mt-1.5">
-                    {notification.type === 'price_increase' ? (
-                      <>
-                        Price increasing from <span className="font-medium">${notification.details.oldPrice}</span> to <span className="font-medium">${notification.details.newPrice}</span> 
-                        (<span className="text-red-600 font-medium">{notification.details.percentageChange?.toFixed(1)}% increase</span>)
-                      </>
-                    ) : (
-                      <>
-                        Renewing in <span className="font-medium text-blue-600">{notification.details.days_until_renewal} days</span>
-                        <span className="mx-1">·</span>
-                        <span className="font-medium">${notification.details.price}</span> per {notification.details.frequency}
-                      </>
-                    )}
+                    {notification.message}
                   </p>
                   <p className="text-xs text-gray-500 mt-2">
                     {new Date(notification.created_at).toLocaleDateString()}

@@ -1,0 +1,54 @@
+{
+  "analytics": {
+    "totalSubscriptions": 14,
+    "totalMonthlyCost": 129.87,
+    "averagePriceChange": 8.2,
+    "upcomingRenewals": 3,
+    "priceChanges": [
+      {
+        "provider": "Netflix",
+        "oldPrice": 14.99,
+        "newPrice": 16.99,
+        "percentageChange": 13.3,
+        "firstDetected": "2025-03-15T09:30:00Z"
+      },
+      {
+        "provider": "Spotify",
+        "oldPrice": 9.99,
+        "newPrice": 10.99,
+        "percentageChange": 10.0,
+        "firstDetected": "2025-03-01T14:15:00Z"
+      },
+      {
+        "provider": "Disney+",
+        "oldPrice": 7.99,
+        "newPrice": 8.99,
+        "percentageChange": 12.5,
+        "firstDetected": "2025-02-20T11:45:00Z"
+      }
+    ],
+    "upcomingRenewalsList": [
+      {
+        "provider": "Amazon Prime",
+        "price": 14.99,
+        "frequency": "monthly",
+        "daysUntilRenewal": 2,
+        "renewal_date": "2025-04-06T00:00:00Z"
+      },
+      {
+        "provider": "YouTube Premium",
+        "price": 11.99,
+        "frequency": "monthly",
+        "daysUntilRenewal": 5,
+        "renewal_date": "2025-04-09T00:00:00Z"
+      },
+      {
+        "provider": "HBO Max",
+        "price": 15.99,
+        "frequency": "monthly",
+        "daysUntilRenewal": 12,
+        "renewal_date": "2025-04-16T00:00:00Z"
+      }
+    ]
+  }
+} 

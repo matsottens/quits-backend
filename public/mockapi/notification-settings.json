@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "data": {
+    "email_notifications": true,
+    "price_change_threshold": 5,
+    "renewal_reminder_days": 7
+  }
+} 

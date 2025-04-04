@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { scanEmails } from '../../services/api';
+import { apiService } from '../../services/api';
 
 export const ScanningScreen: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('Initializing...');
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isLocalDev = localStorage.getItem('isLocalDev') === 'true';
 
   useEffect(() => {
     let mounted = true;
@@ -31,7 +32,7 @@ export const ScanningScreen: React.FC = () => {
         setProgress(25);
         
         // Stage 3: Scanning emails
-        setStatus('Scanning your emails...');
+        setStatus(isLocalDev ? 'Loading mock subscription data...' : 'Scanning your emails...');
         
         // Start progress animation - advance from 25% to 75% during scan
         progressInterval = setInterval(() => {
@@ -44,48 +45,17 @@ export const ScanningScreen: React.FC = () => {
 
         // Perform the actual scanning
         try {
-          const result = await scanEmails();
+          const result = await apiService.scanEmails();
           
-          // Process subscription results to ensure provider names and default values
-          if (result?.subscriptions && result.subscriptions.length > 0) {
-            // Ensure each subscription has proper defaults
-            const processedSubscriptions = result.subscriptions.map(sub => {
-              // Process the provider name to make it more user-friendly
-              let providerName = sub.provider || '';
-              
-              // Handle common services by known patterns
-              if (providerName.toLowerCase().includes('netflix')) {
-                providerName = 'Netflix';
-              } else if (providerName.toLowerCase().includes('spotify')) {
-                providerName = 'Spotify';
-              } else if (providerName.toLowerCase().includes('apple')) {
-                providerName = 'Apple';
-              } else if (providerName.toLowerCase().includes('amazon')) {
-                providerName = 'Amazon';
-              } else if (providerName.toLowerCase().includes('disney')) {
-                providerName = 'Disney+';
-              } else if (providerName.toLowerCase().includes('google')) {
-                providerName = 'Google';
-              } else if (providerName.toLowerCase().includes('hbo')) {
-                providerName = 'HBO Max';
-              }
-              
-              return {
-                ...sub,
-                provider: providerName || "Unknown Service",
-                price: sub.price || 0,
-                frequency: sub.frequency || "monthly"
-              };
-            });
-            
-            // Store the processed subscriptions
-            localStorage.setItem('last_subscriptions', JSON.stringify(processedSubscriptions));
-            result.subscriptions = processedSubscriptions;
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to scan emails');
           }
           
-          // Store other scan results
-          if (result?.count !== undefined) {
-            localStorage.setItem('last_scan_count', result.count.toString());
+          // Process subscription results
+          if (result.data && result.data.details && result.data.details.length > 0) {
+            // Store the processed subscriptions
+            localStorage.setItem('last_subscriptions', JSON.stringify(result.data.details));
+            localStorage.setItem('last_scan_count', result.data.subscriptionsFound.toString());
             localStorage.setItem('last_scan_time', new Date().toISOString());
           }
           
@@ -108,8 +78,8 @@ export const ScanningScreen: React.FC = () => {
             navigate('/dashboard', { 
               state: { 
                 fromScan: true, 
-                scanCount: result?.count || 0,
-                subscriptions: result?.subscriptions || []
+                scanCount: result.data?.subscriptionsFound || 0,
+                subscriptions: result.data?.details || []
               } 
             });
           }, 1000);
@@ -152,7 +122,7 @@ export const ScanningScreen: React.FC = () => {
         clearInterval(progressInterval);
       }
     };
-  }, [navigate, user]);
+  }, [navigate, user, isLocalDev]);
 
   return (
     <Box
@@ -182,6 +152,23 @@ export const ScanningScreen: React.FC = () => {
           boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
         }}
       >
+        {isLocalDev && (
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              display: 'block', 
+              mb: 2, 
+              p: 1, 
+              bgcolor: '#FEF3C7', 
+              color: '#92400E',
+              borderRadius: '4px',
+              fontWeight: 500
+            }}
+          >
+            Dev Mode: Using mock subscription data
+          </Typography>
+        )}
+        
         <CircularProgress
           variant="determinate"
           value={progress}

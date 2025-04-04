@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { BellIcon } from '@heroicons/react/24/outline';
+import { apiService } from '../../services/api';
 
 interface NotificationSettingsData {
   email_notifications: boolean;
@@ -20,20 +21,20 @@ export const NotificationSettings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const isLocalDev = localStorage.getItem('isLocalDev') === 'true';
+
   const fetchSettings = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch('/api/notification-settings', {
-        headers: {
-          Authorization: `Bearer ${user.id}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data);
+      const response = await apiService.getNotificationSettings();
+      if (response.success && response.data) {
+        setSettings(response.data);
+      } else {
+        throw new Error(response.error || 'Failed to fetch notification settings');
       }
     } catch (error) {
       console.error('Error fetching notification settings:', error);
+      setError('Failed to load notification settings');
     } finally {
       setLoading(false);
     }
@@ -51,20 +52,10 @@ export const NotificationSettings: React.FC = () => {
     setSuccess(false);
 
     try {
-      const response = await fetch('/api/notification-settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.id}`,
-          'x-user-id': user.id
-        },
-        body: JSON.stringify({ settings })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save notification settings');
+      const response = await apiService.updateNotificationSettings(settings);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to save notification settings');
       }
-
       setSuccess(true);
     } catch (error) {
       console.error('Error saving notification settings:', error);
@@ -88,6 +79,12 @@ export const NotificationSettings: React.FC = () => {
         <BellIcon className="h-6 w-6 text-blue-500 mr-2" />
         <h2 className="text-xl font-semibold">Notification Settings</h2>
       </div>
+
+      {isLocalDev && (
+        <div className="mb-4 p-2 bg-yellow-50 text-yellow-700 rounded-lg text-xs">
+          <span className="font-medium">Dev Mode:</span> Using mock notification settings
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">

@@ -38,7 +38,144 @@ export interface PriceChange {
 }
 
 // Update the API URL configuration
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_ENV === 'development' ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
+
+// Add mock data handling at the top of the file
+const MOCK_DATA = {
+  '/api/scan-emails': {
+    success: true,
+    message: "Email scan completed successfully",
+    data: {
+      subscriptionsFound: 5,
+      details: [
+        {
+          provider: "Netflix",
+          price: 15.99,
+          frequency: "monthly",
+          lastPayment: "2023-05-15",
+          nextPayment: "2023-06-15"
+        },
+        {
+          provider: "Spotify",
+          price: 9.99,
+          frequency: "monthly",
+          lastPayment: "2023-05-10",
+          nextPayment: "2023-06-10"
+        },
+        {
+          provider: "Amazon Prime",
+          price: 12.99,
+          frequency: "monthly",
+          lastPayment: "2023-05-05",
+          nextPayment: "2023-06-05"
+        },
+        {
+          provider: "Disney+",
+          price: 7.99,
+          frequency: "monthly",
+          lastPayment: "2023-05-20",
+          nextPayment: "2023-06-20"
+        },
+        {
+          provider: "Adobe Creative Cloud",
+          price: 52.99,
+          frequency: "monthly",
+          lastPayment: "2023-05-02",
+          nextPayment: "2023-06-02"
+        }
+      ]
+    }
+  },
+  '/api/subscription-analytics': {
+    success: true,
+    data: {
+      totalSubscriptions: 5,
+      totalMonthlyCost: 99.95,
+      averagePriceChange: 4.2,
+      upcomingRenewals: 3,
+      priceChanges: [
+        {
+          provider: "Netflix",
+          oldPrice: 13.99,
+          newPrice: 15.99,
+          change: 2.0,
+          percentageChange: 14.3,
+          firstDetected: "2023-03-15",
+          lastUpdated: "2023-04-15"
+        },
+        {
+          provider: "Spotify",
+          oldPrice: 9.99,
+          newPrice: 10.99,
+          change: 1.0,
+          percentageChange: 10.0,
+          firstDetected: "2023-02-10",
+          lastUpdated: "2023-03-10"
+        }
+      ],
+      upcomingRenewalsList: [
+        {
+          provider: "Netflix",
+          renewal_date: "2023-06-15",
+          daysUntilRenewal: 7,
+          price: 15.99,
+          frequency: "monthly"
+        },
+        {
+          provider: "Spotify",
+          renewal_date: "2023-06-10",
+          daysUntilRenewal: 2,
+          price: 10.99,
+          frequency: "monthly"
+        },
+        {
+          provider: "Amazon Prime",
+          renewal_date: "2023-06-05",
+          daysUntilRenewal: 15,
+          price: 12.99,
+          frequency: "monthly"
+        }
+      ]
+    }
+  },
+  '/api/notification-settings': {
+    success: true,
+    data: {
+      email_notifications: true,
+      price_change_threshold: 5,
+      renewal_reminder_days: 7
+    }
+  },
+  '/api/notifications': {
+    success: true,
+    data: [
+      {
+        id: "1",
+        type: "price_change",
+        title: "Price Change Alert",
+        message: "Netflix subscription price has increased from $13.99 to $15.99 (14.3%)",
+        created_at: "2023-05-15T14:30:00Z",
+        read: false
+      },
+      {
+        id: "2",
+        type: "renewal",
+        title: "Upcoming Renewal",
+        message: "Your Spotify subscription will renew in 2 days at $10.99",
+        created_at: "2023-05-08T09:15:00Z",
+        read: true
+      },
+      {
+        id: "3",
+        type: "system",
+        title: "Welcome to Quits",
+        message: "Thank you for signing up! Start scanning your emails to find subscriptions.",
+        created_at: "2023-05-01T10:00:00Z",
+        read: true
+      }
+    ]
+  }
+};
 
 class ApiService {
   private static instance: ApiService;
@@ -57,63 +194,52 @@ class ApiService {
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
-    try {
-      // Get the current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('Error getting session:', sessionError);
-        throw new Error('Failed to get authentication session');
-      }
-
-      if (!session?.access_token) {
-        console.error('No access token in session');
-        throw new Error('Not authenticated. Please sign in again.');
-      }
-
-      // Get Gmail token from session storage
-      const gmailToken = sessionStorage.getItem('gmail_access_token');
-      if (!gmailToken) {
-        console.error('No Gmail token found in session storage');
-        throw new Error('No Gmail access token available. Please sign in with Google again.');
-      }
-
-      if (!session.user?.id) {
-        console.error('No user ID in session');
-        throw new Error('No user ID available. Please sign in again.');
-      }
-
-      // Log successful header creation (excluding sensitive data)
-      console.log('Created auth headers:', {
-        hasAccessToken: true,
-        hasGmailToken: true,
-        hasUserId: true,
-        userId: session.user.id,
-        email: session.user.email
-      });
-
+    const isLocalDev = localStorage.getItem('isLocalDev') === 'true';
+    
+    // In development mode, use mock headers
+    if (isLocalDev) {
       return {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'X-Gmail-Token': gmailToken,
-        'X-User-ID': session.user.id
+        'Authorization': 'Bearer dev-token',
+        'X-User-ID': 'dev-user-id',
+        'X-Gmail-Token': 'dev-gmail-token',
+        'Content-Type': 'application/json'
       };
-    } catch (error) {
-      console.error('Error getting auth headers:', error);
-      // Clear any invalid tokens
-      sessionStorage.removeItem('gmail_access_token');
-      throw error;
     }
+    
+    const session = await supabase.auth.getSession();
+    const token = session?.data?.session?.access_token;
+    const userId = session?.data?.session?.user?.id;
+    const gmailToken = sessionStorage.getItem('gmail_access_token');
+
+    return {
+      'Authorization': token ? `Bearer ${token}` : '',
+      'X-User-ID': userId || '',
+      'X-Gmail-Token': gmailToken || '',
+    };
   }
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const isLocalDev = localStorage.getItem('isLocalDev') === 'true';
+    
+    // Check if in development mode and we have mock data for this endpoint
+    if (isLocalDev) {
+      const path = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+      const mockEndpoint = Object.keys(MOCK_DATA).find(key => path.startsWith(key));
+      
+      if (mockEndpoint) {
+        console.log(`[DEV] Using mock data for ${path}`);
+        // Return mock data with a slight delay to simulate network
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return { success: true, data: MOCK_DATA[mockEndpoint] as unknown as T };
+      }
+    }
+    
     try {
       const headers = await this.getAuthHeaders();
       
       // Ensure endpoint starts with /api
       const path = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
-      const url = `${API_URL}${path}`;
+      const url = import.meta.env.VITE_ENV === 'development' ? path : `${API_URL}${path}`;
       
       console.log('Making API request:', {
         url,
@@ -121,7 +247,7 @@ class ApiService {
         hasAuthToken: !!headers['Authorization'],
         hasGmailToken: !!headers['X-Gmail-Token'],
         hasUserId: !!headers['X-User-ID'],
-        environment: process.env.NODE_ENV
+        environment: import.meta.env.VITE_ENV
       });
 
       if (!headers['Authorization']) {
@@ -206,70 +332,31 @@ class ApiService {
         type: error.name,
         stack: error.stack,
         url: endpoint,
-        environment: process.env.NODE_ENV
+        environment: import.meta.env.VITE_ENV
       });
 
       return { 
         success: false, 
         error: error.message || 'Failed to make API request',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: import.meta.env.VITE_ENV === 'development' ? error.stack : undefined
       };
     }
   }
 
-  public async scanEmails(): Promise<ApiResponse<ScanEmailsResponse>> {
-    try {
-      console.log('Starting scanEmails request...');
-      const response = await this.makeRequest<ScanEmailsResponse>('/api/scan-emails', {
-        method: 'POST'
-      });
-
-      if (!response.success) {
-        console.error('scanEmails failed:', response.error);
-        return response;
-      }
-
-      if (!response.data) {
-        console.error('scanEmails returned no data');
-        return {
-          success: false,
-          error: 'No data received from scan-emails endpoint'
-        };
-      }
-
-      // Transform the data using our transform functions
-      const transformedData: ScanEmailsResponse = {
-        ...response.data,
-        subscriptions: response.data.subscriptions.map(transformSubscriptionData),
-        priceChanges: response.data.priceChanges?.map(transformPriceChange) || null
-      };
-
-      console.log('scanEmails successful:', {
-        count: transformedData.count,
-        subscriptionsCount: transformedData.subscriptions?.length,
-        priceChangesCount: transformedData.priceChanges?.length
-      });
-
-      return {
-        success: true,
-        data: transformedData
-      };
-    } catch (error) {
-      console.error('Error in scanEmails:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
-      };
-    }
+  public async scanEmails(): Promise<ApiResponse<any>> {
+    console.log('Starting scanEmails request...');
+    return this.makeRequest('/api/scan-emails', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
   }
 
   public async getNotifications(): Promise<ApiResponse<any>> {
     return this.makeRequest('/api/notifications');
   }
 
-  public async markNotificationAsRead(id: string): Promise<ApiResponse<any>> {
-    return this.makeRequest(`/api/notifications/${id}/read`, {
+  public async markNotificationAsRead(notificationId: string): Promise<ApiResponse<any>> {
+    return this.makeRequest(`/api/notifications/${notificationId}/read`, {
       method: 'POST'
     });
   }
@@ -280,7 +367,7 @@ class ApiService {
 
   public async updateNotificationSettings(settings: any): Promise<ApiResponse<any>> {
     return this.makeRequest('/api/notification-settings', {
-      method: 'POST',
+      method: 'PUT',
       body: JSON.stringify(settings)
     });
   }

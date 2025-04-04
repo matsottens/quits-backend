@@ -6,6 +6,7 @@ import {
   ArrowTrendingUpIcon,
   CalendarIcon
 } from '@heroicons/react/24/outline';
+import { apiService } from '../../services/api';
 
 interface PriceChange {
   provider: string;
@@ -38,31 +39,23 @@ export const SubscriptionAnalytics: React.FC = () => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const apiUrl = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
+  const isLocalDev = localStorage.getItem('isLocalDev') === 'true';
 
   const fetchAnalytics = useCallback(async () => {
     if (!user) return;
 
     try {
-      const response = await fetch(`${apiUrl}/api/analytics`, {
-        headers: {
-          'Authorization': `Bearer ${user.id}`,
-          'x-user-id': user.id
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch analytics');
+      const response = await apiService.getSubscriptionAnalytics();
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch analytics');
       }
-
-      const data = await response.json();
-      setAnalytics(data.analytics);
+      setAnalytics(response.data);
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
       setLoading(false);
     }
-  }, [user, apiUrl]);
+  }, [user]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -89,6 +82,12 @@ export const SubscriptionAnalytics: React.FC = () => {
     <div className="space-y-8">
       <h2 className="text-xl font-bold text-gray-800 mb-4">Subscription Analytics</h2>
       
+      {isLocalDev && (
+        <div className="mb-4 p-2 bg-yellow-50 text-yellow-700 rounded-lg text-xs">
+          <span className="font-medium">Dev Mode:</span> Using mock analytics data
+        </div>
+      )}
+
       {/* Price Changes */}
       {analytics.priceChanges && analytics.priceChanges.length > 0 ? (
         <div className="rounded-xl overflow-hidden border border-gray-100">

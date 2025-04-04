@@ -1,0 +1,52 @@
+{
+  "success": true,
+  "data": {
+    "totalSubscriptions": 5,
+    "totalMonthlyCost": 99.95,
+    "averagePriceChange": 4.2,
+    "upcomingRenewals": 3,
+    "priceChanges": [
+      {
+        "provider": "Netflix",
+        "oldPrice": 13.99,
+        "newPrice": 15.99,
+        "change": 2.0,
+        "percentageChange": 14.3,
+        "firstDetected": "2023-03-15",
+        "lastUpdated": "2023-04-15"
+      },
+      {
+        "provider": "Spotify",
+        "oldPrice": 9.99,
+        "newPrice": 10.99,
+        "change": 1.0,
+        "percentageChange": 10.0,
+        "firstDetected": "2023-02-10",
+        "lastUpdated": "2023-03-10"
+      }
+    ],
+    "upcomingRenewalsList": [
+      {
+        "provider": "Netflix",
+        "renewal_date": "2023-06-15",
+        "daysUntilRenewal": 7,
+        "price": 15.99,
+        "frequency": "monthly"
+      },
+      {
+        "provider": "Spotify",
+        "renewal_date": "2023-06-10",
+        "daysUntilRenewal": 2,
+        "price": 10.99,
+        "frequency": "monthly"
+      },
+      {
+        "provider": "Amazon Prime",
+        "renewal_date": "2023-06-05",
+        "daysUntilRenewal": 15,
+        "price": 12.99,
+        "frequency": "monthly"
+      }
+    ]
+  }
+} 

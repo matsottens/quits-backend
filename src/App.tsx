@@ -15,6 +15,20 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { Box, CircularProgress } from '@mui/material';
 import { AuthCallback } from './components/auth/AuthCallback';
 
+// Check if running in local development
+const isLocalDev = import.meta.env.VITE_ENV === 'development' || 
+                   window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1';
+
+// If in local development, register the service worker and set a flag
+if (isLocalDev) {
+  console.log('Running in local development mode with mock API data');
+  // Set a flag to show dev mode indicators in the UI
+  window.localStorage.setItem('isLocalDev', 'true');
+} else {
+  window.localStorage.removeItem('isLocalDev');
+}
+
 // Protected Route component with Layout
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();

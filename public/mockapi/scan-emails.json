@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "message": "Email scan completed successfully",
+  "data": {
+    "subscriptionsFound": 5,
+    "details": [
+      {
+        "provider": "Netflix",
+        "price": 15.99,
+        "frequency": "monthly",
+        "lastPayment": "2023-05-15",
+        "nextPayment": "2023-06-15"
+      },
+      {
+        "provider": "Spotify",
+        "price": 9.99,
+        "frequency": "monthly",
+        "lastPayment": "2023-05-10",
+        "nextPayment": "2023-06-10"
+      },
+      {
+        "provider": "Amazon Prime",
+        "price": 12.99,
+        "frequency": "monthly",
+        "lastPayment": "2023-05-05",
+        "nextPayment": "2023-06-05"
+      },
+      {
+        "provider": "Disney+",
+        "price": 7.99,
+        "frequency": "monthly",
+        "lastPayment": "2023-05-20",
+        "nextPayment": "2023-06-20"
+      },
+      {
+        "provider": "Adobe Creative Cloud",
+        "price": 52.99,
+        "frequency": "monthly",
+        "lastPayment": "2023-05-02",
+        "nextPayment": "2023-06-02"
+      }
+    ]
+  }
+} 
