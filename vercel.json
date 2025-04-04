@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "quits-frontend",
-  "buildCommand": "npm install && npx vite build",
+  "buildCommand": "npm install && npm run build",
   "installCommand": "npm install",
   "outputDirectory": "dist",
   "framework": "vite",
@@ -14,6 +14,15 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
+  ],
+  "routes": [
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" }
+    },
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
   ],
   "env": {
     "VITE_SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
