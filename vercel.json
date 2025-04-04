@@ -1,8 +1,8 @@
 {
   "version": 2,
   "name": "quits-frontend",
-  "buildCommand": "npm install --no-frozen-lockfile && npm install -g typescript && npm run build",
-  "installCommand": "npm install --no-frozen-lockfile",
+  "buildCommand": "npm install && npm run build",
+  "installCommand": "npm install",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
