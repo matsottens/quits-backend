@@ -64,4 +64,19 @@ The application will be available at [http://localhost:3000](http://localhost:30
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Local Development
+
+The application supports running in local development mode with mock data. This allows you to develop and test the UI without needing a backend API server.
+
+When running in local development mode:
+- The application will display a "Dev Mode" indicator in various components
+- API requests are intercepted and mock data is returned
+- Authentication tokens are simulated
+- No actual API calls are made to external services
+
+To run the application in local development mode:
+```bash
+npm run dev
+``` 
