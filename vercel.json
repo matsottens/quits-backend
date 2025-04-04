@@ -5,7 +5,6 @@
   "installCommand": "npm install",
   "outputDirectory": "dist",
   "framework": "vite",
-  "_comment": "Updated Vercel configuration for main branch - test commit",
   "rewrites": [
     {
       "source": "/api/:path*",
