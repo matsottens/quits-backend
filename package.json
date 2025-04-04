@@ -61,6 +61,7 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss": "^3.3.3",
     "tailwindcss-animate": "^1.0.7",
+    "typescript": "^4.9.5",
     "vaul": "^1.1.2"
   },
   "devDependencies": {
@@ -72,7 +73,6 @@
     "autoprefixer": "^10.4.14",
     "class-variance-authority": "^0.7.1",
     "postcss": "^8.4.27",
-    "typescript": "^4.9.5",
     "vite": "^5.1.4",
     "vite-plugin-svgr": "^4.2.0",
     "vite-tsconfig-paths": "^4.2.1"
@@ -80,8 +80,8 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "npx tsc --skipLibCheck && vite build",
-    "vercel-build": "npx tsc --skipLibCheck && vite build",
+    "build": "node ./node_modules/.bin/tsc --skipLibCheck && vite build",
+    "vercel-build": "node ./node_modules/.bin/tsc --skipLibCheck && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },

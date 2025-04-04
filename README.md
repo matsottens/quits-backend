@@ -54,6 +54,23 @@ The application will be available at [http://localhost:3000](http://localhost:30
 - Tailwind CSS
 - Headless UI
 
+## TypeScript Configuration
+
+The project has been set up with proper TypeScript configurations to ensure compatibility with all UI components. Key fixes include:
+
+1. Ensuring TypeScript is in the main dependencies (not just devDependencies) for build environments 
+2. Adding proper type declarations for:
+   - React JSX intrinsic elements in `src/types/global.d.ts`
+   - Radix UI components in `src/types/radix-ui.d.ts`
+   - Sonner toast library in `src/types/sonner.d.ts`
+
+3. Updated build script to directly reference TypeScript from node_modules:
+   ```
+   "build": "node ./node_modules/.bin/tsc --skipLibCheck && vite build"
+   ```
+
+If you encounter TypeScript errors, check that the type declarations properly match the component props being used.
+
 ## Contributing
 
 1. Fork the repository

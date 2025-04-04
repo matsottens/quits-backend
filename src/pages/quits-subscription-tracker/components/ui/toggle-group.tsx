@@ -35,7 +35,7 @@ const ToggleGroupContext = React.createContext<VariantProps<typeof toggleVariant
 
 type ToggleGroupProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root> & {
   type?: "single" | "multiple"
-}
+} & VariantProps<typeof toggleVariants>
 
 const ToggleGroup = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Root>,
@@ -56,7 +56,7 @@ ToggleGroup.displayName = ToggleGroupPrimitive.Root.displayName
 
 type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item> & {
   value: string
-}
+} & VariantProps<typeof toggleVariants>
 
 const ToggleGroupItem = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Item>,

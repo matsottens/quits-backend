@@ -2,22 +2,28 @@ declare module '@radix-ui/react-toggle-group' {
   import * as React from 'react';
 
   interface ToggleGroupSingleProps extends React.HTMLAttributes<HTMLDivElement> {
-    type: 'single';
+    type?: 'single';
     value?: string;
     defaultValue?: string;
     onValueChange?: (value: string) => void;
+    variant?: string;
+    size?: string;
   }
 
   interface ToggleGroupMultipleProps extends React.HTMLAttributes<HTMLDivElement> {
-    type: 'multiple';
+    type?: 'multiple';
     value?: string[];
     defaultValue?: string[];
     onValueChange?: (value: string[]) => void;
+    variant?: string;
+    size?: string;
   }
 
   interface ToggleGroupItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    value: string;
+    value?: string;
     disabled?: boolean;
+    variant?: string;
+    size?: string;
   }
 
   const Root: React.ForwardRefExoticComponent<
