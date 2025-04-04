@@ -32,5 +32,6 @@
     "VITE_ENV": "production"
   },
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "_comment": "Updated configuration for SPA routing - test commit"
 } 
