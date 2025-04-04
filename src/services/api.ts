@@ -49,7 +49,7 @@ class ApiService {
   private static instance: ApiService;
   private isRefreshing = false;
   private refreshPromise: Promise<void> | null = null;
-
+  
   private constructor() {}
 
   public static getInstance(): ApiService {
@@ -113,7 +113,7 @@ class ApiService {
         await this.refreshAuthToken();
         const { data: { session: refreshedSession } } = await supabase.auth.getSession();
         if (!refreshedSession) {
-          throw new Error('Not authenticated. Please sign in again.');
+        throw new Error('Not authenticated. Please sign in again.');
         }
         return this.constructHeaders(refreshedSession);
       }
@@ -133,33 +133,33 @@ class ApiService {
   }
 
   private constructHeaders(session: Session): Record<string, string> {
-    const gmailToken = sessionStorage.getItem('gmail_access_token');
-    if (!gmailToken) {
-      throw new Error('No Gmail access token available. Please sign in with Google again.');
-    }
+      const gmailToken = sessionStorage.getItem('gmail_access_token');
+      if (!gmailToken) {
+        throw new Error('No Gmail access token available. Please sign in with Google again.');
+      }
 
-    if (!session.user?.id) {
-      throw new Error('No user ID available. Please sign in again.');
-    }
+      if (!session.user?.id) {
+        throw new Error('No user ID available. Please sign in again.');
+      }
 
     const accessToken = session.access_token.trim();
     if (!accessToken.includes('.')) {
       throw new Error('Invalid token format. Please sign in again.');
     }
 
-    console.log('Created auth headers:', {
-      hasAccessToken: true,
-      hasGmailToken: true,
-      hasUserId: true,
-      userId: session.user.id,
-      email: session.user.email
-    });
+      console.log('Created auth headers:', {
+        hasAccessToken: true,
+        hasGmailToken: true,
+        hasUserId: true,
+        userId: session.user.id,
+        email: session.user.email
+      });
 
-    return {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
+      return {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
       'Authorization': `Bearer ${accessToken}`,
-      'X-Gmail-Token': gmailToken,
+        'X-Gmail-Token': gmailToken,
       'X-User-ID': session.user.id,
       'Origin': window.location.origin
     };
@@ -199,8 +199,8 @@ class ApiService {
       };
     } catch (error) {
       console.error('API request failed:', error);
-      return {
-        success: false,
+      return { 
+        success: false, 
         error: error instanceof Error ? error.message : 'An unknown error occurred'
       };
     }
