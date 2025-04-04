@@ -114,19 +114,26 @@ interface ChartIconProps {
   style?: React.CSSProperties;
 }
 
+type TooltipFormatterCallback = 
+  | ((value: any, name: string, props: any) => React.ReactNode)
+  | string
+  | number
+  | ((value: any, name: string, entry: any, index: number) => React.ReactNode);
+
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
+  Omit<React.ComponentProps<typeof RechartsPrimitive.Tooltip>, 'formatter'> &
     React.ComponentProps<"div"> & {
       hideLabel?: boolean
       hideIndicator?: boolean
       indicator?: "line" | "dot" | "dashed"
       nameKey?: string
       labelKey?: string
+      formatter?: TooltipFormatterCallback
     }
 >(
-  (
-    {
+  (props, ref) => {
+    const { 
       active,
       payload,
       className,
@@ -140,9 +147,8 @@ const ChartTooltipContent = React.forwardRef<
       color,
       nameKey,
       labelKey,
-    },
-    ref
-  ) => {
+      ...rest
+    } = props;
     const { config } = useChart()
 
     const tooltipLabel = React.useMemo(() => {
@@ -197,7 +203,7 @@ const ChartTooltipContent = React.forwardRef<
       >
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">
-          {(payload as ChartPayloadItem[]).map((item) => {
+          {(payload as ChartPayloadItem[]).map((item: ChartPayloadItem) => {
             const key = `${nameKey || item.dataKey || "value"}`
             const itemConfig = getPayloadConfigFromPayload(config, item, key)
             const indicatorColor = color || item.payload?.fill || item.color
@@ -241,10 +247,8 @@ const ChartLegendContent = React.forwardRef<
       nameKey?: string
     }
 >(
-  (
-    { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },
-    ref
-  ) => {
+  (props, ref) => {
+    const { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey, ...rest } = props;
     const { config } = useChart()
 
     if (!payload?.length) {
@@ -259,8 +263,9 @@ const ChartLegendContent = React.forwardRef<
           verticalAlign === "top" ? "pb-3" : "pt-3",
           className
         )}
+        {...rest}
       >
-        {payload.map((item) => {
+        {payload.map((item: any) => {
           const chartItem = item as unknown as ChartPayloadItem;
           const key = `${nameKey || chartItem.dataKey || "value"}`
           const itemConfig = getPayloadConfigFromPayload(config, chartItem, key)
