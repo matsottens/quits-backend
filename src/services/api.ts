@@ -41,7 +41,7 @@ export interface PriceChange {
 const API_URL = import.meta.env.VITE_ENV === 'development' ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
 
 // Add mock data handling at the top of the file
-const MOCK_DATA = {
+const MOCK_DATA: { [key: string]: any } = {
   '/api/scan-emails': {
     success: true,
     message: "Email scan completed successfully",

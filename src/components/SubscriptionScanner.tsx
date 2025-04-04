@@ -34,7 +34,7 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
         let processedSubscriptions: SubscriptionData[] = [];
         if (result.subscriptions && result.subscriptions.length > 0) {
           // Ensure each subscription has proper defaults and clean provider names
-          processedSubscriptions = result.subscriptions.map(sub => {
+          processedSubscriptions = result.subscriptions.map((sub: SubscriptionData) => {
             // Process the provider name to make it more user-friendly
             let providerName = sub.provider || '';
             
@@ -66,7 +66,7 @@ export const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScan
                   .split('.')[0] // Take the first part before any dots
                   .replace(/-/g, ' ') // Replace hyphens with spaces
                   .split(' ')
-                  .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize words
+                  .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize words
                   .join(' ');
               }
             }

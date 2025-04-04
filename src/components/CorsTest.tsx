@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import { apiService } from '../services/api';
 
+// Define a proper type for the API response
+interface CorsTestResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+  details?: string;
+}
+
 export const CorsTest: React.FC = () => {
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<CorsTestResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
