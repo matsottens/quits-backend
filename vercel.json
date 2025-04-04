@@ -24,7 +24,5 @@
     "VITE_ENABLE_EMAIL_SCANNING": "true",
     "VITE_ENABLE_MANUAL_SUBSCRIPTION": "true",
     "VITE_ENV": "production"
-  },
-  "cleanUrls": true,
-  "trailingSlash": false
+  }
 } 
