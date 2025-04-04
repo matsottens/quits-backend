@@ -32,8 +32,15 @@ declare global {
       select: React.DetailedHTMLProps<React.SelectHTMLAttributes<HTMLSelectElement>, HTMLSelectElement>;
       option: React.DetailedHTMLProps<React.OptionHTMLAttributes<HTMLOptionElement>, HTMLOptionElement>;
       textarea: React.DetailedHTMLProps<React.TextareaHTMLAttributes<HTMLTextAreaElement>, HTMLTextAreaElement>;
+      pre: React.DetailedHTMLProps<React.HTMLAttributes<HTMLPreElement>, HTMLPreElement>;
     }
   }
+}
+
+// Add explicit declaration for react module
+declare module 'react' {
+  export * from 'react';
+  export default React;
 }
 
 declare module 'react/jsx-runtime' {
