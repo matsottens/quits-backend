@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { EnvelopeIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
-import { scanEmails, SubscriptionData } from '../services/api';
+import { scanEmails } from '../services/api';
+import { SubscriptionData } from '../types/subscription';
 
 interface SubscriptionScannerProps {
   onScanComplete?: (count: number) => void;

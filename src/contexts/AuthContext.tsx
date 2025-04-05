@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
-import { SubscriptionData, PriceChange } from '../services/api';
+import { SubscriptionData, PriceChange } from '../types/subscription';
 
 // Flag to enable mock auth for local development - explicitly set to false
 const USE_MOCK_AUTH = false;
@@ -24,7 +24,9 @@ const MOCK_SESSION: Session = {
   provider_token: 'mock-provider-token',
   provider_refresh_token: null,
   user: MOCK_USER,
-  expires_at: Date.now() + 3600
+  expires_at: Date.now() + 3600,
+  token_type: 'bearer',
+  expires_in: 3600
 };
 
 interface AuthState {
@@ -49,7 +51,7 @@ interface AuthContextType extends AuthState {
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   clearError: () => void;
-  scanEmails: () => Promise<void>;
+  scanEmails: () => Promise<any>;
   subscriptionState: SubscriptionState;
 }
 
@@ -255,8 +257,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setSubscriptionState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // Use the ApiService instead of direct fetch to ensure proper headers and error handling
-      const apiService = (await import('../services/api')).apiService;
+      // Import the apiService
+      const { apiService } = await import('../services/api');
       const response = await apiService.scanEmails();
 
       if (!response.success || !response.data) {

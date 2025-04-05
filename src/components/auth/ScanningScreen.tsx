@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { SubscriptionData } from '../../services/api';
+import { SubscriptionData } from '../../types/subscription';
+
+interface ScanResult {
+  subscriptions: SubscriptionData[];
+  count?: number;
+  scanStatus?: string;
+  totalFound?: number;
+}
 
 const ScanningScreen: React.FC = () => {
   const { scanEmails } = useAuth();
@@ -48,10 +55,10 @@ const ScanningScreen: React.FC = () => {
         // Perform actual scan after a brief delay to set up UI
         setTimeout(async () => {
           try {
-            const result = await scanEmails();
+            const result = await scanEmails() as unknown as ScanResult;
             
             // Save scan results
-            if (result && result.subscriptions) {
+            if (result && Array.isArray(result.subscriptions)) {
               localStorage.setItem('last_scan_count', result.subscriptions.length.toString());
               localStorage.setItem('last_subscriptions', JSON.stringify(result.subscriptions));
               

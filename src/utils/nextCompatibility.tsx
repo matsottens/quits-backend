@@ -1,24 +1,28 @@
 import React from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 
-// Link component that mimics Next.js Link
-export const Link: React.FC<{
+interface LinkProps {
   href: string;
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
-}> = ({ href, children, ...props }) => {
+}
+
+// Link component that mimics Next.js Link
+export const Link = ({ href, children, ...props }: LinkProps): JSX.Element => {
   return <RouterLink to={href} {...props}>{children}</RouterLink>;
 };
 
-// Image component that mimics Next.js Image
-export const Image: React.FC<{
+interface ImageProps {
   src: string;
   alt: string;
   width?: number;
   height?: number;
   className?: string;
-}> = ({ src, alt, width, height, className }) => {
+}
+
+// Image component that mimics Next.js Image
+export const Image = ({ src, alt, width, height, className }: ImageProps): JSX.Element => {
   return (
     <img
       src={src}
@@ -31,8 +35,15 @@ export const Image: React.FC<{
   );
 };
 
+interface RouterInterface {
+  push: (path: string) => void;
+  replace: (path: string) => void;
+  back: () => void;
+  pathname: string;
+}
+
 // Router hooks that mimic Next.js router
-export const useRouter = () => {
+export const useRouter = (): RouterInterface => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -44,7 +55,7 @@ export const useRouter = () => {
   };
 };
 
-export const usePathname = () => {
+export const usePathname = (): string => {
   const location = useLocation();
   return location.pathname;
 }; 

@@ -1,27 +1,8 @@
 import { supabase } from '../supabase';
 import { Session } from '@supabase/supabase-js';
+import { SubscriptionData, PriceChange } from '../types/subscription';
 
-export interface SubscriptionData {
-  provider: string;
-  price: number | null;
-  frequency: 'monthly' | 'yearly';
-  renewal_date: string | null;
-  term_months: number | null;
-  is_price_increase: boolean;
-  lastDetectedDate: string;
-  title?: string;
-}
-
-export interface PriceChange {
-  oldPrice: number;
-  newPrice: number;
-  change: number;
-  percentageChange: number;
-  term_months: number | null;
-  renewal_date: string | null;
-  provider: string;
-}
-
+// Other interfaces
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -50,6 +31,7 @@ const USE_MOCK_DATA = false;
 // Mock data for local development
 const MOCK_SUBSCRIPTIONS: SubscriptionData[] = [
   {
+    id: 'mock-1',
     provider: 'Netflix',
     price: 15.99,
     frequency: 'monthly',
@@ -60,6 +42,7 @@ const MOCK_SUBSCRIPTIONS: SubscriptionData[] = [
     title: 'Netflix Standard'
   },
   {
+    id: 'mock-2',
     provider: 'Spotify',
     price: 9.99,
     frequency: 'monthly',
@@ -70,6 +53,7 @@ const MOCK_SUBSCRIPTIONS: SubscriptionData[] = [
     title: 'Spotify Premium'
   },
   {
+    id: 'mock-3',
     provider: 'Adobe',
     price: 52.99,
     frequency: 'monthly',
@@ -80,6 +64,7 @@ const MOCK_SUBSCRIPTIONS: SubscriptionData[] = [
     title: 'Adobe Creative Cloud'
   },
   {
+    id: 'mock-4',
     provider: 'Disney+',
     price: 7.99,
     frequency: 'monthly',
@@ -374,7 +359,7 @@ class ApiService {
       
       const endTime = new Date().getTime();
       console.log(`Scan request completed in ${(endTime - startTime) / 1000} seconds`);
-      
+
       if (!response.ok) {
         // Get status information
         const statusText = response.statusText;
@@ -429,8 +414,8 @@ class ApiService {
   }
 
   // Helper to generate consistent mock data for development
-  private getMockScanResults() {
-    const mockSubscriptions = [
+  private getMockScanResults(): ApiResponse<ScanEmailsApiResponse> {
+    const mockSubscriptions: SubscriptionData[] = [
       {
         id: 'mock-1',
         provider: 'Netflix',
@@ -439,7 +424,10 @@ class ApiService {
         frequency: 'monthly',
         renewal_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
         category: 'Entertainment',
-        last_payment_date: new Date(Date.now() - 23 * 24 * 60 * 60 * 1000).toISOString()
+        last_payment_date: new Date(Date.now() - 23 * 24 * 60 * 60 * 1000).toISOString(),
+        term_months: 1,
+        is_price_increase: false,
+        lastDetectedDate: new Date().toISOString()
       },
       {
         id: 'mock-2',
@@ -449,7 +437,10 @@ class ApiService {
         frequency: 'monthly',
         renewal_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(), // 12 days from now
         category: 'Entertainment',
-        last_payment_date: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000).toISOString()
+        last_payment_date: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000).toISOString(),
+        term_months: 1,
+        is_price_increase: false,
+        lastDetectedDate: new Date().toISOString()
       },
       {
         id: 'mock-3',
@@ -459,7 +450,10 @@ class ApiService {
         frequency: 'monthly',
         renewal_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
         category: 'Productivity',
-        last_payment_date: new Date(Date.now() - 27 * 24 * 60 * 60 * 1000).toISOString()
+        last_payment_date: new Date(Date.now() - 27 * 24 * 60 * 60 * 1000).toISOString(),
+        term_months: 1,
+        is_price_increase: false,
+        lastDetectedDate: new Date().toISOString()
       },
       {
         id: 'mock-4',
@@ -469,7 +463,10 @@ class ApiService {
         frequency: 'yearly',
         renewal_date: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(), // 45 days from now
         category: 'Productivity',
-        last_payment_date: new Date(Date.now() - 320 * 24 * 60 * 60 * 1000).toISOString()
+        last_payment_date: new Date(Date.now() - 320 * 24 * 60 * 60 * 1000).toISOString(),
+        term_months: 12,
+        is_price_increase: false,
+        lastDetectedDate: new Date().toISOString()
       },
       {
         id: 'mock-5',
@@ -479,7 +476,10 @@ class ApiService {
         frequency: 'yearly',
         renewal_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
         category: 'Cloud Storage',
-        last_payment_date: new Date(Date.now() - 363 * 24 * 60 * 60 * 1000).toISOString()
+        last_payment_date: new Date(Date.now() - 363 * 24 * 60 * 60 * 1000).toISOString(),
+        term_months: 12,
+        is_price_increase: false,
+        lastDetectedDate: new Date().toISOString()
       },
       {
         id: 'mock-6',
@@ -489,18 +489,24 @@ class ApiService {
         frequency: 'yearly',
         renewal_date: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(), // 120 days from now
         category: 'Shopping',
-        last_payment_date: new Date(Date.now() - 245 * 24 * 60 * 60 * 1000).toISOString()
+        last_payment_date: new Date(Date.now() - 245 * 24 * 60 * 60 * 1000).toISOString(),
+        term_months: 12,
+        is_price_increase: false,
+        lastDetectedDate: new Date().toISOString()
       }
     ];
     
     // Save mock results
     localStorage.setItem('last_scan_count', mockSubscriptions.length.toString());
     localStorage.setItem('last_subscriptions', JSON.stringify(mockSubscriptions));
-    
-    return { 
-      subscriptions: mockSubscriptions,
-      scanStatus: 'completed',
-      totalFound: mockSubscriptions.length
+
+      return {
+        success: true,
+      data: {
+        subscriptions: mockSubscriptions,
+        count: mockSubscriptions.length,
+        priceChanges: null
+      }
     };
   }
 
@@ -538,6 +544,7 @@ class ApiService {
 const transformSubscriptionData = (data: Partial<SubscriptionData>): SubscriptionData => {
   const frequency = data.frequency === 'yearly' ? 'yearly' : 'monthly';
   return {
+    id: data.id || `sub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     provider: data.provider || 'Unknown',
     price: data.price || null,
     frequency,
@@ -738,45 +745,49 @@ function processAppleSubscription(data: SubscriptionData): SubscriptionData {
         // Calculate monthly price
         if (period > 1) {
           price = fullAmount / period;
-          console.log(`Calculated monthly price: ${price} from ${fullAmount}/${period} months`);
-        } else {
-          price = fullAmount;
+          console.log(`Extracted price: ${price}`);
         }
-        
-        // Determine frequency
-        if (euroMatch[3].toLowerCase().includes('month')) {
-          frequency = period > 1 ? 'monthly' : 'monthly';
-        } else {
-          frequency = 'yearly';
-        }
-      } else {
-        price = fullAmount;
-      }
-    }
-    
-    // Look for renewal date pattern
-    const dateMatch = data.provider.match(/(?:starting|renews)\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i);
-    if (dateMatch && dateMatch[1]) {
-      try {
-        renewalDate = new Date(dateMatch[1]).toISOString();
-        console.log(`Found renewal date: ${renewalDate}`);
-      } catch (e) {
-        console.log('Failed to parse renewal date');
       }
     }
   }
   
   return {
     ...data,
-    provider,
-    price,
-    frequency,
+    provider: provider,
+    price: price,
+    frequency: frequency,
     renewal_date: renewalDate,
-    term_months: null,
-    is_price_increase: false,
-    lastDetectedDate: new Date().toISOString()
+    term_months: data.term_months ? Number(data.term_months) : null,
   };
 }
+
+// Helper function to extract a potential company name from a raw provider string
+const extractCompanyName = (str: string): string | null => {
+  if (!str) return null;
+  
+  // Potential company name patterns
+  const patterns = [
+    // Try to match "Company Name" <email> pattern
+    /"([^"]+)"/,
+    // Try to match 'Company Name' <email> pattern  
+    /'([^']+)'/,
+    // Try to match Company Name <email> pattern
+    /^([^<]+)</,
+    // Try to match words between brackets
+    /\[([^\]]+)\]/,
+    // Try to match words between parentheses
+    /\(([^)]+)\)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = str.match(pattern);
+    if (matches && matches[1] && matches[1].length > 2) {
+      return matches[1].trim();
+    }
+  }
+  
+  return null;
+};
 
 // Helper function to extract a price from a string (looking for $ or € symbols)
 const extractPriceFromString = (str: string): number | null => {
@@ -813,68 +824,21 @@ const extractPriceFromString = (str: string): number | null => {
   return null;
 };
 
-// Helper function to extract a potential company name from a raw provider string
-const extractCompanyName = (str: string): string | null => {
-  if (!str) return null;
-  
-  // Potential company name patterns
-  const patterns = [
-    // Try to match "Company Name" <email> pattern
-    /"([^"]+)"/,
-    // Try to match 'Company Name' <email> pattern  
-    /'([^']+)'/,
-    // Try to match Company Name <email> pattern
-    /^([^<]+)</,
-    // Try to match words between brackets
-    /\[([^\]]+)\]/,
-    // Try to match words between parentheses
-    /\(([^)]+)\)/,
-  ];
-  
-  for (const pattern of patterns) {
-    const matches = str.match(pattern);
-    if (matches && matches[1] && matches[1].length > 2) {
-      return matches[1].trim();
-    }
-  }
-  
-  return null;
-};
-
-// Transform raw price change data to frontend format
-const transformPriceChange = (change: PriceChange): PriceChange => {
-  return {
-    ...change,
-    oldPrice: Number(change.oldPrice),
-    newPrice: Number(change.newPrice),
-    change: Number(change.change),
-    percentageChange: Number(change.percentageChange),
-    term_months: change.term_months ? Number(change.term_months) : null,
-    renewal_date: change.renewal_date ? new Date(change.renewal_date).toISOString() : null
-  };
-};
+// Export the service and helper functions
+export const apiService = ApiService.getInstance(); 
 
 // Scan emails for subscriptions
 export const scanEmails = async (): Promise<ApiResponse<ScanEmailsApiResponse>> => {
   try {
-    const response = await ApiService.getInstance().makeRequest<ScanEmailsApiResponse>('/scan-emails', {
+    const response = await apiService.makeRequest<ScanEmailsApiResponse>('/scan-emails', {
       method: 'POST'
     });
 
-    if (!response.data) {
+    if (!response.success || !response.data) {
       throw new Error('No data received from scan-emails endpoint');
     }
 
-    const { subscriptions = [], count = 0, priceChanges = null } = response.data;
-
-    return {
-      success: true,
-      data: {
-        subscriptions,
-        count,
-        priceChanges
-      }
-    };
+    return response;
   } catch (error) {
     console.error('Error scanning emails:', error);
     return {
@@ -883,5 +847,3 @@ export const scanEmails = async (): Promise<ApiResponse<ScanEmailsApiResponse>> 
     };
   }
 };
-
-export const apiService = ApiService.getInstance(); 

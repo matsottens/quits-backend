@@ -12,7 +12,7 @@ import {
   CalendarIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
-import { SubscriptionData } from '../../services/api';
+import { SubscriptionData } from '../../types/subscription';
 
 export const Dashboard: React.FC = () => {
   const location = useLocation();

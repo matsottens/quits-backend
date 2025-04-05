@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiService } from '../services/api';
 
 export const CorsTest: React.FC = () => {

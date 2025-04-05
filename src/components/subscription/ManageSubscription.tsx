@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -17,10 +17,21 @@ import {
   SelectChangeEvent,
   FormHelperText,
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled, useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import '@fontsource/playfair-display/400.css';
+import { SubscriptionData as BaseSubscriptionData } from '../../types/subscription';
+
+// Extend the base interface for local use
+export interface ExtendedSubscriptionData extends BaseSubscriptionData {
+  isActive: boolean;
+  description?: string;
+  status: string;
+  type: string;
+  next_renewal_date?: string;
+  category: string;
+}
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
@@ -83,31 +94,12 @@ const DeleteButton = styled(Button)({
   },
 });
 
-export interface SubscriptionData {
-  id: string;
-  name: string;
-  amount: string;
-  billingCycle: string;
-  nextBilling: string;
-  category: string;
-  description?: string;
-  notifyBefore: string;
-  notificationType: string;
-  creditDate?: string;
-  isActive: boolean;
-  provider: string;
-  type: string;
-  price: string;
-  frequency: string;
-  next_renewal_date: string;
-  status: string;
-}
-
 interface ManageSubscriptionProps {
-  subscription: SubscriptionData;
-  onClose: () => void;
-  onSave: (subscription: SubscriptionData) => void;
-  onDelete: (id: string) => void;
+  onSave?: (subscription: ExtendedSubscriptionData) => void;
+  onDelete?: (id: string) => void;
+  subscription?: ExtendedSubscriptionData;
+  onClose?: () => void;
+  onCancel?: () => void;
 }
 
 const ManageSubscription: React.FC<ManageSubscriptionProps> = ({ 
@@ -115,20 +107,52 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
   onClose, 
   onSave,
   onDelete,
+  onCancel,
 }) => {
+  const theme = useTheme();
+  const [tab, setTab] = useState(0);
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<SubscriptionData>(subscription);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  
+  const defaultSubscription: ExtendedSubscriptionData = {
+    id: `sub-${Date.now()}`,
+    provider: '',
+    price: 0,
+    frequency: 'monthly',
+    renewal_date: new Date().toISOString(),
+    term_months: 1,
+    is_price_increase: false,
+    lastDetectedDate: new Date().toISOString(),
+    isActive: true,
+    type: 'digital',
+    status: 'active',
+    next_renewal_date: new Date().toISOString(),
+    category: 'other',
+  };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  const [formData, setFormData] = useState<ExtendedSubscriptionData>(
+    subscription || defaultSubscription
+  );
+
+  // Convert renewal_date to next_renewal_date if needed
+  useEffect(() => {
+    if (subscription && subscription.renewal_date && !subscription.next_renewal_date) {
+      setFormData({
+        ...formData,
+        next_renewal_date: subscription.renewal_date
+      });
+    }
+  }, [subscription]);
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const { name, value } = event.target;
+    if (name) {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
   };
 
   const handleSelectChange = (e: SelectChangeEvent) => {
@@ -140,7 +164,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
   };
 
   const handleToggleActive = () => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       isActive: !prev.isActive,
     }));
@@ -149,14 +173,32 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    onSave(formData);
-    onClose();
+    
+    if (onSave) {
+      onSave(formData);
+    }
+    
+    if (onClose) {
+      onClose();
+    }
   };
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this subscription?')) {
+    if (subscription && onDelete) {
       onDelete(subscription.id);
+      if (onClose) {
+        onClose();
+      }
+    }
+  };
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    } else if (onClose) {
       onClose();
+    } else {
+      navigate(-1);
     }
   };
 
@@ -357,7 +399,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({
                   <Button
                     variant="outlined"
                     color="primary"
-                    onClick={() => navigate(-1)}
+                    onClick={handleCancel}
                     disabled={isLoading}
                   >
                     Cancel

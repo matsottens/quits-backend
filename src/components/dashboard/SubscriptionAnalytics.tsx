@@ -131,14 +131,14 @@ export const SubscriptionAnalytics: React.FC = () => {
             // Convert to array and sort by count
             const topCategories = Object.entries(categoryCount)
               .map(([category, count]) => ({ category, count }))
-              .sort((a, b) => b.count - a.count)
+              .sort((a, b) => (b.count as number) - (a.count as number))
               .slice(0, 5);
             
             setLocalMetrics({
               totalSubscriptions: parsedSubscriptions.length,
               totalMonthlyCost,
               upcomingRenewals,
-              topCategories
+              topCategories: topCategories as {category: string, count: number}[]
             });
           }
         } catch (error) {
@@ -185,7 +185,8 @@ export const SubscriptionAnalytics: React.FC = () => {
       )}
       
       {/* Upcoming Renewals */}
-      {(analytics?.upcomingRenewalsList?.length > 0 || localMetrics?.upcomingRenewals?.length > 0) && (
+      {(analytics?.upcomingRenewalsList && analytics.upcomingRenewalsList.length > 0 || 
+        localMetrics?.upcomingRenewals && localMetrics.upcomingRenewals.length > 0) && (
         <div className="rounded-xl overflow-hidden border border-gray-100">
           <div className="bg-gradient-to-r from-accent/5 to-accent/10 p-4 border-b border-gray-100">
             <h3 className="text-base font-semibold text-accent flex items-center">
@@ -225,7 +226,7 @@ export const SubscriptionAnalytics: React.FC = () => {
       )}
       
       {/* Price Changes - only show if we have data from API */}
-      {analytics?.priceChanges?.length > 0 && (
+      {analytics?.priceChanges && analytics.priceChanges.length > 0 && (
         <div className="rounded-xl overflow-hidden border border-gray-100">
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-4 border-b border-gray-100">
             <h3 className="text-base font-semibold text-primary flex items-center">
@@ -234,7 +235,7 @@ export const SubscriptionAnalytics: React.FC = () => {
             </h3>
           </div>
           <div className="divide-y divide-gray-100">
-            {analytics.priceChanges.map((change, index) => (
+            {analytics && analytics.priceChanges && analytics.priceChanges.map((change, index) => (
               <div key={index} className="p-4 hover:bg-gray-50">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium text-gray-800">{change.provider}</h4>
@@ -259,7 +260,7 @@ export const SubscriptionAnalytics: React.FC = () => {
       )}
       
       {/* Top Categories - show if we have local data */}
-      {localMetrics?.topCategories?.length > 0 && (
+      {localMetrics?.topCategories && localMetrics.topCategories.length > 0 && (
         <div className="rounded-xl overflow-hidden border border-gray-100">
           <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 border-b border-gray-100">
             <h3 className="text-base font-semibold text-green-700 flex items-center">
@@ -269,7 +270,7 @@ export const SubscriptionAnalytics: React.FC = () => {
           </div>
           <div className="p-4">
             <div className="space-y-4">
-              {localMetrics.topCategories.map((category, index) => (
+              {localMetrics && localMetrics.topCategories && localMetrics.topCategories.map((category, index) => (
                 <div key={index} className="relative pt-1">
                   <div className="flex mb-2 items-center justify-between">
                     <div>
@@ -285,7 +286,7 @@ export const SubscriptionAnalytics: React.FC = () => {
                   </div>
                   <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
                     <div 
-                      style={{ width: `${(category.count / localMetrics.totalSubscriptions) * 100}%` }} 
+                      style={{ width: `${(category.count / (localMetrics?.totalSubscriptions || 1)) * 100}%` }} 
                       className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
                     ></div>
                   </div>
