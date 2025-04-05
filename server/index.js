@@ -21,7 +21,38 @@ app.use((req, res, next) => {
   next();
 });
 
-// Apply CORS middleware
+// Special handling for scan-emails endpoint - MUST be before corsMiddleware
+app.use('/api/scan-emails', (req, res, next) => {
+  const origin = req.headers.origin;
+  
+  console.log(`[SCAN-EMAILS] ${req.method} request from ${origin}`, {
+    headers: req.headers,
+    method: req.method,
+    path: req.path
+  });
+  
+  // Handle preflight request manually for this route
+  if (req.method === 'OPTIONS') {
+    // Always allow the origin that sent the request
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Gmail-Token, X-User-ID, X-Requested-With, Accept');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.status(204).end();
+    return;
+  }
+  
+  // For non-OPTIONS requests, set the CORS headers and continue
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  
+  next();
+});
+
+// Apply CORS middleware for other routes
 app.use(corsMiddleware);
 app.use(bodyParser.json());
 
