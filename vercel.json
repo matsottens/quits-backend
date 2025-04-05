@@ -9,12 +9,12 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
+      "src": "/(.*)",
       "headers": {
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET,OPTIONS,PATCH,DELETE,POST,PUT",
-        "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-Gmail-Token, X-User-ID, Origin"
+        "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-Gmail-Token, X-User-ID, Origin, Cache-Control, Pragma"
       },
       "continue": true
     },
@@ -29,6 +29,7 @@
     "GOOGLE_CALLBACK_URL": "https://api.quits.cc/auth/google/callback",
     "SESSION_SECRET": "your_session_secret_here",
     "SUPABASE_URL": "https://pihflemmavointdxjdsx.supabase.co",
-    "CLIENT_URL": "https://quits.cc"
+    "CLIENT_URL": "https://quits.cc",
+    "CORS_ALLOWED_ORIGINS": "https://quits.cc,https://www.quits.cc,https://quits-frontend.vercel.app,http://localhost:3000,http://localhost:5173"
   }
 } 
