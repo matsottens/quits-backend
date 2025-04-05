@@ -52,10 +52,19 @@ function isAllowedOrigin(origin) {
 }
 
 function getCorsHeaders(origin) {
-  // Always use the actual origin that was sent in the request for allowed origins
-  if (isAllowedOrigin(origin)) {
+  if (!origin) {
+    // For requests with no origin, use * to allow from anywhere (e.g. curl requests)
     return {
-      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': allowedMethods.join(', '),
+      'Access-Control-Allow-Headers': allowedHeaders.join(', '),
+      'Access-Control-Expose-Headers': exposedHeaders.join(', '),
+      'Access-Control-Max-Age': maxAge
+    };
+  } else if (isAllowedOrigin(origin)) {
+    // Important: Use the actual origin that was sent in the request
+    return {
+      'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': allowedMethods.join(', '),
       'Access-Control-Allow-Headers': allowedHeaders.join(', '),
       'Access-Control-Expose-Headers': exposedHeaders.join(', '),
