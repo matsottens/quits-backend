@@ -53,9 +53,9 @@ export const SignUp: React.FC = () => {
       setLoading(true);
 
       await signUp(formData.email, formData.password);
-      setSuccess('Sign up successful! Redirecting to dashboard...');
+      setSuccess('Sign up successful! Redirecting to add phone number...');
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/phone-number');
       }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign up');

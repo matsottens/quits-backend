@@ -67,9 +67,9 @@ const ScanningScreen: React.FC = () => {
               setStatus("Scan complete!");
               setScanComplete(true);
               
-              // Navigate to dashboard with the results
+              // Navigate to phone number screen with the results
               setTimeout(() => {
-                navigate('/dashboard', { 
+                navigate('/phone-number', { 
                   state: { 
                     subscriptions: result.subscriptions
                   }
@@ -154,7 +154,7 @@ const ScanningScreen: React.FC = () => {
           </div>
         ) : (
           <p className="text-gray-500 text-sm text-center italic">
-            {scanComplete ? "Redirecting to your dashboard..." : "This may take a few moments..."}
+            {scanComplete ? "Redirecting to your phone number..." : "This may take a few moments..."}
           </p>
         )}
       </div>
