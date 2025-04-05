@@ -182,10 +182,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => 
       const redirectUrl = `${window.location.origin}/auth/callback`;
       console.log('Using redirect URL:', redirectUrl);
       
+      // Ensure we request the necessary Gmail scopes
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          scopes: 'https://www.googleapis.com/auth/gmail.readonly',
+          scopes: 'https://www.googleapis.com/auth/gmail.readonly email profile',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',  // Force the Google consent screen to appear
+            include_granted_scopes: 'true'
+          },
           redirectTo: redirectUrl
         }
       });

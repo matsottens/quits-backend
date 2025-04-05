@@ -11,7 +11,7 @@ interface ScanResult {
 }
 
 const ScanningScreen: React.FC = () => {
-  const { scanEmails } = useAuth();
+  const { scanEmails, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [progress, setProgress] = useState<number>(0);
   const [status, setStatus] = useState<string>("Preparing to scan...");
@@ -24,6 +24,22 @@ const ScanningScreen: React.FC = () => {
       setError(null);
       setProgress(0);
       setStatus("Connecting to email provider...");
+      
+      // Check for Gmail token
+      const gmailToken = sessionStorage.getItem('gmail_access_token');
+      if (!gmailToken) {
+        console.warn('No Gmail token found in session storage');
+        setError('Gmail access token not found. Please sign in with Google again.');
+        
+        // Redirect to sign in after a short delay
+        setTimeout(() => {
+          navigate('/signin');
+        }, 2000);
+        
+        return;
+      }
+      
+      console.log('Gmail token found, proceeding with scan');
       
       // Setup progress animation
       const progressInterval = setInterval(() => {
@@ -58,6 +74,19 @@ const ScanningScreen: React.FC = () => {
             console.log("Starting scanEmails call from ScanningScreen");
             const result = await scanEmails();
             console.log("Scan result:", result);
+            
+            // If there's a Gmail token issue, redirect to sign in
+            if (result?.error?.includes('Gmail token') || result?.error?.includes('access token')) {
+              clearInterval(progressInterval);
+              clearInterval(statusInterval);
+              setError('Gmail access token expired or invalid. Please sign in with Google again.');
+              
+              setTimeout(() => {
+                signInWithGoogle();
+              }, 2000);
+              
+              return;
+            }
             
             // Extract subscriptions from the response structure
             const subscriptions = result?.data?.subscriptions || [];
@@ -156,7 +185,7 @@ const ScanningScreen: React.FC = () => {
     };
 
     startScan();
-  }, [scanEmails, navigate]);
+  }, [scanEmails, navigate, signInWithGoogle]);
 
   // Helper function to determine progress bar color
   const getProgressColor = () => {
