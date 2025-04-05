@@ -98,22 +98,39 @@ const corsOptions = {
   ]
 };
 
-// Apply CORS middleware
-app.use(cors(corsOptions));
-
 // Add specific logging for scan-emails endpoint
 app.use('/api/scan-emails', (req, res, next) => {
-  console.log('Request to /api/scan-emails:', {
+  const origin = req.headers.origin;
+  
+  console.log(`[SCAN-EMAILS] ${req.method} request from ${origin}`, {
+    headers: req.headers,
     method: req.method,
-    origin: req.headers.origin,
-    headers: {
-      ...req.headers,
-      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
-      cookie: req.headers.cookie ? '[REDACTED]' : undefined
-    }
+    path: req.path
   });
+  
+  // Handle preflight request manually for this route
+  if (req.method === 'OPTIONS') {
+    // Always allow the origin that sent the request
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Gmail-Token, X-User-ID, X-Requested-With, Accept');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.status(204).end();
+    return;
+  }
+  
+  // For non-OPTIONS requests, set the CORS headers and continue
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  
   next();
 });
+
+// Apply CORS middleware for other routes
+app.use(cors(corsOptions));
 
 // Then apply other middleware
 app.use(cspMiddleware);
@@ -124,20 +141,6 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // app.use(requestTracker); // Commented out undefined middleware
 
 // Test endpoint for CORS
-app.get('/api/test-cors', (req, res) => {
-  res.json({
-    message: 'CORS test successful',
-    corsConfig: {
-      allowedOrigins: corsConfig.allowedOrigins,
-      allowedMethods: corsConfig.allowedMethods,
-      allowedHeaders: corsConfig.allowedHeaders,
-      exposedHeaders: corsConfig.exposedHeaders,
-      allowCredentials: corsConfig.allowCredentials
-    }
-  });
-});
-
-// Comprehensive CORS test endpoint
 app.get('/api/test-cors', (req, res) => {
   const requestId = Math.random().toString(36).substring(2) + Date.now().toString(36);
   
@@ -218,11 +221,67 @@ app.get('/api/test-cors', (req, res) => {
   });
 });
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  const healthData = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: process.version,
+    environment: process.env.NODE_ENV || 'development',
+    service: 'quits-api',
+    memory: process.memoryUsage(),
+    cors: {
+      allowedOrigins: corsConfig.allowedOrigins,
+      origin: req.headers.origin,
+      isAllowed: corsConfig.isAllowedOrigin(req.headers.origin)
+    }
+  };
+  
+  console.log('Health check requested:', {
+    timestamp: new Date().toISOString(),
+    path: req.path,
+    origin: req.headers.origin,
+    method: req.method,
+    ip: req.ip
+  });
+  
+  res.json(healthData);
+});
+
 // Add routes
 app.use('/api', testRouter);
 app.use('/api', emailsRouter);
 app.use('/api/notifications', authenticateRequest, notificationsRouter);
 app.use('/api/analytics', authenticateRequest, analyticsRouter);
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  const healthData = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: process.version,
+    environment: process.env.NODE_ENV || 'development',
+    service: 'quits-api',
+    memory: process.memoryUsage(),
+    cors: {
+      allowedOrigins: corsConfig.allowedOrigins,
+      origin: req.headers.origin,
+      isAllowed: corsConfig.isAllowedOrigin(req.headers.origin)
+    }
+  };
+  
+  console.log('Health check requested:', {
+    timestamp: new Date().toISOString(),
+    path: req.path,
+    origin: req.headers.origin,
+    method: req.method,
+    ip: req.ip
+  });
+  
+  res.json(healthData);
+});
 
 // Session configuration
 app.use(session({
