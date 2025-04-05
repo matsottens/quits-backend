@@ -327,9 +327,9 @@ const SubscriptionDashboard: React.FC = () => {
   };
 
   return (
-    <StyledContainer as="div">
-      <StyledAppBar position="static" as="div">
-        <StyledToolbar as="div">
+    <StyledContainer>
+      <StyledAppBar position="static">
+        <StyledToolbar>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <IconButton
               edge="start"
@@ -401,7 +401,7 @@ const SubscriptionDashboard: React.FC = () => {
         </StyledToolbar>
       </StyledAppBar>
 
-      <StyledDrawer anchor="left" open={drawerOpen} onClose={toggleDrawer} as="div">
+      <StyledDrawer anchor="left" open={drawerOpen} onClose={toggleDrawer}>
         <Box sx={{ p: 2 }}>
           <Typography
             variant="h6"
@@ -456,7 +456,7 @@ const SubscriptionDashboard: React.FC = () => {
           Your Subscriptions ({subscriptions.length})
         </Typography>
 
-        <StyledPaper as="div">
+        <StyledPaper>
           <List>
             {subscriptions.map((subscription, index) => (
               <React.Fragment key={subscription.id}>
