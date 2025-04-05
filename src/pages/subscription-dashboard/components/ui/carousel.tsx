@@ -1,3 +1,5 @@
+/// <reference types="react" />
+/// <reference types="react/jsx-runtime" />
 "use client"
 
 import * as React from "react"

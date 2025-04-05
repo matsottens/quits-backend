@@ -108,7 +108,7 @@ export const NotificationSettings: React.FC = () => {
             <input
               type="checkbox"
               checked={settings.email_notifications}
-              onChange={(e) => setSettings({ ...settings, email_notifications: e.target.checked })}
+              onChange={(e: any) => setSettings({ ...settings, email_notifications: e.target.checked })}
               className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
             />
             <span className="text-gray-700">Enable email notifications</span>
@@ -129,7 +129,7 @@ export const NotificationSettings: React.FC = () => {
               min="1"
               max="100"
               value={settings.price_change_threshold}
-              onChange={(e) => setSettings({ ...settings, price_change_threshold: Math.max(1, Math.min(100, parseInt(e.target.value) || 1)) })}
+              onChange={(e: any) => setSettings({ ...settings, price_change_threshold: Math.max(1, Math.min(100, parseInt(e.target.value) || 1)) })}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>
@@ -149,7 +149,7 @@ export const NotificationSettings: React.FC = () => {
               min="1"
               max="30"
               value={settings.renewal_reminder_days}
-              onChange={(e) => setSettings({ ...settings, renewal_reminder_days: Math.max(1, Math.min(30, parseInt(e.target.value) || 1)) })}
+              onChange={(e: any) => setSettings({ ...settings, renewal_reminder_days: Math.max(1, Math.min(30, parseInt(e.target.value) || 1)) })}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>

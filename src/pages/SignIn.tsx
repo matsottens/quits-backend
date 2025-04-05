@@ -1,3 +1,5 @@
+/// <reference types="react" />
+/// <reference types="react/jsx-runtime" />
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';

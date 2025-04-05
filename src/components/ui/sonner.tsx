@@ -1,4 +1,4 @@
-import React from "react"
+import * as React from 'react'; // Fixed import
 "use client"
 
 import { Toaster as Sonner } from "sonner"

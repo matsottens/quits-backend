@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { useState, useRef, useEffect } from 'react';
+const { useState, useEffect, useRef } = React;
+// Removed duplicate import
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -326,9 +327,9 @@ const SubscriptionDashboard: React.FC = () => {
   };
 
   return (
-    <StyledContainer>
-      <StyledAppBar position="static">
-        <StyledToolbar>
+    <StyledContainer as="div">
+      <StyledAppBar position="static" as="div">
+        <StyledToolbar as="div">
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <IconButton
               edge="start"
@@ -400,7 +401,7 @@ const SubscriptionDashboard: React.FC = () => {
         </StyledToolbar>
       </StyledAppBar>
 
-      <StyledDrawer anchor="left" open={drawerOpen} onClose={toggleDrawer}>
+      <StyledDrawer anchor="left" open={drawerOpen} onClose={toggleDrawer} as="div">
         <Box sx={{ p: 2 }}>
           <Typography
             variant="h6"
@@ -455,7 +456,7 @@ const SubscriptionDashboard: React.FC = () => {
           Your Subscriptions ({subscriptions.length})
         </Typography>
 
-        <StyledPaper>
+        <StyledPaper as="div">
           <List>
             {subscriptions.map((subscription, index) => (
               <React.Fragment key={subscription.id}>

@@ -1,4 +1,4 @@
-import React from "react"
+import * as React from 'react'; // Fixed import
 import { Home, Calendar, Search, Filter } from "lucide-react"
 
 export default function BottomNavigation() {

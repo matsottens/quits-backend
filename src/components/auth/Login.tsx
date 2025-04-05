@@ -1,3 +1,5 @@
+/// <reference types="react" />
+/// <reference types="react/jsx-runtime" />
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -103,7 +105,7 @@ export const Login: React.FC = () => {
                 className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-input bg-white placeholder:text-muted-foreground text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
                 placeholder="Email address"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e: any) => setEmail(e.target.value)}
                 disabled={isLoading}
               />
             </div>
@@ -120,7 +122,7 @@ export const Login: React.FC = () => {
                 className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-input bg-white placeholder:text-muted-foreground text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
                 placeholder="Password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e: any) => setPassword(e.target.value)}
                 disabled={isLoading}
               />
             </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import * as React from 'react'; // Fixed import
 import { DialogProps } from "@radix-ui/react-dialog"
 import { Command as CommandPrimitive } from "cmdk"
 import { Search } from "lucide-react"

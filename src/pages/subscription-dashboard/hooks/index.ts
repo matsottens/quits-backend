@@ -1,5 +1,12 @@
 import * as React from 'react'
-import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react"
+const { 
+  useState, 
+  useEffect, 
+  useRef, 
+  useCallback,
+  useLayoutEffect
+} = React;
+// Removed duplicate import
 
 export function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)

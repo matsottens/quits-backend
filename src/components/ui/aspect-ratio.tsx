@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import * as React from 'react'; // Fixed import
 import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio"
 
 export { AspectRatioPrimitive as AspectRatio } 

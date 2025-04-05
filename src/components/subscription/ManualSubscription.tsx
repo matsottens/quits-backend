@@ -162,7 +162,7 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
         overflow: 'auto',
         backgroundColor: 'white',
         boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-      }}>
+      }} as="div">
         <IconButton
           onClick={onClose}
           sx={{
@@ -175,7 +175,7 @@ const ManualSubscription: React.FC<ManualSubscriptionProps> = ({ onClose, onSubm
           <CloseIcon />
         </IconButton>
 
-        <StyledTitle variant="h5" sx={{ color: '#26457A' }}>Add Subscription Manually</StyledTitle>
+        <StyledTitle variant="h5" sx={{ color: '#26457A' }} as="div">Add Subscription Manually</StyledTitle>
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>

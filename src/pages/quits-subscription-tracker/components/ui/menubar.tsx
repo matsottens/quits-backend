@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import * as React from 'react'; // Fixed import
 import * as MenubarPrimitive from "@radix-ui/react-menubar"
 import { Check, ChevronRight, Circle } from "lucide-react"
 

@@ -1,11 +1,6 @@
 import * as React from 'react'
-import { 
-  useState, 
-  useEffect, 
-  useRef, 
-  useCallback, 
-  useLayoutEffect 
-} from 'react'
+const { useEffect, useLayoutEffect } = React;
+// Removed duplicate import
 
 export function useIsomorphicLayoutEffect(
   effect: React.EffectCallback,

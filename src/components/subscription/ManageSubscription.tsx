@@ -232,7 +232,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({ subscription,
         position: 'relative', 
         maxHeight: '90vh', 
         overflow: 'auto',
-      }}>
+      }} as="div">
         <IconButton
           onClick={onClose}
           sx={{
@@ -245,7 +245,7 @@ const ManageSubscription: React.FC<ManageSubscriptionProps> = ({ subscription,
           <CloseIcon />
         </IconButton>
 
-        <StyledTitle variant="h5" sx={{ color: '#26457A' }}>Manage Subscription</StyledTitle>
+        <StyledTitle variant="h5" sx={{ color: '#26457A' }} as="div">Manage Subscription</StyledTitle>
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>

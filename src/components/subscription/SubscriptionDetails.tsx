@@ -90,7 +90,7 @@ const SubscriptionDetails: React.FC<SubscriptionDetailsProps> = ({ subscription,
         zIndex: 1000,
       }}
     >
-      <StyledPaper sx={{ width: '100%', maxWidth: 600, position: 'relative' }}>
+      <StyledPaper sx={{ width: '100%', maxWidth: 600, position: 'relative' }} as="div">
         <IconButton
           onClick={onClose}
           sx={{
@@ -104,7 +104,7 @@ const SubscriptionDetails: React.FC<SubscriptionDetailsProps> = ({ subscription,
         </IconButton>
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <StyledTitle variant="h5">{subscription.name}</StyledTitle>
+          <StyledTitle variant="h5" as="div">{subscription.name}</StyledTitle>
           <Box>
             <IconButton onClick={() => onEdit(subscription)} sx={{ color: '#1a365d' }}>
               <EditIcon />

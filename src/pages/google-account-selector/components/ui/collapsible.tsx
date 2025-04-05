@@ -1,4 +1,4 @@
-import React from "react"
+import * as React from 'react'; // Fixed import
 "use client"
 
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"

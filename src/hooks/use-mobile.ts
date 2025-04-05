@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import * as React from 'react';
+const { useState, useEffect } = React;
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);

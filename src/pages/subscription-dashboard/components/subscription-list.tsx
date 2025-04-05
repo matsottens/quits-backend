@@ -220,7 +220,7 @@ export default function SubscriptionList({
           placeholder="Search subscriptions..."
           variant="outlined"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e: any) => setSearchQuery(e.target.value)}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">

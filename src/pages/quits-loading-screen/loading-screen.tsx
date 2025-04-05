@@ -1,7 +1,7 @@
-import React from "react"
 "use client"
 
-import { useState, useEffect } from "react"
+import * as React from 'react';
+const { useState, useEffect } = React;
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 

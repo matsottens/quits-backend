@@ -1,4 +1,4 @@
-import React from "react"
+import * as React from 'react'; // Fixed import
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"

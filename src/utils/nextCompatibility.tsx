@@ -1,6 +1,17 @@
 import * as React from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 
+// Add JSX namespace declaration
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      svg: React.SVGProps<SVGSVGElement>;
+      path: React.SVGProps<SVGPathElement>;
+    }
+  }
+}
+
+
 interface LinkProps {
   href: string;
   children: React.ReactNode;

@@ -1,3 +1,5 @@
+/// <reference types="react" />
+/// <reference types="react/jsx-runtime" />
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 

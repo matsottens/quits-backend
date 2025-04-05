@@ -1,3 +1,5 @@
+/// <reference types="react" />
+/// <reference types="react/jsx-runtime" />
 "use client"
 
 import * as React from 'react';
@@ -11,9 +13,10 @@ import '@fontsource/inter/300.css';
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
-import { useState } from "react"
+// Removed duplicate import
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+const { useState } = React;
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")

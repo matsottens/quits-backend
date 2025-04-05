@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import * as React from 'react'; // Fixed import
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
 } from "embla-carousel-react"

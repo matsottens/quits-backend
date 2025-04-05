@@ -125,7 +125,7 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }: 
         zIndex: 1000,
       }}
     >
-      <StyledPaper sx={{ width: '100%', maxWidth: 600, position: 'relative' }}>
+      <StyledPaper sx={{ width: '100%', maxWidth: 600, position: 'relative' }} as="div">
         <IconButton
           onClick={onClose}
           sx={{
@@ -138,7 +138,7 @@ const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }: 
           <CloseIcon />
         </IconButton>
 
-        <StyledTitle variant="h5">Add New Subscription</StyledTitle>
+        <StyledTitle variant="h5" as="div">Add New Subscription</StyledTitle>
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>

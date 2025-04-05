@@ -1,4 +1,4 @@
-import React from "react"
+import * as React from 'react'; // Fixed import
 import { cn } from "../../lib/utils"
 
 export interface InputProps

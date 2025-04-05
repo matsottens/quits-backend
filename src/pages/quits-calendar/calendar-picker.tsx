@@ -1,7 +1,7 @@
-import React from "react"
 "use client"
 
-import { useState } from "react"
+import * as React from 'react';
+const { useState } = React;
 import { ChevronLeft, ChevronRight, CalendarIcon, Home, Search, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -59,7 +59,7 @@ export default function CalendarPicker() {
             <input
               type="text"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e: any) => setDate(e.target.value)}
               className="text-xl w-full outline-none"
             />
             <CalendarIcon className="w-6 h-6 text-gray-500 bg-gray-200 rounded-full p-1" />
@@ -75,7 +75,7 @@ export default function CalendarPicker() {
               <ChevronLeft className="w-6 h-6 text-gray-500" />
               <select
                 value={month}
-                onChange={(e) => setMonth(e.target.value)}
+                onChange={(e: any) => setMonth(e.target.value)}
                 className="text-xl font-medium bg-transparent appearance-none pr-8"
               >
                 <option>Aug</option>
@@ -86,7 +86,7 @@ export default function CalendarPicker() {
               <ChevronLeft className="w-6 h-6 text-gray-500" />
               <select
                 value={year}
-                onChange={(e) => setYear(e.target.value)}
+                onChange={(e: any) => setYear(e.target.value)}
                 className="text-xl font-medium bg-transparent appearance-none pr-8"
               >
                 <option>2025</option>

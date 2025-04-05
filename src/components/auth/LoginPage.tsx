@@ -1,3 +1,5 @@
+/// <reference types="react" />
+/// <reference types="react/jsx-runtime" />
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, TextField, Box, Typography, Container, Divider } from '@mui/material';
@@ -127,7 +129,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <StyledContainer>
+    <StyledContainer as="div">
       {/* Status bar */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography sx={{ color: 'black', fontWeight: 500 }}>9:41</Typography>
@@ -174,7 +176,7 @@ const LoginPage: React.FC = () => {
             Sign in to your account
           </Typography>
 
-          <StyledForm onSubmit={handleSubmit}>
+          <StyledForm onSubmit={handleSubmit} as="div">
             <StyledTextField
               label="Email"
               type="email"
@@ -199,7 +201,7 @@ const LoginPage: React.FC = () => {
               </Link>
             </Box>
 
-            <StyledButton type="submit" fullWidth>
+            <StyledButton type="submit" fullWidth as="div">
               Sign in
             </StyledButton>
           </StyledForm>

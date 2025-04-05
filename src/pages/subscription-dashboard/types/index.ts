@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'; // Fixed import
 import { type ClassValue } from "clsx"
 
 export type ClassNameValue = ClassValue

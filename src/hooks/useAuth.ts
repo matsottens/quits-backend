@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import * as React from 'react';
+const { useState, useEffect } = React;
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { User, Session } from '@supabase/supabase-js';

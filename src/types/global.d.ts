@@ -65,6 +65,17 @@ declare module 'react' {
 
 declare module 'react/jsx-runtime' {
   import * as React from 'react';
+
+// Add JSX namespace declaration
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      svg: React.SVGProps<SVGSVGElement>;
+      path: React.SVGProps<SVGPathElement>;
+    }
+  }
+}
+
   
   export namespace JSX {
     interface Element extends React.ReactElement<any, any> {}
