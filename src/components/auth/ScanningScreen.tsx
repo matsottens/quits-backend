@@ -55,28 +55,72 @@ const ScanningScreen: React.FC = () => {
         // Perform actual scan after a brief delay to set up UI
         setTimeout(async () => {
           try {
-            const result = await scanEmails() as unknown as ScanResult;
+            console.log("Starting scanEmails call from ScanningScreen");
+            const result = await scanEmails();
+            console.log("Scan result:", result);
             
-            // Save scan results
-            if (result && Array.isArray(result.subscriptions)) {
-              localStorage.setItem('last_scan_count', result.subscriptions.length.toString());
-              localStorage.setItem('last_subscriptions', JSON.stringify(result.subscriptions));
+            // Extract subscriptions from the response structure
+            const subscriptions = result?.data?.subscriptions || [];
+            
+            // Check if we have valid subscription data
+            if (Array.isArray(subscriptions) && subscriptions.length > 0) {
+              localStorage.setItem('last_scan_count', subscriptions.length.toString());
+              localStorage.setItem('last_subscriptions', JSON.stringify(subscriptions));
               
               // Complete the progress and display success
               setProgress(100);
-              setStatus("Scan complete!");
+              setStatus(`Scan complete! Found ${subscriptions.length} subscriptions.`);
               setScanComplete(true);
               
               // Navigate to phone number screen with the results
               setTimeout(() => {
                 navigate('/phone-number', { 
                   state: { 
-                    subscriptions: result.subscriptions
+                    subscriptions: subscriptions
                   }
                 });
               }, 1000);
             } else {
-              throw new Error("No subscription data returned");
+              // For development/testing - use mock data if no real subscriptions found
+              if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.log("No subscriptions found, using mock data for development");
+                const mockSubscriptions = [
+                  {
+                    id: 'mock-1',
+                    provider: 'Netflix',
+                    price: 15.99,
+                    frequency: 'monthly',
+                    renewal_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+                    term_months: 1,
+                    is_price_increase: false,
+                    lastDetectedDate: new Date().toISOString()
+                  },
+                  {
+                    id: 'mock-2',
+                    provider: 'Spotify',
+                    price: 9.99,
+                    frequency: 'monthly',
+                    renewal_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    term_months: 1,
+                    is_price_increase: false,
+                    lastDetectedDate: new Date().toISOString()
+                  }
+                ];
+                
+                setProgress(100);
+                setStatus("Using mock data for development");
+                setScanComplete(true);
+                
+                setTimeout(() => {
+                  navigate('/phone-number', { 
+                    state: { 
+                      subscriptions: mockSubscriptions
+                    }
+                  });
+                }, 1000);
+              } else {
+                throw new Error("No subscription data returned");
+              }
             }
           } catch (error) {
             clearInterval(progressInterval);

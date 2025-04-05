@@ -119,7 +119,8 @@ const MOCK_NOTIFICATIONS = [
   }
 ];
 
-class ApiService {
+// Make sure the ApiService class is exported
+export class ApiService {
   private static instance: ApiService;
   private isRefreshing = false;
   private refreshPromise: Promise<void> | null = null;

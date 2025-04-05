@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
 import { SubscriptionData, PriceChange } from '../types/subscription';
+import { ApiService } from '../services/api';
 
 // Flag to enable mock auth for local development - explicitly set to false
 const USE_MOCK_AUTH = false;
@@ -282,8 +283,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => 
     setSubscriptionState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      // Get the API service instance
-      const ApiService = (await import('../services/api')).ApiService;
+      // Get the API service instance - use the directly imported ApiService
+      console.log('Getting ApiService instance...');
       const apiService = ApiService.getInstance();
       
       // Call the scan emails API
