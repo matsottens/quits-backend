@@ -18,7 +18,7 @@ import { AuthCallback } from './components/auth/AuthCallback';
 import PrivateRoute from './components/PrivateRoute';
 import SignIn from './pages/SignIn';
 import CorsTest from './components/CorsTest';
-import { SubscriptionProvider } from './hooks/useSubscriptions';
+import { SubscriptionProvider } from './hooks/useSubscriptions.tsx';
 import Subscriptions from './pages/Subscriptions';
 import AddSubscription from './pages/AddSubscription';
 import SubscriptionDetailsPage from './pages/SubscriptionDetailsPage';
