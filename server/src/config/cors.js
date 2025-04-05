@@ -43,6 +43,11 @@ function isAllowedOrigin(origin) {
     return true;
   }
   
+  // Check for quits.cc domains (with or without www)
+  if (origin === 'https://quits.cc' || origin === 'https://www.quits.cc') {
+    return true;
+  }
+  
   return false;
 }
 
@@ -57,6 +62,7 @@ function getCorsHeaders(origin) {
       'Access-Control-Max-Age': maxAge
     };
   } else if (isAllowedOrigin(origin)) {
+    // Important: Use the actual origin that was sent in the request
     return {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': allowedMethods.join(', '),
