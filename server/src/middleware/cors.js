@@ -50,6 +50,8 @@ const corsMiddleware = (req, res, next) => {
     logCorsInfo(requestId, {
       type: 'preflight_request',
       method: req.method,
+      origin: origin,
+      path: req.path,
       headers: req.headers
     });
 
@@ -64,6 +66,9 @@ const corsMiddleware = (req, res, next) => {
       // Log successful preflight
       logCorsInfo(requestId, {
         type: 'preflight_success',
+        origin: origin,
+        path: req.path,
+        responseHeaders: res.getHeaders(),
         headers: corsHeaders
       });
 
@@ -74,7 +79,10 @@ const corsMiddleware = (req, res, next) => {
       logCorsInfo(requestId, {
         type: 'preflight_failed',
         reason: 'origin_not_allowed',
-        origin
+        origin: origin,
+        path: req.path,
+        allowedOrigins: corsConfig.allowedOrigins,
+        isOriginAllowed: corsConfig.isAllowedOrigin(origin)
       });
 
       // Reject the preflight request
@@ -82,7 +90,9 @@ const corsMiddleware = (req, res, next) => {
         error: 'CORS error',
         message: 'Origin not allowed',
         requestId,
-        origin
+        origin,
+        path: req.path,
+        allowedOrigins: corsConfig.allowedOrigins
       });
     }
     return;
