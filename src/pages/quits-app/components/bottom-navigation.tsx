@@ -1,3 +1,4 @@
+import React from "react"
 import { Home, Calendar, Search, Filter } from "lucide-react"
 
 export default function BottomNavigation() {
