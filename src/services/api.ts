@@ -24,7 +24,7 @@ interface ScanEmailsApiResponse {
   priceChanges: PriceChange[] | null;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://quits-api.vercel.app';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
 // Explicitly disable mock data
 const USE_MOCK_DATA = false;
 
@@ -250,88 +250,130 @@ class ApiService {
     // For local development with mock data
     if (USE_MOCK_DATA) {
       console.log('Using mock data for endpoint:', endpoint);
-      let mockResponse: any = null;
-      
-      // Return appropriate mock data based on the endpoint
-      if (endpoint === '/scan-emails' || endpoint === '/api/scan-emails') {
-        mockResponse = {
-          subscriptions: MOCK_SUBSCRIPTIONS,
-          count: MOCK_SUBSCRIPTIONS.length,
-          priceChanges: MOCK_PRICE_CHANGES
-        };
-      } else if (endpoint === '/api/notifications') {
-        mockResponse = MOCK_NOTIFICATIONS;
-      } else if (endpoint.includes('/api/notifications/') && endpoint.includes('/read')) {
-        const id = endpoint.split('/')[3];
-        MOCK_NOTIFICATIONS.find(n => n.id === id)!.read = true;
-        mockResponse = { success: true };
-      } else if (endpoint === '/api/notification-settings') {
-        mockResponse = {
-          emailNotifications: true,
-          pushNotifications: false,
-          priceChangeAlerts: true,
-          renewalReminders: true
-        };
-      } else if (endpoint === '/api/subscription-analytics') {
-        mockResponse = {
-          totalSpend: MOCK_SUBSCRIPTIONS.reduce((sum, sub) => sum + (sub.price || 0), 0),
-          subscriptionCount: MOCK_SUBSCRIPTIONS.length,
-          mostExpensive: MOCK_SUBSCRIPTIONS.reduce((prev, current) => 
-            (prev.price || 0) > (current.price || 0) ? prev : current),
-          upcomingRenewals: MOCK_SUBSCRIPTIONS.filter(sub => 
-            new Date(sub.renewal_date || '') < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
-        };
-      } else if (endpoint === '/api/test-cors') {
-        mockResponse = { message: 'CORS test successful', timestamp: new Date().toISOString() };
+      if (endpoint === '/api/scan-emails') {
+        return this.getMockScanResults() as ApiResponse<T>;
       }
-      
-      if (mockResponse) {
-        return { success: true, data: mockResponse as T };
+      if (endpoint === '/api/notifications') {
+        return { success: true, data: MOCK_NOTIFICATIONS } as ApiResponse<T>;
       }
-      
-      return { 
-        success: false, 
-        error: 'Endpoint not mocked: ' + endpoint
-      };
+      return { success: true, data: {} as T };
     }
-    
-    // Real API request logic for production
+
+    // In regular API request flow
     try {
       const headers = await this.getAuthHeaders();
-      const path = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
-      const url = `${API_URL}${path}`;
       
-      console.log('Making API request:', {
-        url,
-        method: options.method || 'GET',
-        hasAuthToken: !!headers['Authorization'],
-        hasGmailToken: !!headers['X-Gmail-Token'],
-        hasUserId: !!headers['X-User-ID']
-      });
-
-      const response = await fetch(url, {
+      const url = `${API_URL}${endpoint}`;
+      console.log('Making API request to:', url);
+      
+      // Set default options for all requests
+      const fetchOptions: RequestInit = {
         ...options,
         headers: {
           ...headers,
-          ...options.headers
-        }
+          ...options.headers,
+        },
+        credentials: 'include',
+        mode: 'cors'
+      };
+
+      // For OPTIONS requests, make sure proper CORS headers are included
+      if (options.method === 'OPTIONS') {
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          'Access-Control-Request-Method': 'POST,GET,PUT,DELETE',
+          'Access-Control-Request-Headers': 'Content-Type, Authorization, X-Gmail-Token, X-User-ID'
+        };
+      }
+      
+      // Log request details for debugging
+      console.log('Request details:', {
+        url,
+        method: options.method || 'GET',
+        headers: Object.keys(fetchOptions.headers),
+        hasBody: !!options.body
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      const response = await fetch(url, fetchOptions);
+      
+      console.log('API response status:', response.status);
+      
+      if (response.status === 401) {
+        console.log('Unauthorized response, attempting to refresh token...');
+        await this.refreshAuthToken();
+        // Retry with new token
+        const newHeaders = await this.getAuthHeaders();
+        const retryOptions = {
+          ...options,
+          headers: {
+            ...newHeaders,
+            ...options.headers,
+          },
+          credentials: 'include',
+          mode: 'cors'
+        };
+        const retryResponse = await fetch(url, retryOptions);
+        if (retryResponse.status === 401) {
+          console.error('Still unauthorized after token refresh');
+          throw new Error('Authentication failed after token refresh. Please sign in again.');
+        }
+        return this.processResponse<T>(retryResponse);
       }
-
-      const data = await response.json();
-      return {
-        success: true,
-        data: data as T
-      };
+      
+      return this.processResponse<T>(response);
     } catch (error) {
-      console.error('API request failed:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'An unknown error occurred'
+      console.error('API request error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown API error',
+        details: error instanceof Error ? error.stack : undefined
+      };
+    }
+  }
+
+  private async processResponse<T>(response: Response): Promise<ApiResponse<T>> {
+    try {
+      // Check if the response has JSON content
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        
+        if (!response.ok) {
+          return {
+            success: false,
+            error: data.message || `API error: ${response.status}`,
+            details: data.details || JSON.stringify(data)
+          };
+        }
+        
+        return {
+          success: true,
+          data: data as T
+        };
+      } else {
+        // Handle non-JSON responses
+        const text = await response.text();
+        
+        if (!response.ok) {
+          return {
+            success: false,
+            error: `API error: ${response.status}`,
+            details: text
+          };
+        }
+        
+        // For successful non-JSON responses
+        return {
+          success: true,
+          data: { message: text } as unknown as T
+        };
+      }
+    } catch (error) {
+      console.error('Error processing API response:', error);
+      return {
+        success: false,
+        error: 'Failed to process API response',
+        details: error instanceof Error ? error.message : undefined
       };
     }
   }
@@ -351,7 +393,7 @@ class ApiService {
 
       // Track start time for performance monitoring
       const startTime = new Date().getTime();
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers,
@@ -537,6 +579,72 @@ class ApiService {
 
   public async testCors(): Promise<ApiResponse<any>> {
     return this.makeRequest('/api/test-cors');
+  }
+
+  public async testApiConnection(): Promise<ApiResponse<any>> {
+    try {
+      // First, try to access the API without authentication
+      const publicResponse = await fetch(`${API_URL}/api/health`, {
+        method: 'GET',
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
+        }
+      });
+      
+      console.log('Public API health check status:', publicResponse.status);
+      
+      let publicResponseText;
+      try {
+        publicResponseText = await publicResponse.text();
+      } catch (e) {
+        publicResponseText = 'Unable to get response text';
+      }
+      
+      // Now try with authentication headers
+      let authenticatedResponse;
+      try {
+        const headers = await this.getAuthHeaders();
+        authenticatedResponse = await fetch(`${API_URL}/api/auth/profile`, {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'include',
+          headers
+        });
+        
+        console.log('Authenticated API check status:', authenticatedResponse.status);
+      } catch (error) {
+        console.error('Error in authenticated API check:', error);
+        return {
+          success: false,
+          error: 'Authenticated API check failed',
+          data: {
+            publicStatus: publicResponse.status,
+            publicResponse: publicResponseText,
+            authError: error instanceof Error ? error.message : 'Unknown error'
+          }
+        };
+      }
+      
+      return {
+        success: true,
+        data: {
+          publicStatus: publicResponse.status,
+          publicResponse: publicResponseText,
+          authenticatedStatus: authenticatedResponse?.status || 'Not tested',
+          apiUrl: API_URL
+        }
+      };
+    } catch (error) {
+      console.error('API connection test failed:', error);
+      return {
+        success: false,
+        error: 'API connection test failed',
+        details: error instanceof Error ? error.message : undefined
+      };
+    }
   }
 }
 

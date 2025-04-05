@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { CorsTest } from '../CorsTest';
+import CorsTest from '../CorsTest';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();

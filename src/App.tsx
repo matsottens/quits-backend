@@ -16,6 +16,7 @@ import { Box, CircularProgress } from '@mui/material';
 import { AuthCallback } from './components/auth/AuthCallback';
 import PrivateRoute from './components/PrivateRoute';
 import SignIn from './pages/SignIn';
+import CorsTest from './components/CorsTest';
 
 // Protected Route component with Layout
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children  }: any) => {
@@ -73,6 +74,7 @@ const AppRouter: React.FC = () => {
         <Route path="/auth/consent" element={<EmailOAuthConsent />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/scanning" element={<ScanningScreen />} />
+        <Route path="/api-test" element={<CorsTest />} />
         <Route
           path="/subscription-selection"
           element={

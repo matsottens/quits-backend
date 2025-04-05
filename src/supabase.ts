@@ -1,19 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Environment variables are set by Vercel or locally via env vars
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://pihflemmavointdxjdsx.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpaGZsZW1tYXZvaW50ZHhqZHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMxODgxNzcsImV4cCI6MjA1ODc2NDE3N30.yJqxRrBNLkuiMz1--QOn_EHm8l2A8B-XSV4hEBS4_pY';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+// Always log the values being used to help with debugging
+console.log('Using Supabase URL:', supabaseUrl);
+console.log('Using Supabase Anon Key:', supabaseAnonKey ? (supabaseAnonKey.substring(0, 20) + '...') : 'Not Set');
 
-// Create a single instance of the Supabase client
+// Create a single supabase client for interacting with your database
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: true,
     persistSession: true,
-    storageKey: 'quits-auth',
-    flowType: 'pkce',
-    detectSessionInUrl: true
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
   }
 }); 

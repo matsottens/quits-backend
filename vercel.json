@@ -1,14 +1,19 @@
 {
   "version": 2,
   "name": "quits-frontend",
-  "buildCommand": "node vercel-build.js",
+  "buildCommand": "node vercel-build-debug.js",
   "installCommand": "npm install",
   "outputDirectory": "dist",
   "framework": "vite",
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "https://api.quits.cc/api/$1"
+      "dest": "https://api.quits.cc/api/$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Authorization, X-Gmail-Token, X-User-ID, Origin"
+      }
     },
     {
       "src": "/assets/(.*)",
