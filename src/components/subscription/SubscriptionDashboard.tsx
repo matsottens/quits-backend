@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -56,25 +57,25 @@ const StyledContainer = styled(Container)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   padding: theme.spacing(4),
-}));
+})) as React.ComponentType<React.ComponentProps<typeof Container>>;
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: '#26457A',
   color: 'white',
   boxShadow: 'none',
   borderBottom: '1px solid #e5e7eb',
-}));
+})) as React.ComponentType<React.ComponentProps<typeof AppBar>>;
 
 const StyledToolbar = styled(Toolbar)({
   display: 'flex',
   justifyContent: 'space-between',
   padding: '1rem 0',
-});
+}) as React.ComponentType<React.ComponentProps<typeof Toolbar>>;
 
 const Logo = styled(Box)({
   display: 'flex',
   alignItems: 'center',
-});
+}) as React.ComponentType<React.ComponentProps<typeof Box>>;
 
 const LogoIcon = styled(Box)({
   width: '2rem',
@@ -93,14 +94,14 @@ const LogoIcon = styled(Box)({
       backgroundColor: 'rgba(255, 255, 255, 0.7)',
     },
   },
-});
+}) as React.ComponentType<React.ComponentProps<typeof Box>>;
 
 const LogoText = styled(Typography)({
   fontSize: '1.5rem',
   fontWeight: 700,
   color: 'white',
   fontFamily: 'Playfair Display, serif',
-});
+}) as React.ComponentType<React.ComponentProps<typeof Typography>>;
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -108,7 +109,7 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   borderRadius: '1rem',
   boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
   marginTop: theme.spacing(3),
-}));
+})) as React.ComponentType<React.ComponentProps<typeof Paper>>;
 
 const StyledListItem = styled(ListItem)(({ theme }) => ({
   borderRadius: '0.5rem',
@@ -117,7 +118,7 @@ const StyledListItem = styled(ListItem)(({ theme }) => ({
   '&:hover': {
     backgroundColor: '#f3f4f6',
   },
-}));
+})) as React.ComponentType<React.ComponentProps<typeof ListItem>>;
 
 const StyledDrawer = styled(Drawer)(({ theme }) => ({
   '& .MuiDrawer-paper': {
@@ -125,7 +126,7 @@ const StyledDrawer = styled(Drawer)(({ theme }) => ({
     backgroundColor: 'white',
     borderRight: '1px solid #e5e7eb',
   },
-}));
+})) as React.ComponentType<React.ComponentProps<typeof Drawer>>;
 
 interface SubscriptionFormData {
   name: string;
@@ -223,7 +224,7 @@ const SubscriptionDashboard: React.FC = () => {
   };
 
   const handleToggleMenu = () => {
-    setMenuOpen((prevOpen) => !prevOpen);
+    setMenuOpen((prevOpen: boolean) => !prevOpen);
   };
 
   const handleCloseMenu = (event: Event | React.SyntheticEvent) => {
@@ -295,32 +296,31 @@ const SubscriptionDashboard: React.FC = () => {
   };
 
   const handleSubscriptionEdit = async (updatedSubscription: Subscription) => {
+    if (!user) return;
+    
     try {
-      const savedSubscription = await db.updateSubscription(
-        updatedSubscription.id,
-        updatedSubscription
-      );
-      
-      setSubscriptions(prev =>
-        prev.map(sub =>
-          sub.id === savedSubscription.id ? savedSubscription : sub
-        )
-      );
-      
+      await db.updateSubscription(updatedSubscription.id, updatedSubscription);
+      setSubscriptions((prev: Subscription[]) => {
+        return prev.map((sub: Subscription) => {
+          return sub.id === updatedSubscription.id ? updatedSubscription : sub;
+        });
+      });
       setSelectedSubscription(null);
-    } catch (error) {
-      console.error('Error editing subscription:', error);
+    } catch (err) {
+      console.error('Error updating subscription:', err);
       setError('Failed to update subscription');
     }
   };
 
   const handleSubscriptionDelete = async (id: string) => {
+    if (!user) return;
+    
     try {
       await db.deleteSubscription(id);
-      setSubscriptions(prev => prev.filter(sub => sub.id !== id));
+      setSubscriptions((prev: Subscription[]) => prev.filter((sub: Subscription) => sub.id !== id));
       setSelectedSubscription(null);
-    } catch (error) {
-      console.error('Error deleting subscription:', error);
+    } catch (err) {
+      console.error('Error deleting subscription:', err);
       setError('Failed to delete subscription');
     }
   };
