@@ -24,7 +24,10 @@ interface ScanEmailsApiResponse {
   priceChanges: PriceChange[] | null;
 }
 
+// Use API URL from environment variables or default to api.quits.cc
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
+console.log('API Service initialized with API_URL:', API_URL);
+
 // Explicitly disable mock data
 const USE_MOCK_DATA = false;
 
@@ -379,79 +382,95 @@ class ApiService {
   }
 
   public async scanEmails(): Promise<ApiResponse<ScanEmailsApiResponse>> {
-    console.log('Starting email scan process...');
+    console.log('Scanning emails...');
+    
+    // For local development with mock data, return mock data
+    if (USE_MOCK_DATA) {
+      console.log('Using mock scan data');
+      return this.getMockScanResults();
+    }
     
     try {
-      const headers = await this.getAuthHeaders();
-      if (!headers) {
-        throw new Error('Authentication required to scan emails');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.error('No session found');
+        throw new Error('Not authenticated. Please sign in again.');
       }
       
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
-      const url = `${apiUrl}/api/scan-emails`;
-      console.log(`Scanning emails with API endpoint: ${url}`);
-
-      // Track start time for performance monitoring
-      const startTime = new Date().getTime();
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-      });
+      const gmailToken = sessionStorage.getItem('gmail_access_token');
       
-      const endTime = new Date().getTime();
-      console.log(`Scan request completed in ${(endTime - startTime) / 1000} seconds`);
-
-      if (!response.ok) {
-        // Get status information
-        const statusText = response.statusText;
-        const status = response.status;
-        console.error(`Scan failed with status ${status}: ${statusText}`);
+      if (!gmailToken) {
+        console.error('Gmail token not found');
+        throw new Error('Gmail token not found. Please connect your Gmail account.');
+      }
+      
+      console.log('Sending request to scan emails...');
+      
+      try {
+        const response = await fetch(`${API_URL}/api/scan-emails`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'X-Gmail-Token': gmailToken,
+            'X-User-ID': session.user.id,
+            'Origin': window.location.origin
+          },
+          credentials: 'include',
+          mode: 'cors',
+          body: JSON.stringify({
+            userId: session.user.id,
+            // Include any other required parameters
+          })
+        });
+      
+        console.log('Scan response status:', response.status);
         
-        // Try to get more details from the response
-        let errorDetails = '';
-        try {
-          const errorResponse = await response.json();
-          errorDetails = errorResponse.message || errorResponse.error || JSON.stringify(errorResponse);
-        } catch (e) {
-          // If we can't parse the JSON, use the status text
-          errorDetails = statusText;
+        if (!response.ok) {
+          let errorText;
+          try {
+            const errorData = await response.json();
+            errorText = errorData.message || errorData.error || `Server returned ${response.status}`;
+          } catch (e) {
+            errorText = `Server returned ${response.status}`;
+          }
+          
+          console.error('Email scan failed:', errorText);
+          return {
+            success: false,
+            error: `Failed to scan emails: ${errorText}`,
+            details: `Status: ${response.status} ${response.statusText}`
+          };
         }
         
-        throw new Error(`Email scan failed (${status}): ${errorDetails}`);
-      }
-      
-      const result = await response.json();
-      console.log('Scan completed successfully', result);
-
-      // Check for empty results
-      if (!result.subscriptions || !Array.isArray(result.subscriptions)) {
-        console.warn('No subscription data returned from scan', result);
+        const data = await response.json();
+        console.log('Email scan complete:', data);
         
-        // In development, use mock data as fallback
-        if (import.meta.env.DEV) {
-          console.log('Using mock subscription data in development mode');
-          return this.getMockScanResults();
-        }
+        return {
+          success: true,
+          data: {
+            subscriptions: data.subscriptions || [],
+            count: data.count || 0,
+            priceChanges: data.priceChanges || null
+          }
+        };
         
-        throw new Error('No subscription data found in scan results');
+      } catch (fetchError) {
+        console.error('Error scanning emails:', fetchError);
+        return {
+          success: false,
+          error: 'Failed to scan emails',
+          details: fetchError instanceof Error ? fetchError.message : String(fetchError)
+        };
       }
-      
-      // Save results to localStorage for persistence
-      localStorage.setItem('last_scan_count', result.subscriptions.length.toString());
-      localStorage.setItem('last_subscriptions', JSON.stringify(result.subscriptions));
-      
-      return result;
     } catch (error) {
       console.error('Error scanning emails:', error);
-      
-      // In development, use mock data as fallback
-      if (import.meta.env.DEV) {
-        console.log('Using mock subscription data in development mode due to error');
-        return this.getMockScanResults();
-      }
-      
-      throw error;
+      return {
+        success: false,
+        error: 'Failed to scan emails',
+        details: error instanceof Error ? error.message : String(error)
+      };
     }
   }
 
@@ -583,57 +602,51 @@ class ApiService {
 
   public async testApiConnection(): Promise<ApiResponse<any>> {
     try {
-      // First, try to access the API without authentication
+      console.log('Testing API connectivity...');
       const publicResponse = await fetch(`${API_URL}/api/health`, {
         method: 'GET',
-        mode: 'cors',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json',
           'Origin': window.location.origin
-        }
+        },
+        mode: 'cors',
       });
       
-      console.log('Public API health check status:', publicResponse.status);
-      
-      let publicResponseText;
-      try {
-        publicResponseText = await publicResponse.text();
-      } catch (e) {
-        publicResponseText = 'Unable to get response text';
-      }
-      
-      // Now try with authentication headers
       let authenticatedResponse;
       try {
         const headers = await this.getAuthHeaders();
         authenticatedResponse = await fetch(`${API_URL}/api/auth/profile`, {
           method: 'GET',
-          mode: 'cors',
+          headers: headers,
           credentials: 'include',
-          headers
+          mode: 'cors',
         });
-        
-        console.log('Authenticated API check status:', authenticatedResponse.status);
-      } catch (error) {
-        console.error('Error in authenticated API check:', error);
-        return {
-          success: false,
-          error: 'Authenticated API check failed',
-          data: {
-            publicStatus: publicResponse.status,
-            publicResponse: publicResponseText,
-            authError: error instanceof Error ? error.message : 'Unknown error'
-          }
-        };
+      } catch (authError) {
+        console.log('Auth test failed:', authError);
+        authenticatedResponse = { status: 'auth_failed', statusText: String(authError) };
       }
       
       return {
         success: true,
         data: {
-          publicStatus: publicResponse.status,
-          publicResponse: publicResponseText,
-          authenticatedStatus: authenticatedResponse?.status || 'Not tested',
+          publicEndpoint: {
+            url: `${API_URL}/api/health`,
+            status: publicResponse.status,
+            statusText: publicResponse.statusText,
+            ok: publicResponse.ok,
+            headers: Object.fromEntries(publicResponse.headers.entries()),
+            body: await publicResponse.json().catch(() => 'Could not parse JSON')
+          },
+          authenticatedEndpoint: {
+            url: `${API_URL}/api/auth/profile`,
+            status: authenticatedResponse.status || 'undefined',
+            statusText: authenticatedResponse.statusText || 'undefined',
+            ok: authenticatedResponse.ok || false,
+            headers: authenticatedResponse.headers ? 
+              Object.fromEntries(authenticatedResponse.headers.entries()) : 
+              'No headers'
+          },
+          scanEmailsEndpoint: await this.testScanEmailsCors(),
           apiUrl: API_URL
         }
       };
@@ -642,7 +655,66 @@ class ApiService {
       return {
         success: false,
         error: 'API connection test failed',
-        details: error instanceof Error ? error.message : undefined
+        details: String(error)
+      };
+    }
+  }
+  
+  // Test CORS for scan-emails endpoint specifically
+  private async testScanEmailsCors(): Promise<any> {
+    try {
+      // First test OPTIONS preflight
+      const optionsResponse = await fetch(`${API_URL}/api/scan-emails`, {
+        method: 'OPTIONS',
+        headers: {
+          'Origin': window.location.origin,
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Content-Type, Authorization, X-Gmail-Token'
+        },
+        mode: 'cors'
+      });
+      
+      // Then test POST request with minimal body
+      const headers = await this.getAuthHeaders();
+      const postResponse = await fetch(`${API_URL}/api/scan-emails`, {
+        method: 'POST',
+        headers: headers,
+        mode: 'cors',
+        credentials: 'include',
+        body: JSON.stringify({ test: true })
+      }).catch(error => {
+        return {
+          ok: false,
+          status: 'error',
+          statusText: String(error),
+          error: error
+        };
+      });
+      
+      return {
+        optionsPreflight: {
+          status: optionsResponse.status,
+          statusText: optionsResponse.statusText,
+          ok: optionsResponse.ok,
+          headers: Object.fromEntries(optionsResponse.headers.entries())
+        },
+        postRequest: {
+          status: postResponse.status || 'error',
+          statusText: postResponse.statusText || 'unknown',
+          ok: postResponse.ok || false,
+          headers: postResponse.headers ? 
+            Object.fromEntries(postResponse.headers.entries()) : 
+            'No headers',
+          body: postResponse.json ? 
+            await postResponse.json().catch(() => 'Could not parse JSON') : 
+            'No body'
+        }
+      };
+    } catch (error) {
+      console.error('Scan emails CORS test failed:', error);
+      return {
+        error: 'Scan emails CORS test failed',
+        details: String(error)
       };
     }
   }
