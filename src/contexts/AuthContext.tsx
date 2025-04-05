@@ -175,16 +175,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => 
     
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
+      console.log('Initiating Google sign-in with OAuth...');
+      
+      // Use the correct redirect URL - make sure it matches what's set in Supabase
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      console.log('Using redirect URL:', redirectUrl);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           scopes: 'https://www.googleapis.com/auth/gmail.readonly',
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: redirectUrl
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Google sign-in error:', error);
+        throw error;
+      } else {
+        console.log('Google sign-in initiated successfully, redirecting...');
+      }
     } catch (error) {
+      console.error('Failed to sign in with Google:', error);
       handleAuthError(error instanceof Error ? error : new Error('Failed to sign in with Google'));
     }
   };
@@ -254,46 +266,70 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => 
   };
 
   const scanEmails = async () => {
-    try {
-      setSubscriptionState(prev => ({ ...prev, isLoading: true, error: null }));
+    if (!authState.session?.provider_token) {
+      console.error('No Gmail token found in session');
+      // Check if we have a token in session storage
+      const storedToken = sessionStorage.getItem('gmail_access_token');
       
-      // Import the apiService
-      const { apiService } = await import('../services/api');
-      const response = await apiService.scanEmails();
-
-      if (!response.success || !response.data) {
-        throw new Error(response.error || 'Failed to scan emails: No data received');
+      if (!storedToken) {
+        console.log('No Gmail token found, redirecting to Google auth');
+        await signInWithGoogle();
+        return { success: false, error: 'Gmail token not found. Redirecting to Google auth...' };
       }
-
-      const { subscriptions = [], priceChanges = null } = response.data;
-
-      // Save to localStorage for persistence
-      localStorage.setItem('last_scan_count', String(subscriptions.length));
-      localStorage.setItem('last_subscriptions', JSON.stringify(subscriptions));
-      localStorage.setItem('last_scan_time', new Date().toISOString());
+    }
+    
+    // Continue with scan as before
+    setSubscriptionState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      // Get the API service instance
+      const ApiService = (await import('../services/api')).ApiService;
+      const apiService = ApiService.getInstance();
       
-      setSubscriptionState(prev => ({
-        ...prev,
-        isLoading: false,
-        subscriptions: subscriptions || [],
-        priceChanges: priceChanges || null,
-        lastScanTime: new Date().toISOString()
-      }));
-
-      // Return the scan results for direct use if needed
-      return {
-        subscriptions,
-        count: subscriptions.length,
-        priceChanges
-      };
+      // Call the scan emails API
+      console.log('Calling scanEmails API...');
+      const response = await apiService.scanEmails();
+      console.log('ScanEmails API response:', response);
+      
+      if (response.success && response.data) {
+        setSubscriptionState(prev => ({
+          ...prev,
+          subscriptions: response.data.subscriptions || [],
+          priceChanges: response.data.priceChanges,
+          lastScanTime: new Date().toISOString(),
+          isLoading: false,
+          error: null
+        }));
+        return response;
+      } else {
+        // Check if the error is related to Gmail token
+        if (response.error?.includes('Gmail token') || 
+            response.error?.includes('token expired') || 
+            response.details?.includes('401')) {
+          console.log('Gmail token issue detected, redirecting to Google auth');
+          await signInWithGoogle();
+          return { success: false, error: 'Gmail token expired. Redirecting to Google auth...' };
+        }
+        
+        setSubscriptionState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: response.error || 'Failed to scan emails'
+        }));
+        return response;
+      }
     } catch (error) {
       console.error('Error scanning emails:', error);
       setSubscriptionState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to scan emails'
+        error: error instanceof Error ? error.message : 'An error occurred while scanning emails'
       }));
-      throw error; // Re-throw to allow proper error handling in components
+      return { 
+        success: false, 
+        error: 'Failed to scan emails', 
+        details: error instanceof Error ? error.message : String(error)
+      };
     }
   };
 
