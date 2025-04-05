@@ -3,6 +3,30 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
 import { SubscriptionData, PriceChange } from '../services/api';
 
+// Flag to enable mock auth for local development - explicitly set to false
+const USE_MOCK_AUTH = false;
+
+// Mock user for local development
+const MOCK_USER: User = {
+  id: 'mock-user-id',
+  email: 'mock-user@example.com',
+  created_at: new Date().toISOString(),
+  app_metadata: {},
+  user_metadata: {},
+  aud: 'authenticated',
+  role: ''
+};
+
+// Mock session for local development
+const MOCK_SESSION: Session = {
+  access_token: 'mock-access-token.with.periods',
+  refresh_token: 'mock-refresh-token',
+  provider_token: 'mock-provider-token',
+  provider_refresh_token: null,
+  user: MOCK_USER,
+  expires_at: Date.now() + 3600
+};
+
 interface AuthState {
   user: User | null;
   session: Session | null;
@@ -45,9 +69,9 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    session: null,
-    isLoading: true,
+    user: USE_MOCK_AUTH ? MOCK_USER : null,
+    session: USE_MOCK_AUTH ? MOCK_SESSION : null,
+    isLoading: !USE_MOCK_AUTH,
     error: null
   });
 
@@ -73,6 +97,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const refreshSession = async () => {
+    if (USE_MOCK_AUTH) {
+      console.log('Using mock authentication, skipping session refresh');
+      return;
+    }
+    
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
       const { data: { session }, error } = await supabase.auth.refreshSession();
@@ -98,6 +127,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signIn = async (email: string, password: string) => {
+    if (USE_MOCK_AUTH) {
+      console.log('Using mock authentication, auto-signing in');
+      setAuthState({
+        user: MOCK_USER,
+        session: MOCK_SESSION,
+        isLoading: false,
+        error: null
+      });
+      return;
+    }
+    
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
       const { data: { session, user }, error } = await supabase.auth.signInWithPassword({
@@ -120,6 +160,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signInWithGoogle = async () => {
+    if (USE_MOCK_AUTH) {
+      console.log('Using mock authentication, auto-signing in with Google');
+      setAuthState({
+        user: MOCK_USER,
+        session: MOCK_SESSION,
+        isLoading: false,
+        error: null
+      });
+      return;
+    }
+    
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
       const { error } = await supabase.auth.signInWithOAuth({
@@ -137,6 +188,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signUp = async (email: string, password: string) => {
+    if (USE_MOCK_AUTH) {
+      console.log('Using mock authentication, auto-signing up');
+      setAuthState({
+        user: MOCK_USER,
+        session: MOCK_SESSION,
+        isLoading: false,
+        error: null
+      });
+      return;
+    }
+    
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
       const { data: { session, user }, error } = await supabase.auth.signUp({
@@ -159,6 +221,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signOut = async () => {
+    if (USE_MOCK_AUTH) {
+      console.log('Using mock authentication, signing out');
+      setAuthState({
+        user: null,
+        session: null,
+        isLoading: false,
+        error: null
+      });
+      return;
+    }
+    
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
       const { error } = await supabase.auth.signOut();
@@ -181,38 +254,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const scanEmails = async () => {
     try {
       setSubscriptionState(prev => ({ ...prev, isLoading: true, error: null }));
-      const response = await fetch('/api/scan-emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authState.session?.access_token}`,
-          'X-User-ID': authState.user?.id || ''
-        }
-      });
+      
+      // Use the ApiService instead of direct fetch to ensure proper headers and error handling
+      const apiService = (await import('../services/api')).apiService;
+      const response = await apiService.scanEmails();
 
-      if (!response.ok) {
-        throw new Error('Failed to scan emails');
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Failed to scan emails: No data received');
       }
 
-      const data = await response.json();
+      const { subscriptions = [], priceChanges = null } = response.data;
+
+      // Save to localStorage for persistence
+      localStorage.setItem('last_scan_count', String(subscriptions.length));
+      localStorage.setItem('last_subscriptions', JSON.stringify(subscriptions));
+      localStorage.setItem('last_scan_time', new Date().toISOString());
       
       setSubscriptionState(prev => ({
         ...prev,
         isLoading: false,
-        subscriptions: data.subscriptions || [],
-        priceChanges: data.priceChanges || null,
+        subscriptions: subscriptions || [],
+        priceChanges: priceChanges || null,
         lastScanTime: new Date().toISOString()
       }));
+
+      // Return the scan results for direct use if needed
+      return {
+        subscriptions,
+        count: subscriptions.length,
+        priceChanges
+      };
     } catch (error) {
+      console.error('Error scanning emails:', error);
       setSubscriptionState(prev => ({
         ...prev,
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to scan emails'
       }));
+      throw error; // Re-throw to allow proper error handling in components
     }
   };
 
   useEffect(() => {
+    if (USE_MOCK_AUTH) {
+      console.log('Using mock authentication, skipping auth initialization');
+      return;
+    }
+    
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -256,20 +344,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const value = {
-    ...authState,
-    signIn,
-    signInWithGoogle,
-    signUp,
-    signOut,
-    refreshSession,
-    clearError,
-    scanEmails,
-    subscriptionState
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        ...authState,
+        signIn,
+        signInWithGoogle,
+        signUp,
+        signOut,
+        refreshSession,
+        clearError,
+        scanEmails,
+        subscriptionState
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

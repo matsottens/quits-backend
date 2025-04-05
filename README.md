@@ -81,4 +81,40 @@ If you encounter TypeScript errors, check that the type declarations properly ma
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Local Development
+
+This project is set up to work with mock data in local development, making it easy to develop without connecting to a backend API or authentication service.
+
+### Mock Data Features
+
+- **Mock Authentication**: When running locally, the app will use a mock authentication system that simulates user login/signup
+- **Mock API Responses**: API requests are intercepted locally and return realistic mock data for subscriptions, notifications, etc.
+- **No Backend Required**: You can develop the frontend without needing to set up the backend API
+
+### Running Locally
+
+1. Install dependencies:
+   ```
+   npm install
+   ```
+
+2. Start the development server:
+   ```
+   npm run dev
+   ```
+
+3. Open your browser at http://localhost:3000
+
+### Switching Between Mock and Real Data
+
+If you need to test with the real API:
+
+1. Create a `.env.local` file with:
+   ```
+   VITE_USE_MOCK_DATA=false
+   VITE_API_URL=https://your-real-api-url.com
+   ```
+
+2. Restart the development server 

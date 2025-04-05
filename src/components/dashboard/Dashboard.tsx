@@ -20,51 +20,71 @@ export const Dashboard: React.FC = () => {
   const [scanCount, setScanCount] = useState<number | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionData[]>([]);
   const [totalMonthlyCost, setTotalMonthlyCost] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  // Check for scan results from navigation state
+  // Load subscription data from various sources
   useEffect(() => {
-    // First priority: check location state (from direct navigation)
-    if (location.state) {
-      if ('scanCount' in location.state) {
-        setScanCount(Number(location.state.scanCount));
+    const loadSubscriptionData = () => {
+      setIsLoading(true);
+      let subscriptionsData: SubscriptionData[] = [];
+      let foundData = false;
+      
+      // First priority: check location state (from direct navigation)
+      if (location.state && 'subscriptions' in location.state && location.state.subscriptions?.length > 0) {
+        console.log('Loading subscriptions from navigation state');
+        subscriptionsData = location.state.subscriptions;
+        setScanCount(location.state.subscriptions.length);
+        foundData = true;
+        
+        // Clear the state to avoid showing the same results on refresh
+        window.history.replaceState({}, document.title);
+      } 
+      // Second priority: check localStorage (from previous scans)
+      else {
+        const lastScanCount = localStorage.getItem('last_scan_count');
+        if (lastScanCount) {
+          setScanCount(Number(lastScanCount));
+        }
+        
+        const savedSubscriptions = localStorage.getItem('last_subscriptions');
+        if (savedSubscriptions) {
+          try {
+            const parsedSubscriptions = JSON.parse(savedSubscriptions);
+            if (Array.isArray(parsedSubscriptions) && parsedSubscriptions.length > 0) {
+              console.log('Loading subscriptions from localStorage');
+              subscriptionsData = parsedSubscriptions;
+              foundData = true;
+            }
+          } catch (error) {
+            console.error('Failed to parse saved subscriptions:', error);
+          }
+        }
       }
       
-      if ('subscriptions' in location.state) {
-        setSubscriptions(location.state.subscriptions || []);
-        calculateTotalCost(location.state.subscriptions);
+      // Update state with found data
+      if (foundData) {
+        setSubscriptions(subscriptionsData);
+        calculateAndSetTotalCost(subscriptionsData);
       }
       
-      // Clear the state to avoid showing the same results on refresh
-      window.history.replaceState({}, document.title);
-      return;
-    }
+      setIsLoading(false);
+    };
     
-    // Second priority: check localStorage (from previous scans)
-    const lastScanCount = localStorage.getItem('last_scan_count');
-    if (lastScanCount) {
-      setScanCount(Number(lastScanCount));
-    }
-    
-    const savedSubscriptions = localStorage.getItem('last_subscriptions');
-    if (savedSubscriptions) {
-      try {
-        const parsedSubscriptions = JSON.parse(savedSubscriptions);
-        setSubscriptions(parsedSubscriptions);
-        calculateTotalCost(parsedSubscriptions);
-      } catch (error) {
-        console.error('Failed to parse saved subscriptions:', error);
-      }
-    }
+    loadSubscriptionData();
   }, [location.state]);
   
-  const calculateTotalCost = (subs: SubscriptionData[]) => {
-    return subs.reduce((total, sub) => {
+  // Calculate monthly cost of all subscriptions
+  const calculateAndSetTotalCost = (subs: SubscriptionData[]) => {
+    const total = subs.reduce((total, sub) => {
       const price = sub.price || 0;
       if (sub.frequency === 'yearly') {
         return total + (price / 12);
       }
       return total + price;
     }, 0);
+    
+    setTotalMonthlyCost(total);
+    return total;
   };
   
   // Format price with currency symbol
@@ -115,7 +135,9 @@ export const Dashboard: React.FC = () => {
                     <ChartBarIcon className="h-8 w-8 mr-3" />
                     <div>
                       <h3 className="text-sm font-medium text-gray-500">Total Subscriptions</h3>
-                      <p className="mt-1 text-2xl font-semibold">{scanCount || "0"}</p>
+                      <p className="mt-1 text-2xl font-semibold">
+                        {isLoading ? "Loading..." : (scanCount || "0")}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -125,7 +147,9 @@ export const Dashboard: React.FC = () => {
                     <CurrencyDollarIcon className="h-8 w-8 mr-3" />
                     <div>
                       <h3 className="text-sm font-medium text-gray-500">Est. Monthly Cost</h3>
-                      <p className="mt-1 text-2xl font-semibold">${totalMonthlyCost.toFixed(2)}</p>
+                      <p className="mt-1 text-2xl font-semibold">
+                        {isLoading ? "Loading..." : `$${totalMonthlyCost.toFixed(2)}`}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -145,13 +169,22 @@ export const Dashboard: React.FC = () => {
                   </h2>
                 </div>
                 
-                {subscriptions && subscriptions.length > 0 ? (
+                {isLoading ? (
+                  <div className="p-8 text-center">
+                    <p className="text-gray-500">Loading subscriptions...</p>
+                  </div>
+                ) : subscriptions && subscriptions.length > 0 ? (
                   <div className="divide-y divide-gray-100">
                     {subscriptions.map((subscription, index) => (
                       <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
                         <div className="flex items-center justify-between">
                           <h3 className="font-medium text-gray-800">
                             {subscription.provider || "Unknown Service"}
+                            {subscription.title && subscription.title !== subscription.provider && (
+                              <span className="ml-1 text-gray-500 text-sm">
+                                ({subscription.title})
+                              </span>
+                            )}
                           </h3>
                           <span className="font-medium text-primary">
                             {formatPrice(subscription.price, subscription.frequency)}

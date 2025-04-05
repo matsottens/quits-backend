@@ -4,49 +4,152 @@ import { useAuth } from '../../contexts/AuthContext';
 import { SubscriptionData } from '../../services/api';
 
 const ScanningScreen: React.FC = () => {
+  const { scanEmails } = useAuth();
   const navigate = useNavigate();
-  const { scanEmails, subscriptionState } = useAuth();
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState<number>(0);
+  const [status, setStatus] = useState<string>("Preparing to scan...");
+  const [error, setError] = useState<string | null>(null);
+  const [scanComplete, setScanComplete] = useState<boolean>(false);
 
   useEffect(() => {
     const startScan = async () => {
+      // Reset states for new scan
+      setError(null);
+      setProgress(0);
+      setStatus("Connecting to email provider...");
+      
+      // Setup progress animation
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          // Slow down progress near the end to wait for actual completion
+          if (prev >= 90) return prev;
+          return Math.min(prev + (Math.random() * 4), 90);
+        });
+      }, 1000);
+
+      // Status update animation
+      const statusMessages = [
+        "Scanning inbox...",
+        "Identifying subscription emails...",
+        "Analyzing subscription data...",
+        "Calculating payment patterns...",
+        "Preparing results..."
+      ];
+      
+      let currentMessageIndex = 0;
+      const statusInterval = setInterval(() => {
+        if (currentMessageIndex < statusMessages.length) {
+          setStatus(statusMessages[currentMessageIndex]);
+          currentMessageIndex++;
+        }
+      }, 3500);
+
       try {
-        await scanEmails();
-        navigate('/dashboard', { state: { scanCount: subscriptionState.subscriptions.length } });
+        // Perform actual scan after a brief delay to set up UI
+        setTimeout(async () => {
+          try {
+            const result = await scanEmails();
+            
+            // Save scan results
+            if (result && result.subscriptions) {
+              localStorage.setItem('last_scan_count', result.subscriptions.length.toString());
+              localStorage.setItem('last_subscriptions', JSON.stringify(result.subscriptions));
+              
+              // Complete the progress and display success
+              setProgress(100);
+              setStatus("Scan complete!");
+              setScanComplete(true);
+              
+              // Navigate to dashboard with the results
+              setTimeout(() => {
+                navigate('/dashboard', { 
+                  state: { 
+                    subscriptions: result.subscriptions
+                  }
+                });
+              }, 1000);
+            } else {
+              throw new Error("No subscription data returned");
+            }
+          } catch (error) {
+            clearInterval(progressInterval);
+            clearInterval(statusInterval);
+            
+            let errorMessage = "Failed to scan emails";
+            if (error instanceof Error) {
+              errorMessage = error.message;
+            }
+            
+            console.error("Email scan error:", error);
+            setError(errorMessage);
+            setStatus("Scan failed");
+          }
+        }, 2000);
       } catch (error) {
-        console.error('Scan failed:', error);
-        navigate('/dashboard');
+        clearInterval(progressInterval);
+        let errorMessage = "Failed to start scan";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        
+        console.error("Email scan error:", error);
+        setError(errorMessage);
+        setStatus("Scan failed");
       }
+
+      // Cleanup function
+      return () => {
+        clearInterval(progressInterval);
+        clearInterval(statusInterval);
+      };
     };
 
     startScan();
+  }, [scanEmails, navigate]);
 
-    // Simulate progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [navigate, scanEmails, subscriptionState.subscriptions.length]);
+  // Helper function to determine progress bar color
+  const getProgressColor = () => {
+    if (error) return "bg-red-500";
+    if (scanComplete) return "bg-green-500";
+    return "bg-primary";
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFEDD6]">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md text-center">
-        <h2 className="text-2xl font-bold text-[#26457A]">Scanning Your Emails</h2>
-        <p className="text-gray-600">Looking for subscription information...</p>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div
-            className="bg-[#26457A] h-2.5 rounded-full transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          />
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">Scanning Your Emails</h2>
+          <p className="text-gray-600 mt-2">
+            {error ? "An error occurred" : status}
+          </p>
         </div>
-        <p className="text-sm text-gray-500">{progress}% complete</p>
+
+        {/* Progress bar */}
+        <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
+          <div 
+            className={`h-4 rounded-full transition-all duration-300 ${getProgressColor()}`}
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+
+        {error ? (
+          <div className="mt-6">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+              <p className="font-medium">Something went wrong</p>
+              <p className="text-sm">{error}</p>
+            </div>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="w-full bg-primary hover:bg-primary-dark text-white py-2 px-4 rounded-md transition-colors"
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-sm text-center italic">
+            {scanComplete ? "Redirecting to your dashboard..." : "This may take a few moments..."}
+          </p>
+        )}
       </div>
     </div>
   );

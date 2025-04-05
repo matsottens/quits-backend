@@ -55,7 +55,8 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
-const App: React.FC = () => {
+// App Router component that uses the auth context
+const AppRouter: React.FC = () => {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -63,43 +64,50 @@ const App: React.FC = () => {
   }
 
   return (
+    <Router>
+      <Routes>
+        <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/signin" />} />
+        <Route path="/signin" element={user ? <Navigate to="/dashboard" /> : <SignIn />} />
+        <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <SignUp />} />
+        <Route path="/auth/google/callback" element={<OAuthRedirect />} />
+        <Route path="/auth/consent" element={<EmailOAuthConsent />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/scanning" element={<ScanningScreen />} />
+        <Route
+          path="/subscription-selection"
+          element={
+            <ProtectedRoute>
+              <SubscriptionSelection />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <Dashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Router>
+  );
+};
+
+// Main App component with all providers
+const App: React.FC = () => {
+  return (
     <ThemeProvider>
       <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/signin" />} />
-            <Route path="/signin" element={user ? <Navigate to="/dashboard" /> : <SignIn />} />
-            <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <SignUp />} />
-            <Route path="/auth/google/callback" element={<OAuthRedirect />} />
-            <Route path="/auth/consent" element={<EmailOAuthConsent />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/scanning" element={<ScanningScreen />} />
-            <Route
-              path="/subscription-selection"
-              element={
-                <ProtectedRoute>
-                  <SubscriptionSelection />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </Router>
+        <AppRouter />
       </AuthProvider>
     </ThemeProvider>
   );

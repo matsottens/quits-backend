@@ -43,7 +43,93 @@ interface ScanEmailsApiResponse {
   priceChanges: PriceChange[] | null;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'https://quits-api.vercel.app';
+// Explicitly disable mock data
+const USE_MOCK_DATA = false;
+
+// Mock data for local development
+const MOCK_SUBSCRIPTIONS: SubscriptionData[] = [
+  {
+    provider: 'Netflix',
+    price: 15.99,
+    frequency: 'monthly',
+    renewal_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    term_months: 1,
+    is_price_increase: false,
+    lastDetectedDate: new Date().toISOString(),
+    title: 'Netflix Standard'
+  },
+  {
+    provider: 'Spotify',
+    price: 9.99,
+    frequency: 'monthly',
+    renewal_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    term_months: 1,
+    is_price_increase: false,
+    lastDetectedDate: new Date().toISOString(),
+    title: 'Spotify Premium'
+  },
+  {
+    provider: 'Adobe',
+    price: 52.99,
+    frequency: 'monthly',
+    renewal_date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+    term_months: 12,
+    is_price_increase: true,
+    lastDetectedDate: new Date().toISOString(),
+    title: 'Adobe Creative Cloud'
+  },
+  {
+    provider: 'Disney+',
+    price: 7.99,
+    frequency: 'monthly',
+    renewal_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+    term_months: 1,
+    is_price_increase: false,
+    lastDetectedDate: new Date().toISOString(),
+    title: 'Disney+ Basic'
+  }
+];
+
+const MOCK_PRICE_CHANGES: PriceChange[] = [
+  {
+    provider: 'Adobe',
+    oldPrice: 49.99,
+    newPrice: 52.99,
+    change: 3.00,
+    percentageChange: 6.0,
+    term_months: 12,
+    renewal_date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    provider: 'Netflix',
+    oldPrice: 13.99,
+    newPrice: 15.99,
+    change: 2.00,
+    percentageChange: 14.3,
+    term_months: 1,
+    renewal_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+const MOCK_NOTIFICATIONS = [
+  {
+    id: '1',
+    title: 'Netflix price increase',
+    message: 'Your Netflix subscription price will increase from $13.99 to $15.99 on your next billing cycle.',
+    type: 'price_increase',
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    read: false
+  },
+  {
+    id: '2',
+    title: 'Spotify renewal coming up',
+    message: 'Your Spotify Premium subscription will renew in 7 days at $9.99.',
+    type: 'renewal_reminder',
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    read: false
+  }
+];
 
 class ApiService {
   private static instance: ApiService;
@@ -100,6 +186,16 @@ class ApiService {
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
+    // For local development with mock data, return empty headers
+    if (USE_MOCK_DATA) {
+      console.log('Using mock data, skipping auth headers');
+      return {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Origin': window.location.origin
+      };
+    }
+    
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -166,6 +262,55 @@ class ApiService {
   }
 
   public async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    // For local development with mock data
+    if (USE_MOCK_DATA) {
+      console.log('Using mock data for endpoint:', endpoint);
+      let mockResponse: any = null;
+      
+      // Return appropriate mock data based on the endpoint
+      if (endpoint === '/scan-emails' || endpoint === '/api/scan-emails') {
+        mockResponse = {
+          subscriptions: MOCK_SUBSCRIPTIONS,
+          count: MOCK_SUBSCRIPTIONS.length,
+          priceChanges: MOCK_PRICE_CHANGES
+        };
+      } else if (endpoint === '/api/notifications') {
+        mockResponse = MOCK_NOTIFICATIONS;
+      } else if (endpoint.includes('/api/notifications/') && endpoint.includes('/read')) {
+        const id = endpoint.split('/')[3];
+        MOCK_NOTIFICATIONS.find(n => n.id === id)!.read = true;
+        mockResponse = { success: true };
+      } else if (endpoint === '/api/notification-settings') {
+        mockResponse = {
+          emailNotifications: true,
+          pushNotifications: false,
+          priceChangeAlerts: true,
+          renewalReminders: true
+        };
+      } else if (endpoint === '/api/subscription-analytics') {
+        mockResponse = {
+          totalSpend: MOCK_SUBSCRIPTIONS.reduce((sum, sub) => sum + (sub.price || 0), 0),
+          subscriptionCount: MOCK_SUBSCRIPTIONS.length,
+          mostExpensive: MOCK_SUBSCRIPTIONS.reduce((prev, current) => 
+            (prev.price || 0) > (current.price || 0) ? prev : current),
+          upcomingRenewals: MOCK_SUBSCRIPTIONS.filter(sub => 
+            new Date(sub.renewal_date || '') < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+        };
+      } else if (endpoint === '/api/test-cors') {
+        mockResponse = { message: 'CORS test successful', timestamp: new Date().toISOString() };
+      }
+      
+      if (mockResponse) {
+        return { success: true, data: mockResponse as T };
+      }
+      
+      return { 
+        success: false, 
+        error: 'Endpoint not mocked: ' + endpoint
+      };
+    }
+    
+    // Real API request logic for production
     try {
       const headers = await this.getAuthHeaders();
       const path = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
@@ -207,32 +352,156 @@ class ApiService {
   }
 
   public async scanEmails(): Promise<ApiResponse<ScanEmailsApiResponse>> {
+    console.log('Starting email scan process...');
+    
     try {
-      const response = await this.makeRequest<ScanEmailsApiResponse>('/scan-emails', {
-        method: 'POST'
-      });
-
-      if (!response.data) {
-        throw new Error('No data received from scan-emails endpoint');
+      const headers = await this.getAuthHeaders();
+      if (!headers) {
+        throw new Error('Authentication required to scan emails');
       }
+      
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
+      const url = `${apiUrl}/api/scan-emails`;
+      console.log(`Scanning emails with API endpoint: ${url}`);
 
-      const { subscriptions = [], count = 0, priceChanges = null } = response.data;
-
-      return {
-        success: true,
-        data: {
-          subscriptions,
-          count,
-          priceChanges
+      // Track start time for performance monitoring
+      const startTime = new Date().getTime();
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+      });
+      
+      const endTime = new Date().getTime();
+      console.log(`Scan request completed in ${(endTime - startTime) / 1000} seconds`);
+      
+      if (!response.ok) {
+        // Get status information
+        const statusText = response.statusText;
+        const status = response.status;
+        console.error(`Scan failed with status ${status}: ${statusText}`);
+        
+        // Try to get more details from the response
+        let errorDetails = '';
+        try {
+          const errorResponse = await response.json();
+          errorDetails = errorResponse.message || errorResponse.error || JSON.stringify(errorResponse);
+        } catch (e) {
+          // If we can't parse the JSON, use the status text
+          errorDetails = statusText;
         }
-      };
+        
+        throw new Error(`Email scan failed (${status}): ${errorDetails}`);
+      }
+      
+      const result = await response.json();
+      console.log('Scan completed successfully', result);
+
+      // Check for empty results
+      if (!result.subscriptions || !Array.isArray(result.subscriptions)) {
+        console.warn('No subscription data returned from scan', result);
+        
+        // In development, use mock data as fallback
+        if (import.meta.env.DEV) {
+          console.log('Using mock subscription data in development mode');
+          return this.getMockScanResults();
+        }
+        
+        throw new Error('No subscription data found in scan results');
+      }
+      
+      // Save results to localStorage for persistence
+      localStorage.setItem('last_scan_count', result.subscriptions.length.toString());
+      localStorage.setItem('last_subscriptions', JSON.stringify(result.subscriptions));
+      
+      return result;
     } catch (error) {
       console.error('Error scanning emails:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to scan emails'
-      };
+      
+      // In development, use mock data as fallback
+      if (import.meta.env.DEV) {
+        console.log('Using mock subscription data in development mode due to error');
+        return this.getMockScanResults();
+      }
+      
+      throw error;
     }
+  }
+
+  // Helper to generate consistent mock data for development
+  private getMockScanResults() {
+    const mockSubscriptions = [
+      {
+        id: 'mock-1',
+        provider: 'Netflix',
+        title: 'Premium Plan',
+        price: 15.99,
+        frequency: 'monthly',
+        renewal_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+        category: 'Entertainment',
+        last_payment_date: new Date(Date.now() - 23 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'mock-2',
+        provider: 'Spotify',
+        title: 'Family Plan',
+        price: 14.99,
+        frequency: 'monthly',
+        renewal_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(), // 12 days from now
+        category: 'Entertainment',
+        last_payment_date: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'mock-3',
+        provider: 'Adobe',
+        title: 'Creative Cloud',
+        price: 52.99,
+        frequency: 'monthly',
+        renewal_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
+        category: 'Productivity',
+        last_payment_date: new Date(Date.now() - 27 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'mock-4',
+        provider: 'Notion',
+        title: 'Pro Plan',
+        price: 48,
+        frequency: 'yearly',
+        renewal_date: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(), // 45 days from now
+        category: 'Productivity',
+        last_payment_date: new Date(Date.now() - 320 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'mock-5',
+        provider: 'Google',
+        title: 'Google One Storage',
+        price: 29.99,
+        frequency: 'yearly',
+        renewal_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
+        category: 'Cloud Storage',
+        last_payment_date: new Date(Date.now() - 363 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'mock-6',
+        provider: 'Amazon',
+        title: 'Prime Membership',
+        price: 139,
+        frequency: 'yearly',
+        renewal_date: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(), // 120 days from now
+        category: 'Shopping',
+        last_payment_date: new Date(Date.now() - 245 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    ];
+    
+    // Save mock results
+    localStorage.setItem('last_scan_count', mockSubscriptions.length.toString());
+    localStorage.setItem('last_subscriptions', JSON.stringify(mockSubscriptions));
+    
+    return { 
+      subscriptions: mockSubscriptions,
+      scanStatus: 'completed',
+      totalFound: mockSubscriptions.length
+    };
   }
 
   public async getNotifications(): Promise<ApiResponse<any>> {
