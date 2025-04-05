@@ -23,6 +23,7 @@
     "VITE_API_URL": "https://quits-api.vercel.app",
     "VITE_ENABLE_EMAIL_SCANNING": "true",
     "VITE_ENABLE_MANUAL_SUBSCRIPTION": "true",
-    "VITE_ENV": "production"
+    "VITE_ENV": "production",
+    "NODE_OPTIONS": "--max-old-space-size=4096"
   }
 } 
