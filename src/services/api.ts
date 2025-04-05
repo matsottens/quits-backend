@@ -340,8 +340,8 @@ class ApiService {
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json();
-        
-        if (!response.ok) {
+
+      if (!response.ok) {
           return {
             success: false,
             error: data.message || `API error: ${response.status}`,
@@ -353,7 +353,7 @@ class ApiService {
           success: true,
           data: data as T
         };
-      } else {
+          } else {
         // Handle non-JSON responses
         const text = await response.text();
         
@@ -437,8 +437,8 @@ class ApiService {
           }
           
           console.error('Email scan failed:', errorText);
-          return {
-            success: false,
+      return { 
+        success: false, 
             error: `Failed to scan emails: ${errorText}`,
             details: `Status: ${response.status} ${response.statusText}`
           };
