@@ -236,6 +236,35 @@ app.get('/api/health', (req, res) => {
   res.json(healthData);
 });
 
+// CORS test endpoint - helpful for debugging CORS issues
+app.get('/api/cors-test', corsMiddleware, (req, res) => {
+  const origin = req.headers.origin;
+  
+  console.log('CORS test requested:', {
+    timestamp: new Date().toISOString(),
+    origin,
+    referer: req.headers.referer,
+    userAgent: req.headers['user-agent'],
+  });
+  
+  res.json({
+    success: true,
+    message: 'CORS is working correctly',
+    timestamp: new Date().toISOString(),
+    request: {
+      origin: origin,
+      host: req.hostname,
+      method: req.method,
+      path: req.path
+    },
+    cors: {
+      allowedOrigins: corsConfig.allowedOrigins,
+      isAllowed: corsConfig.isAllowedOrigin(origin),
+      headers: res.getHeaders()
+    }
+  });
+});
+
 // Add routes
 app.use('/api', testRouter);
 app.use('/api', emailsRouter);

@@ -31,29 +31,36 @@ const maxAge = 86400; // 24 hours
 const allowCredentials = true;
 
 function isAllowedOrigin(origin) {
-  if (!origin) return true; // Allow requests with no origin (like mobile apps or curl requests)
+  // For development and testing - allow requests with no origin
+  if (!origin) {
+    console.log('No origin provided, allowing request');
+    return true;
+  }
   
-  // Check exact matches
+  // Log the origin for debugging
+  console.log(`Checking if origin is allowed: ${origin}`);
+  
+  // Check for exact match in allowedOrigins array
   if (allowedOrigins.includes(origin)) {
+    console.log(`Origin ${origin} is explicitly allowed`);
     return true;
   }
   
-  // Check for any Vercel deployment of the user's projects
+  // Check for Vercel preview deployments
   if (origin.match(/https:\/\/[\w-]+-matsottens\.vercel\.app/)) {
+    console.log(`Origin ${origin} matched Vercel deployment pattern`);
     return true;
   }
   
-  // Check for quits.cc domains (with or without www)
-  if (origin === 'https://quits.cc' || origin === 'https://www.quits.cc') {
-    return true;
-  }
-  
+  // Log rejection
+  console.log(`Origin ${origin} is not allowed`);
   return false;
 }
 
 function getCorsHeaders(origin) {
+  // For requests with no origin, use * to allow from anywhere
   if (!origin) {
-    // For requests with no origin, use * to allow from anywhere (e.g. curl requests)
+    console.log('Setting CORS headers for request with no origin');
     return {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': allowedMethods.join(', '),
@@ -61,8 +68,11 @@ function getCorsHeaders(origin) {
       'Access-Control-Expose-Headers': exposedHeaders.join(', '),
       'Access-Control-Max-Age': maxAge
     };
-  } else if (isAllowedOrigin(origin)) {
-    // Important: Use the actual origin that was sent in the request
+  } 
+  
+  // For allowed origins, return proper CORS headers with the actual origin
+  if (isAllowedOrigin(origin)) {
+    console.log(`Setting CORS headers for allowed origin: ${origin}`);
     return {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': allowedMethods.join(', '),
@@ -73,7 +83,14 @@ function getCorsHeaders(origin) {
     };
   }
   
-  return {};
+  // For disallowed origins, return empty object (no CORS headers)
+  console.log(`Not setting CORS headers for disallowed origin: ${origin}`);
+  return {
+    'Access-Control-Allow-Origin': 'null',
+    'Access-Control-Allow-Methods': 'null',
+    'Access-Control-Allow-Headers': 'null',
+    'Content-Type': 'text/plain'
+  };
 }
 
 module.exports = {
