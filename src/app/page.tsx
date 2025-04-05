@@ -29,7 +29,7 @@ export default function SignupPage() {
               Enter your email below to create your account
             </p>
           </div>
-          <form onSubmit={ handleSubmit }: any className="mt-8 space-y-6">
+          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             <div className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium">
@@ -38,7 +38,7 @@ export default function SignupPage() {
                 <Input
                   id="email"
                   type="email"
-                  value={ email }: any
+                  value={email}
                   onChange={(e: any) => setEmail(e.target.value)}
                   required
                   className="mt-1"
