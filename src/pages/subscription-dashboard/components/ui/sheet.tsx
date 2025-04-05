@@ -1,6 +1,6 @@
 "use client"
 
-import * as React from "react"
+import React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
@@ -18,7 +18,7 @@ const SheetPortal = SheetPrimitive.Portal
 const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
->(({ className, ...props }, ref) => (
+>(({ className, ...props }: React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>, ref: React.ForwardedRef<React.ElementRef<typeof SheetPrimitive.Overlay>>) => (
   <SheetPrimitive.Overlay
     className={cn(
       "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
@@ -56,7 +56,7 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
+>(({ side = "right", className, children, ...props }: SheetContentProps, ref: React.ForwardedRef<React.ElementRef<typeof SheetPrimitive.Content>>) => (
   <SheetPortal>
     <SheetOverlay />
     <SheetPrimitive.Content
@@ -105,7 +105,7 @@ SheetFooter.displayName = "SheetFooter"
 const SheetTitle = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
->(({ className, ...props }, ref) => (
+>(({ className, ...props }: React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>, ref: React.ForwardedRef<React.ElementRef<typeof SheetPrimitive.Title>>) => (
   <SheetPrimitive.Title
     ref={ref}
     className={cn("text-lg font-semibold text-foreground", className)}
@@ -117,7 +117,7 @@ SheetTitle.displayName = SheetPrimitive.Title.displayName
 const SheetDescription = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>
->(({ className, ...props }, ref) => (
+>(({ className, ...props }: React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>, ref: React.ForwardedRef<React.ElementRef<typeof SheetPrimitive.Description>>) => (
   <SheetPrimitive.Description
     ref={ref}
     className={cn("text-sm text-muted-foreground", className)}
