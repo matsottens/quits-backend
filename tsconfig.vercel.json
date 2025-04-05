@@ -29,12 +29,9 @@
         "src/*"
       ]
     },
-    "types": [
-      "react",
-      "react-dom",
-      "vite/client"
-    ],
-    "typeRoots": ["./node_modules/@types"]
+    "typeRoots": [
+      "node_modules/@types"
+    ]
   },
   "include": [
     "src/**/*",
