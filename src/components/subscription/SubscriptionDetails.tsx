@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -18,7 +18,7 @@ import '@fontsource/playfair-display/500.css';
 import '@fontsource/playfair-display/600.css';
 import '@fontsource/playfair-display/700.css';
 
-const StyledPaper = styled(Paper)(({ theme }) => ({
+const StyledPaper = styled(Paper)(({ theme }: any) => ({
   padding: theme.spacing(4),
   backgroundColor: 'white',
   borderRadius: '1rem',
@@ -69,12 +69,10 @@ interface SubscriptionDetailsProps {
   onDelete: (id: string) => void;
 }
 
-const SubscriptionDetails: React.FC<SubscriptionDetailsProps> = ({
-  subscription,
+const SubscriptionDetails: React.FC<SubscriptionDetailsProps> = ({ subscription,
   onClose,
   onEdit,
-  onDelete,
-}) => {
+  onDelete, }: any) => {
   const navigate = useNavigate();
 
   return (

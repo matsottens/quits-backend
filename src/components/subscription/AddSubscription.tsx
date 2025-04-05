@@ -21,7 +21,7 @@ import '@fontsource/playfair-display/500.css';
 import '@fontsource/playfair-display/600.css';
 import '@fontsource/playfair-display/700.css';
 
-const StyledPaper = styled(Paper)(({ theme }) => ({
+const StyledPaper = styled(Paper)(({ theme }: any) => ({
   padding: theme.spacing(4),
   backgroundColor: 'white',
   borderRadius: '1rem',
@@ -35,7 +35,7 @@ const StyledTitle = styled(Typography)({
   marginBottom: '1.5rem',
 });
 
-const StyledTextField = styled(TextField)(({ theme }) => ({
+const StyledTextField = styled(TextField)(({ theme }: any) => ({
   '& .MuiOutlinedInput-root': {
     '&:hover fieldset': {
       borderColor: '#1a365d',
@@ -69,7 +69,7 @@ interface AddSubscriptionProps {
   onSubmit: (subscription: SubscriptionFormData) => void;
 }
 
-const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }) => {
+const AddSubscription: React.FC<AddSubscriptionProps> = ({ onClose, onSubmit }: any) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<SubscriptionFormData>({

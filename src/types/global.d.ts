@@ -64,7 +64,7 @@ declare module 'react' {
 }
 
 declare module 'react/jsx-runtime' {
-  import React from 'react';
+  import * as React from 'react';
   
   export namespace JSX {
     interface Element extends React.ReactElement<any, any> {}

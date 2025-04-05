@@ -1,8 +1,8 @@
-import React from 'react';
+import * as React from 'react';
 import { Box, Typography, Container } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
-const StyledContainer = styled(Container)(({ theme }) => ({
+const StyledContainer = styled(Container)(({ theme }: any) => ({
   minHeight: '100vh',
   backgroundColor: '#ffefd5',
   display: 'flex',

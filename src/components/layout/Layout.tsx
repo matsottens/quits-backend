@@ -1,11 +1,11 @@
-import React from 'react';
+import * as React from 'react';
 import { Box, Container } from '@mui/material';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children }) => {
+export const Layout: React.FC<LayoutProps> = ({ children }: any) => {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
       <Container component="main" sx={{ flex: 1, py: 4 }}>

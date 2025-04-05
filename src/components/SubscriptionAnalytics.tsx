@@ -39,7 +39,7 @@ interface SubscriptionAnalyticsProps {
   scanCount?: number | null;
 }
 
-export const SubscriptionAnalytics: React.FC<SubscriptionAnalyticsProps> = ({ scanCount }) => {
+export const SubscriptionAnalytics: React.FC<SubscriptionAnalyticsProps> = ({ scanCount }: any) => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);

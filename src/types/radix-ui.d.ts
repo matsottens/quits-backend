@@ -1,5 +1,5 @@
 declare module '@radix-ui/react-toggle-group' {
-  import * as React from 'react';
+  
 
   interface ToggleGroupSingleProps extends React.HTMLAttributes<HTMLDivElement> {
     type?: 'single';

@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export const EmailOAuthConsent: React.FC = () => {
@@ -84,7 +84,7 @@ export const EmailOAuthConsent: React.FC = () => {
             <br />
             Learn about how Quits handles your data in our{' '}
             <button
-              onClick={(e) => {
+              onClick={(e: any) => {
                 e.preventDefault();
               }}
               className="text-blue-600 hover:text-blue-800 underline cursor-pointer bg-transparent border-none p-0"

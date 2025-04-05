@@ -33,7 +33,7 @@ export interface ExtendedSubscriptionData extends BaseSubscriptionData {
   category: string;
 }
 
-const StyledPaper = styled(Paper)(({ theme }) => ({
+const StyledPaper = styled(Paper)(({ theme }: any) => ({
   padding: theme.spacing(4),
   backgroundColor: 'white',
   borderRadius: '1rem',
@@ -67,7 +67,7 @@ const StyledTitle = styled(Typography)({
   marginBottom: '1.5rem',
 });
 
-const StyledTextField = styled(TextField)(({ theme }) => ({
+const StyledTextField = styled(TextField)(({ theme }: any) => ({
   '& .MuiInputBase-input': {
     color: '#26457A',
   },
@@ -102,13 +102,11 @@ interface ManageSubscriptionProps {
   onCancel?: () => void;
 }
 
-const ManageSubscription: React.FC<ManageSubscriptionProps> = ({ 
-  subscription, 
+const ManageSubscription: React.FC<ManageSubscriptionProps> = ({ subscription, 
   onClose, 
   onSave,
   onDelete,
-  onCancel,
-}) => {
+  onCancel, }: any) => {
   const theme = useTheme();
   const [tab, setTab] = useState(0);
   const navigate = useNavigate();

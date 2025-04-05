@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationCenter from '../components/NotificationCenter';
 import NotificationSettings from '../components/NotificationSettings';

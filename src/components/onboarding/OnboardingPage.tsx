@@ -11,7 +11,7 @@ import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 
-const StyledContainer = styled(Container)(({ theme }) => ({
+const StyledContainer = styled(Container)(({ theme }: any) => ({
   minHeight: '100vh',
   backgroundColor: '#ffefd5',
   display: 'flex',
@@ -51,7 +51,7 @@ const LogoText = styled(Typography)({
   fontFamily: 'Playfair Display, serif',
 });
 
-const StyledPaper = styled(Paper)(({ theme }) => ({
+const StyledPaper = styled(Paper)(({ theme }: any) => ({
   padding: theme.spacing(4),
   maxWidth: '32rem',
   margin: '0 auto',
@@ -60,7 +60,7 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
 }));
 
-const StyledButton = styled(Button)(({ theme }) => ({
+const StyledButton = styled(Button)(({ theme }: any) => ({
   height: '3.5rem',
   backgroundColor: 'black',
   color: 'white',

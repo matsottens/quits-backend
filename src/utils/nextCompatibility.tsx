@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 
 interface LinkProps {

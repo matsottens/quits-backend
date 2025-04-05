@@ -11,7 +11,7 @@ import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 
-const StyledContainer = styled(Container)(({ theme }) => ({
+const StyledContainer = styled(Container)(({ theme }: any) => ({
   minHeight: '100vh',
   backgroundColor: '#ffffff',
   display: 'flex',
@@ -57,13 +57,13 @@ const FormContainer = styled(Box)({
   margin: '0 auto',
 });
 
-const StyledForm = styled('form')(({ theme }) => ({
+const StyledForm = styled('form')(({ theme }: any) => ({
   display: 'flex',
   flexDirection: 'column',
   gap: theme.spacing(3),
 }));
 
-const StyledTextField = styled(TextField)(({ theme }) => ({
+const StyledTextField = styled(TextField)(({ theme }: any) => ({
   '& .MuiOutlinedInput-root': {
     height: '3.5rem',
     backgroundColor: '#ffffff',
@@ -83,7 +83,7 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
   },
 }));
 
-const StyledButton = styled(Button)(({ theme }) => ({
+const StyledButton = styled(Button)(({ theme }: any) => ({
   height: '3.5rem',
   backgroundColor: 'black',
   color: 'white',
@@ -92,7 +92,7 @@ const StyledButton = styled(Button)(({ theme }) => ({
   },
 }));
 
-const SocialButton = styled(Button)(({ theme }) => ({
+const SocialButton = styled(Button)(({ theme }: any) => ({
   height: '3.5rem',
   backgroundColor: '#ffffff',
   color: '#000000',
@@ -180,7 +180,7 @@ const LoginPage: React.FC = () => {
               type="email"
               placeholder="email@domain.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e: any) => setEmail(e.target.value)}
               required
             />
 
@@ -189,7 +189,7 @@ const LoginPage: React.FC = () => {
               type="password"
               placeholder="Password123"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e: any) => setPassword(e.target.value)}
               required
             />
 

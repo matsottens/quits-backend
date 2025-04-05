@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import '@fontsource/playfair-display/400.css';

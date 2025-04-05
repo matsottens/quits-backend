@@ -1,14 +1,12 @@
-import React from 'react';
+import * as React from 'react';
 
 interface LoadingSpinnerProps {
   size?: 'small' | 'medium' | 'large';
   color?: string;
 }
 
-const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
-  size = 'medium', 
-  color = 'primary' 
-}) => {
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ size = 'medium', 
+  color = 'primary' }: any) => {
   // Determine size based on prop
   const sizeClasses = {
     small: 'w-4 h-4',

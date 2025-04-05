@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react';
+import * as React from 'react';
 import { Link } from '../../utils/nextCompatibility';
 // Remove Next.js font imports and add CSS imports for the fonts
 import '@fontsource/playfair-display/400.css';
@@ -78,7 +78,7 @@ export default function SignupPage() {
                 type="email"
                 placeholder="email@domain.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e: any) => setEmail(e.target.value)}
                 className="h-14 px-4 bg-white border-gray-200 font-sans text-sm"
                 required
               />
@@ -93,7 +93,7 @@ export default function SignupPage() {
                 type="password"
                 placeholder="Password123"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e: any) => setPassword(e.target.value)}
                 className="h-14 px-4 bg-white border-gray-200 font-sans text-sm"
                 required
               />

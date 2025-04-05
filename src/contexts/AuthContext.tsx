@@ -69,7 +69,7 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => {
   const [authState, setAuthState] = useState<AuthState>({
     user: USE_MOCK_AUTH ? MOCK_USER : null,
     session: USE_MOCK_AUTH ? MOCK_SESSION : null,

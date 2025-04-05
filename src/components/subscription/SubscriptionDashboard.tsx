@@ -51,7 +51,7 @@ import { db } from '../../lib/supabase';
 import type { Subscription } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
-const StyledContainer = styled(Container)(({ theme }) => ({
+const StyledContainer = styled(Container)(({ theme }: any) => ({
   minHeight: '100vh',
   backgroundColor: '#ffefd5',
   display: 'flex',
@@ -59,7 +59,7 @@ const StyledContainer = styled(Container)(({ theme }) => ({
   padding: theme.spacing(4),
 })) as React.ComponentType<React.ComponentProps<typeof Container>>;
 
-const StyledAppBar = styled(AppBar)(({ theme }) => ({
+const StyledAppBar = styled(AppBar)(({ theme }: any) => ({
   backgroundColor: '#26457A',
   color: 'white',
   boxShadow: 'none',
@@ -103,7 +103,7 @@ const LogoText = styled(Typography)({
   fontFamily: 'Playfair Display, serif',
 }) as React.ComponentType<React.ComponentProps<typeof Typography>>;
 
-const StyledPaper = styled(Paper)(({ theme }) => ({
+const StyledPaper = styled(Paper)(({ theme }: any) => ({
   padding: theme.spacing(3),
   backgroundColor: 'white',
   borderRadius: '1rem',
@@ -111,7 +111,7 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   marginTop: theme.spacing(3),
 })) as React.ComponentType<React.ComponentProps<typeof Paper>>;
 
-const StyledListItem = styled(ListItem)(({ theme }) => ({
+const StyledListItem = styled(ListItem)(({ theme }: any) => ({
   borderRadius: '0.5rem',
   marginBottom: theme.spacing(1),
   cursor: 'pointer',
@@ -120,7 +120,7 @@ const StyledListItem = styled(ListItem)(({ theme }) => ({
   },
 })) as React.ComponentType<React.ComponentProps<typeof ListItem>>;
 
-const StyledDrawer = styled(Drawer)(({ theme }) => ({
+const StyledDrawer = styled(Drawer)(({ theme }: any) => ({
   '& .MuiDrawer-paper': {
     width: 280,
     backgroundColor: 'white',
@@ -373,7 +373,7 @@ const SubscriptionDashboard: React.FC = () => {
             placement="bottom-end"
             transition
           >
-            {({ TransitionProps, placement }) => (
+            {({ TransitionProps, placement }: any) => (
               <Grow
                 {...TransitionProps}
                 style={{

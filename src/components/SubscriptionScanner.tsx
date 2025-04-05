@@ -10,7 +10,7 @@ interface SubscriptionScannerProps {
   onScanComplete?: (count: number) => void;
 }
 
-const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScanComplete }) => {
+const SubscriptionScanner: React.FC<SubscriptionScannerProps> = ({ onScanComplete }: any) => {
   const { scanEmails, subscriptionState } = useAuth();
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
