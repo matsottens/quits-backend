@@ -10,4 +10,6 @@ export function useIsomorphicLayoutEffect(
     return useLayoutEffect(effect, deps)
   }
   return useEffect(effect, deps)
-} 
+}
+
+export { useSubscriptions } from './useSubscriptions'; 

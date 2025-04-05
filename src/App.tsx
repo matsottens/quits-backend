@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Layout } from './components/layout/Layout';
 import { Login } from './components/auth/Login';
 import { SignUp } from './components/auth/SignUp';
+import { PhoneNumberInput } from './components/auth/PhoneNumberInput';
 import { Dashboard } from './components/dashboard/Dashboard';
 import Settings from './components/settings/Settings';
 import OAuthRedirect from './components/auth/OAuthRedirect';
@@ -75,6 +76,11 @@ const AppRouter: React.FC = () => {
         <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/signin" />} />
         <Route path="/signin" element={user ? <Navigate to="/dashboard" /> : <SignIn />} />
         <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <SignUp />} />
+        <Route path="/phone-number" element={
+          <ProtectedRoute>
+            <PhoneNumberInput />
+          </ProtectedRoute>
+        } />
         <Route path="/auth/google/callback" element={<OAuthRedirect />} />
         <Route path="/auth/consent" element={<EmailOAuthConsent />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
