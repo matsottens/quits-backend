@@ -82,6 +82,7 @@ export default defineConfig({
         target: API_URL,
         changeOrigin: true,
         secure: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
@@ -109,9 +110,17 @@ export default defineConfig({
   esbuild: {
     target: 'es2020',
   },
-  // Skip TypeScript checking to avoid issues in build environment
-  typescript: {
-    // Skip type checking during build
-    typeCheck: false,
-  },
+  preview: {
+    port: 3000,
+    open: true,
+    cors: true,
+    proxy: {
+      '/api': {
+        target: API_URL,
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
+    }
+  }
 }); 
