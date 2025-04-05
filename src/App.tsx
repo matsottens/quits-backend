@@ -1,5 +1,5 @@
 import '@fontsource-variable/inter';
-import React from 'react';
+import * as React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { Login } from './components/auth/Login';
@@ -18,7 +18,7 @@ import PrivateRoute from './components/PrivateRoute';
 import SignIn from './pages/SignIn';
 
 // Protected Route component with Layout
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children  }: any) => {
   const { user, isLoading } = useAuth();
   
   if (isLoading) {
@@ -37,7 +37,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 // Public Route component - redirects to dashboard if already authenticated
-const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children  }: any) => {
   const { user, isLoading } = useAuth();
   
   if (isLoading) {
