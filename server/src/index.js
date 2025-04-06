@@ -1617,6 +1617,67 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Gmail token test endpoint
+app.post('/api/test-gmail-token', corsMiddleware, async (req, res) => {
+  try {
+    const gmailToken = req.headers['x-gmail-token'];
+    const userId = req.headers['x-user-id'];
+    
+    if (!gmailToken) {
+      return res.status(401).json({ error: 'No Gmail token provided' });
+    }
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'No user ID provided' });
+    }
+    
+    // Create Gmail client with token
+    const gmail = createGmailClient(gmailToken);
+    
+    try {
+      // Try a simple Gmail API call to check token validity
+      const profile = await gmail.users.getProfile({
+        userId: 'me'
+      });
+      
+      // Return user profile as validation of token
+      res.json({
+        success: true,
+        message: 'Gmail token is valid',
+        profile: {
+          email: profile.data.emailAddress,
+          messagesTotal: profile.data.messagesTotal,
+          threadsTotal: profile.data.threadsTotal
+        }
+      });
+    } catch (gmailError) {
+      console.error('Gmail token test failed:', gmailError);
+      
+      // Check if token is expired
+      if (gmailError.response && gmailError.response.data && gmailError.response.data.error === 'invalid_grant') {
+        return res.status(401).json({
+          error: 'Gmail token expired',
+          message: 'Your Gmail authorization has expired. Please authenticate again.',
+          details: gmailError.response.data
+        });
+      }
+      
+      return res.status(401).json({
+        error: 'Gmail API error',
+        message: 'Error validating Gmail token',
+        details: gmailError.message
+      });
+    }
+  } catch (error) {
+    console.error('Error testing Gmail token:', error);
+    res.status(500).json({
+      error: 'Server error',
+      message: 'Failed to test Gmail token',
+      details: error.message
+    });
+  }
+});
+
 app.get('/', (req, res) => {
   // Check if the request wants HTML (browser) or JSON (API client)
   const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');

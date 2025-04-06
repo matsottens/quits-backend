@@ -55,7 +55,7 @@ const corsMiddleware = (req, res, next) => {
       ...req.headers,
       authorization: req.headers.authorization ? '[REDACTED]' : undefined,
       'x-gmail-token': req.headers['x-gmail-token'] ? '[REDACTED]' : undefined,
-      cookie: req.headers.cookie ? '[REDACTED]' : undefined
+      'x-user-id': req.headers['x-user-id'] ? '[REDACTED]' : undefined
     },
     query: req.query,
     body: req.body,
@@ -76,53 +76,28 @@ const corsMiddleware = (req, res, next) => {
     allowedOrigins: corsConfig.allowedOrigins
   });
 
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    logCorsInfo(requestId, {
-      type: 'preflight_request',
-      method: req.method,
-      headers: req.headers
-    });
-
-    const corsHeaders = corsConfig.getCorsHeaders(origin);
+  // Special handling for /api/scan-emails endpoint
+  if (req.path === '/api/scan-emails') {
+    console.log('[CORS] Email scan endpoint hit - applying special CORS handling');
     
-    if (corsHeaders) {
-      // Set CORS headers
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        res.setHeader(key, value);
-      });
-
-      // Log successful preflight
-      logCorsInfo(requestId, {
-        type: 'preflight_success',
-        headers: corsHeaders,
-        responseHeaders: res.getHeaders()
-      });
-
-      // End the preflight request
-      res.status(204).end();
-    } else {
-      // Log failed preflight
-      logCorsInfo(requestId, {
-        type: 'preflight_failed',
-        reason: 'origin_not_allowed',
-        origin,
-        allowedOrigins: corsConfig.allowedOrigins
-      });
-
-      // Reject the preflight request
-      res.status(403).json({
-        error: 'CORS error',
-        message: 'Origin not allowed',
-        requestId,
-        origin,
-        allowedOrigins: corsConfig.allowedOrigins
-      });
+    // For preflight requests
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Gmail-Token, X-User-ID, Origin, X-Requested-With, Accept');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      return res.status(204).end();
     }
-    return;
+    
+    // For actual requests
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
   }
-
-  // Handle actual requests
+  
+  // Get the CORS headers based on origin
   const corsHeaders = corsConfig.getCorsHeaders(origin);
   
   if (corsHeaders) {
