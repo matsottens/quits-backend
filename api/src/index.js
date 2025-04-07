@@ -241,6 +241,44 @@ app.post('/api/scan-emails', requireAuth, async (req, res) => {
   }
 });
 
+// CORS test endpoint
+app.get('/api/cors-test', (req, res) => {
+  // Log the request
+  console.log('CORS test request received:', {
+    origin: req.headers.origin,
+    method: req.method,
+    path: req.path,
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '[REDACTED]' : undefined,
+    }
+  });
+  
+  // Return details about the request
+  res.json({
+    success: true,
+    message: 'CORS test successful',
+    request: {
+      origin: req.headers.origin,
+      method: req.method,
+      path: req.path,
+      host: req.headers.host,
+      referer: req.headers.referer,
+      userAgent: req.headers['user-agent']
+    },
+    headers: {
+      cors: {
+        'access-control-allow-origin': res.getHeader('Access-Control-Allow-Origin'),
+        'access-control-allow-methods': res.getHeader('Access-Control-Allow-Methods'),
+        'access-control-allow-headers': res.getHeader('Access-Control-Allow-Headers'),
+        'access-control-allow-credentials': res.getHeader('Access-Control-Allow-Credentials'),
+        'vary': res.getHeader('Vary')
+      }
+    },
+    allowedOrigins
+  });
+});
+
 // Print registered routes
 app._router.stack.forEach((r) => {
   if (r.route && r.route.path) {
